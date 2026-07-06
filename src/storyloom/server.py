@@ -18,10 +18,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
-from storyloom.api_client import ApiClient
-from storyloom.game_loop import GameLoop, GameState
+from storyloom.io.api_client import ApiClient
+from storyloom.core.game_loop import GameLoop, GameState
 from storyloom.main import DEFAULT_STORY_CONFIG, SAMPLE_OUTLINE
-from storyloom.streaming_parser import StreamingXmlParser, EventType
+from storyloom.parser.streaming_parser import StreamingXmlParser, EventType
 from storyloom.web_display import WebDisplay
 
 # ── Request models ──────────────────────────────────────────────────

@@ -6,7 +6,7 @@ the FastAPI SSE layer to drain and push to the browser.
 """
 
 import threading
-from storyloom.xml_parser import Segment
+from storyloom.parser.xml_parser import Segment
 
 
 class WebDisplay:
