@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storyloom — 共创故事</title>
+    <style>
+        :root {
+            --bg-dark: #07090f;
+            --bg-light: #161a2b;
+            --surface-color: rgba(22, 26, 43, 0.65);
+            --surface-border: rgba(129, 140, 248, 0.2);
+            --text-main: #d1d5db;
+            --text-title: #f3f4f6;
+            --text-highlight: #818cf8;
+            --accent-color: #6366f1;
+            --system-color: #fbbf24;
+            --danger-color: #f43f5e;
+            --border-radius: 16px;
+            --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-story: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: var(--font-ui);
+            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-light) 100%);
+            color: var(--text-main);
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; overflow: hidden;
+            background-image:
+                radial-gradient(circle at 15% 50%, rgba(129,140,248,0.05), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(99,102,241,0.05), transparent 25%);
+        }
+        .container {
+            width: 100%; max-width: 750px; height: 92vh; display: flex; flex-direction: column;
+            background: var(--surface-color);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--surface-border); border-radius: var(--border-radius);
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+            overflow: hidden;
+        }
+        .header {
+            padding: 28px 40px 16px; text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .header h1 { font-size: 1.4rem; color: var(--text-title); font-weight: 600; letter-spacing: 2px; }
+        .header .sub { font-size: 0.8rem; color: #9ca3af; margin-top: 4px; }
+
+        .chat-area {
+            flex: 1; padding: 30px 40px; overflow-y: auto;
+            font-family: var(--font-story); line-height: 2;
+        }
+        .chat-area::-webkit-scrollbar { width: 5px; }
+        .chat-area::-webkit-scrollbar-track { background: transparent; }
+        .chat-area::-webkit-scrollbar-thumb { background: rgba(129,140,248,0.2); border-radius: 10px; }
+
+        .msg-user {
+            color: var(--text-highlight); text-align: right; margin: 14px 0;
+            padding: 8px 16px; background: rgba(99,102,241,0.1);
+            border-radius: 12px 4px 12px 12px;
+            animation: fadeIn 0.3s ease-out; font-style: italic;
+        }
+        .msg-system {
+            text-align: center; color: #9ca3af; font-size: 0.85rem;
+            margin: 16px 0; font-style: italic;
+        }
+        .msg-llm {
+            color: var(--text-main); margin: 18px 0; padding: 12px 18px;
+            background: rgba(129,140,248,0.06); border-left: 3px solid var(--text-highlight);
+            border-radius: 0 8px 8px 0; animation: fadeIn 0.4s ease-out;
+            white-space: pre-wrap;
+        }
+        .msg-error {
+            color: var(--danger-color); text-align: center; margin: 12px 0;
+            font-size: 0.85rem; background: rgba(244,63,94,0.1);
+            padding: 8px; border-radius: 8px;
+        }
+        .msg-wait {
+            text-align: center; color: var(--text-highlight); margin: 12px 0;
+            font-size: 0.85rem; animation: pulse 2s infinite;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .spinner {
+            width: 14px; height: 14px;
+            border: 2px solid rgba(129,140,248,0.2);
+            border-top-color: var(--text-highlight); border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .result-card {
+            margin: 24px 0; padding: 20px; background: rgba(99,102,241,0.08);
+            border: 1px solid rgba(129,140,248,0.2); border-radius: 12px;
+            animation: fadeIn 0.5s ease-out;
+        }
+        .result-card h3 { color: var(--text-title); margin-bottom: 12px; font-size: 1rem; }
+        .result-card .item { margin: 6px 0; font-size: 0.9rem; color: var(--text-main); }
+        .result-card .item strong { color: var(--text-highlight); }
+
+        .input-area {
+            padding: 20px 40px 28px; background: rgba(7,9,15,0.8);
+            border-top: 1px solid rgba(255,255,255,0.05);
+            display: flex; gap: 12px; align-items: center;
+        }
+        .input-area input {
+            flex: 1; background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1); color: var(--text-title);
+            padding: 12px 18px; border-radius: 10px; font-size: 1rem;
+            font-family: inherit; outline: none; transition: border-color 0.3s;
+        }
+        .input-area input:focus { border-color: var(--text-highlight); }
+        .input-area input::placeholder { color: #6b7280; }
+        .input-area button {
+            background: var(--accent-color); color: #fff; border: none;
+            padding: 12px 28px; border-radius: 10px; font-size: 0.95rem;
+            cursor: pointer; font-weight: 500; transition: all 0.3s; white-space: nowrap;
+        }
+        .input-area button:hover { background: var(--text-highlight); color: #000; }
+        .input-area button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .start-game-btn {
+            display: block; margin: 16px auto; background: var(--accent-color);
+            color: #fff; border: none; padding: 14px 48px; border-radius: 12px;
+            font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.3s;
+            box-shadow: 0 8px 20px rgba(99,102,241,0.3);
+        }
+        .start-game-btn:hover { background: var(--text-highlight); color: #000; transform: translateY(-2px); }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>共创你的故事</h1>
+        <div class="sub">Co-Creation — Story Setup</div>
+    </div>
+    <div class="chat-area" id="chat-area">
+        <p class="msg-system" id="placeholder">
+            描述你想体验的故事，AI 会与你对话完善设定。<br>
+            <span style="color:#6b7280">例如："一个赛博朋克爱情故事" 或 "武侠江湖冒险"</span>
+        </p>
+    </div>
+    <div class="input-area" id="input-area">
+        <input type="text" id="user-input" placeholder="输入你的故事想法..." autocomplete="off">
+        <button id="send-btn" onclick="sendMessage()">发送</button>
+    </div>
+</div>
+
+<script>
+const API = '';
+let sessionId = null;
+let eventSource = null;
+let awaitingPrompt = false;
+let finalResult = null;
+let cocreateComplete = false;  // suppress error after result
+
+// ── Helpers ────────────────────────────────────────────────────
+async function apiPost(path, body = {}) {
+    const res = await fetch(API + path, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || 'Request failed');
+    }
+    return res.json();
+}
+
+// ── SSE ────────────────────────────────────────────────────────
+function connectSSE() {
+    if (eventSource) eventSource.close();
+    cocreateComplete = false;
+    eventSource = new EventSource(API + `/api/cocreate/${sessionId}/stream`);
+
+    eventSource.addEventListener('output', (e) => {
+        const data = JSON.parse(e.data);
+        appendLLM(data.text);
+    });
+
+    eventSource.addEventListener('wait', (e) => {
+        appendWait(JSON.parse(e.data).message);
+    });
+
+    eventSource.addEventListener('error', (e) => {
+        if (cocreateComplete) return;  // stream closed after result — normal
+        try {
+            appendError('⚠ ' + JSON.parse(e.data).message);
+        } catch (_) {
+            appendError('⚠ 连接异常');
+        }
+        setInputEnabled(true);
+    });
+
+    eventSource.addEventListener('prompt', (e) => {
+        const data = JSON.parse(e.data);
+        awaitingPrompt = true;
+        removeWaits();
+        setInputEnabled(true);
+        document.getElementById('user-input').placeholder = data.text || '输入你的回答...';
+        document.getElementById('user-input').focus();
+    });
+
+    eventSource.addEventListener('result', (e) => {
+        const data = JSON.parse(e.data);
+        finalResult = data;
+        cocreateComplete = true;
+        awaitingPrompt = false;
+        removeWaits();
+        setInputEnabled(false);
+        showResultCard(data);
+    });
+
+    eventSource.addEventListener('heartbeat', () => {});
+}
+
+// ── Actions ────────────────────────────────────────────────────
+async function startCocreate(seed) {
+    appendWait('正在联系故事编织者...');
+    setInputEnabled(false);
+    try {
+        const data = await apiPost('/api/cocreate', { seed });
+        sessionId = data.session_id;
+        connectSSE();
+    } catch (err) {
+        appendError('⚠ ' + err.message);
+        setInputEnabled(true);
+    }
+}
+
+function sendMessage() {
+    const input = document.getElementById('user-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    if (!sessionId) {
+        input.value = '';
+        document.getElementById('placeholder')?.remove();
+        appendUser(text);
+        startCocreate(text);
+    } else if (awaitingPrompt) {
+        input.value = '';
+        input.placeholder = '等待回复...';
+        appendUser(text);
+        setInputEnabled(false);
+        apiPost(`/api/cocreate/${sessionId}/input`, { answer: text })
+            .catch(err => { appendError('⚠ ' + err.message); setInputEnabled(true); });
+    }
+}
+
+// ── UI ─────────────────────────────────────────────────────────
+function appendUser(text) {
+    const area = document.getElementById('chat-area');
+    const div = document.createElement('div');
+    div.className = 'msg-user';
+    div.textContent = text;
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+}
+
+function appendLLM(text) {
+    removeWaits();
+    const area = document.getElementById('chat-area');
+    document.getElementById('placeholder')?.remove();
+    // Filter out raw config blocks (=== xxx ===)
+    const cleaned = text.replace(/^={3,}\s*\w+\s*={3,}$[\s\S]*?(?=^={3,}|\Z)/gm, '');
+    if (!cleaned.trim()) return;
+    const div = document.createElement('div');
+    div.className = 'msg-llm';
+    div.textContent = cleaned.trim();
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+}
+
+function appendWait(msg) {
+    removeWaits();
+    const area = document.getElementById('chat-area');
+    const div = document.createElement('div');
+    div.className = 'msg-wait';
+    div.id = 'wait-msg';
+    div.innerHTML = '<div class="spinner"></div> ' + msg;
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+}
+
+function removeWaits() {
+    document.querySelectorAll('.msg-wait').forEach(e => e.remove());
+}
+
+function appendError(msg) {
+    removeWaits();
+    const area = document.getElementById('chat-area');
+    const div = document.createElement('div');
+    div.className = 'msg-error';
+    div.textContent = msg;
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+}
+
+function setInputEnabled(enabled) {
+    document.getElementById('user-input').disabled = !enabled;
+    document.getElementById('send-btn').disabled = !enabled;
+}
+
+function showResultCard(data) {
+    const area = document.getElementById('chat-area');
+    const cfg = data.story_config || {};
+    const outline = data.outline_text || '';
+    const vars = (cfg.variables || []).map(v =>
+        v.name + ' (' + v.type + ')')
+    .join('、');
+
+    const div = document.createElement('div');
+    div.className = 'result-card';
+    div.innerHTML =
+        '<h3>✦ 故事设定完成</h3>' +
+        '<div class="item"><strong>类型</strong>：' + escapeHtml(cfg.genre || '') + ' · ' + escapeHtml(cfg.setting || '') + '</div>' +
+        '<div class="item"><strong>主角</strong>：' + escapeHtml(cfg.protagonist_name || '') + ' — ' + escapeHtml(cfg.protagonist_identity || '') + '</div>' +
+        '<div class="item"><strong>特质</strong>：' + escapeHtml(cfg.protagonist_traits || '') + '</div>' +
+        '<div class="item"><strong>风格</strong>：' + escapeHtml(cfg.tone || '') + '</div>' +
+        '<div class="item"><strong>冲突</strong>：' + escapeHtml(cfg.conflict || '') + '</div>' +
+        '<div class="item"><strong>变量</strong>：' + escapeHtml(vars || '(无)') + '</div>' +
+        '<div class="item" style="margin-top:8px;font-size:0.8rem;color:#9ca3af;">' +
+            escapeHtml(outline.split('\n').slice(0, 8).join(' · ')) +
+            (outline.split('\n').length > 8 ? ' …' : '') +
+        '</div>' +
+        '<button class="start-game-btn" onclick="launchGame()">开始冒险 →</button>';
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+    document.getElementById('input-area').style.display = 'none';
+}
+
+function escapeHtml(s) {
+    const el = document.createElement('span');
+    el.textContent = s;
+    return el.innerHTML;
+}
+
+function launchGame() {
+    if (finalResult) {
+        sessionStorage.setItem('cocreate_result', JSON.stringify(finalResult));
+    }
+    window.location.href = '/';
+}
+
+// ── Keyboard ───────────────────────────────────────────────────
+document.getElementById('user-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage();
+});
+</script>
+</body>
+</html>

@@ -6,241 +6,323 @@
     <title>Storyloom — AI 互动小说</title>
     <style>
         :root {
-            --bg-color: #0b0c10;
-            --surface-color: #1f2833;
-            --text-main: #c5c6c7;
-            --text-highlight: #66fcf1;
-            --accent-color: #45a29e;
-            --system-color: #f39c12;
-            --danger-color: #e74c3c;
-            --border-radius: 12px;
+            /* 现代化深色毛玻璃调色板 */
+            --bg-dark: #07090f;
+            --bg-light: #161a2b;
+            --surface-color: rgba(22, 26, 43, 0.65);
+            --surface-border: rgba(45, 212, 191, 0.15);
+            
+            --text-main: #d1d5db;      /* 柔和的正文颜色，防疲劳 */
+            --text-title: #f3f4f6;
+            --text-highlight: #2dd4bf; /* 强调色：薄荷青 */
+            --accent-color: #0d9488;
+            --system-color: #fbbf24;
+            --danger-color: #f43f5e;
+            
+            --border-radius: 16px;
+            --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --font-story: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", serif;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: var(--bg-color);
+            font-family: var(--font-ui);
+            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-light) 100%);
             color: var(--text-main);
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background-image: radial-gradient(circle at 50% 0%, #1f2833 0%, #0b0c10 70%);
+            overflow: hidden;
+            /* 背景环境光晕 */
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(45, 212, 191, 0.05), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(129, 140, 248, 0.05), transparent 25%);
         }
 
         .game-container {
             width: 100%;
-            max-width: 850px;
-            height: 95vh;
+            max-width: 900px;
+            height: 92vh;
             display: flex;
             flex-direction: column;
-            background: rgba(31, 40, 51, 0.75);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(102, 252, 241, 0.15);
+            background: var(--surface-color);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--surface-border);
             border-radius: var(--border-radius);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
             overflow: hidden;
+            transition: all 0.3s ease;
         }
 
-        /* ── Dashboard ─────────────────────────── */
+        /* ── Dashboard (仪表盘) ─────────────────────────── */
         .dashboard {
-            padding: 20px 30px;
-            background: rgba(11, 12, 16, 0.85);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 24px 36px;
+            background: rgba(7, 9, 15, 0.6);
+            border-bottom: 1px solid var(--surface-border);
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
+            gap: 40px;
         }
 
         .stats-area {
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            max-width: 300px;
+            gap: 14px;
+            max-width: 320px;
         }
 
         .stat-row {
             display: flex;
             align-items: center;
-            font-size: 0.9rem;
-            font-weight: 600;
+            font-size: 0.85rem;
+            font-weight: 500;
+            letter-spacing: 0.5px;
         }
 
         .stat-label {
-            width: 70px;
-            color: var(--text-main);
+            width: 75px;
+            color: var(--text-title);
+            text-transform: uppercase;
         }
 
         .stat-bar-bg {
             flex: 1;
-            height: 10px;
-            background: #333;
-            border-radius: 5px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 4px;
             overflow: hidden;
             margin-right: 15px;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
         }
 
         .stat-bar-fill {
             height: 100%;
-            border-radius: 5px;
-            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 4px;
+            transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+        }
+        
+        /* 进度条高光效果 */
+        .stat-bar-fill::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%);
+            animation: shimmer 2s infinite linear;
         }
 
         .stat-value {
-            width: 55px;
+            width: 45px;
             text-align: right;
             font-variant-numeric: tabular-nums;
+            color: var(--text-title);
         }
 
         .inventory-area {
             flex: 1.5;
             padding-left: 30px;
-            border-left: 1px solid rgba(255,255,255,0.1);
+            border-left: 1px solid rgba(255,255,255,0.05);
         }
 
         .inventory-title {
-            font-size: 0.8rem;
-            color: #888;
-            margin-bottom: 8px;
+            font-size: 0.75rem;
+            color: #9ca3af;
+            margin-bottom: 12px;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
+            font-weight: 600;
         }
 
         .inventory-tags {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 10px;
         }
 
         .inv-tag {
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 4px 12px;
+            padding: 6px 14px;
             border-radius: 20px;
-            font-size: 0.85rem;
-            color: #ddd;
+            font-size: 0.8rem;
+            color: var(--text-main);
+            backdrop-filter: blur(4px);
+            transition: all 0.3s ease;
+        }
+        
+        .inv-tag:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-1px);
         }
 
-        .tag-section { margin-bottom: 12px; }
-        .tag-section-label { font-size: 0.75rem; color: #666; margin-bottom: 4px; }
-
-        /* ── Narrative area ────────────────────── */
+        /* ── Narrative area (阅读区) ────────────────────── */
         .narrative-area {
             flex: 1;
-            padding: 30px 40px;
+            padding: 40px 48px;
             overflow-y: auto;
-            line-height: 2;
-            font-size: 1.1rem;
+            line-height: 2.2;
+            font-size: 1.05rem;
+            font-family: var(--font-story);
             scroll-behavior: smooth;
         }
 
+        /* 优雅的滚动条 */
         .narrative-area::-webkit-scrollbar { width: 6px; }
-        .narrative-area::-webkit-scrollbar-thumb { background: var(--accent-color); border-radius: 10px; }
-
-        .story-char { animation: fadeIn 0.05s ease-in forwards; opacity: 0; }
+        .narrative-area::-webkit-scrollbar-track { background: transparent; }
+        .narrative-area::-webkit-scrollbar-thumb { 
+            background: rgba(45, 212, 191, 0.2); 
+            border-radius: 10px; 
+        }
+        .narrative-area::-webkit-scrollbar-thumb:hover { background: rgba(45, 212, 191, 0.5); }
 
         .player-action {
             color: var(--text-highlight);
-            margin: 25px 0;
+            margin: 30px 0;
             font-weight: 500;
-            padding: 10px 15px;
-            background: rgba(102, 252, 241, 0.05);
+            padding: 12px 20px;
+            background: linear-gradient(90deg, rgba(45, 212, 191, 0.1) 0%, transparent 100%);
             border-left: 3px solid var(--text-highlight);
             border-radius: 0 8px 8px 0;
+            font-style: italic;
         }
 
         .system-message {
             color: var(--system-color);
-            margin: 15px 0;
-            font-size: 0.95rem;
+            margin: 20px 0;
+            font-size: 0.9rem;
             text-align: center;
-            font-style: italic;
+            font-style: normal;
+            opacity: 0.8;
+            background: rgba(251, 191, 36, 0.1);
+            padding: 8px;
+            border-radius: 8px;
         }
 
-        /* ── Control area ──────────────────────── */
+        /* ── Control area (控制区) ──────────────────────── */
         .control-area {
-            padding: 25px 30px;
-            background: rgba(11, 12, 16, 0.95);
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-            min-height: 80px;
+            padding: 24px 36px;
+            background: rgba(7, 9, 15, 0.8);
+            border-top: 1px solid var(--surface-border);
+            min-height: 90px;
             display: flex;
-            gap: 15px;
+            gap: 16px;
             justify-content: center;
             align-items: center;
             flex-wrap: wrap;
         }
 
         .choice-btn {
-            background: rgba(69, 162, 158, 0.1);
-            color: var(--text-highlight);
-            border: 1px solid var(--accent-color);
+            background: rgba(22, 26, 43, 0.8);
+            color: var(--text-title);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 1rem;
+            border-radius: 12px;
+            font-size: 0.95rem;
             cursor: pointer;
-            transition: all 0.3s ease;
-            min-width: 120px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            min-width: 140px;
+            font-family: inherit;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .choice-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(45deg, transparent, rgba(45, 212, 191, 0.1), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.5s ease;
         }
 
         .choice-btn:hover:not(:disabled) {
-            background: var(--accent-color);
-            color: #fff;
+            background: rgba(45, 212, 191, 0.15);
+            border-color: var(--text-highlight);
+            color: var(--text-highlight);
             transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(45, 212, 191, 0.15);
+        }
+
+        .choice-btn:hover:not(:disabled)::before {
+            transform: translateX(100%);
+        }
+
+        .choice-btn:active:not(:disabled) {
+            transform: translateY(0);
         }
 
         .choice-btn:disabled {
             opacity: 0.4;
             cursor: not-allowed;
+            background: rgba(0,0,0,0.2);
         }
 
         .start-btn {
-            background: rgba(102, 252, 241, 0.15);
-            color: var(--text-highlight);
-            border: 2px solid var(--text-highlight);
-            padding: 14px 40px;
-            border-radius: 8px;
-            font-size: 1.2rem;
+            background: var(--accent-color);
+            color: #fff;
+            border: none;
+            padding: 14px 48px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(13, 148, 136, 0.3);
         }
 
         .start-btn:hover {
             background: var(--text-highlight);
             color: #000;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(45, 212, 191, 0.4);
         }
 
         .loading-text {
-            color: var(--accent-color);
+            color: var(--text-highlight);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            font-size: 0.95rem;
+            letter-spacing: 1px;
+            animation: pulse 2s infinite;
         }
 
         .spinner {
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(69, 162, 158, 0.3);
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(45, 212, 191, 0.2);
             border-top-color: var(--text-highlight);
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            animation: spin 0.8s linear infinite;
         }
 
-        /* ── Animations ────────────────────────── */
-        @keyframes fadeIn { to { opacity: 1; } }
+        /* ── Animations (动画) ────────────────────────── */
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); } 
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        @keyframes shimmer { 100% { transform: translateX(100%); } }
+        
         @keyframes flashHighlight {
-            0% { background-color: rgba(102, 252, 241, 0.8); color: #000; box-shadow: 0 0 15px var(--text-highlight); }
-            100% { background-color: transparent; color: inherit; box-shadow: none; }
+            0% { background-color: rgba(45, 212, 191, 0.4); color: #fff; box-shadow: 0 0 15px var(--text-highlight); }
+            100% { background-color: rgba(255, 255, 255, 0.05); color: inherit; box-shadow: none; }
         }
         @keyframes flashDanger {
-            0% { background-color: rgba(231, 76, 60, 0.8); box-shadow: 0 0 15px var(--danger-color); }
+            0% { background-color: rgba(244, 63, 94, 0.4); box-shadow: 0 0 15px var(--danger-color); }
             100% { background-color: transparent; box-shadow: none; }
         }
 
-        .flash-update { animation: flashHighlight 1s ease-out; }
-        .flash-danger  { animation: flashDanger 1s ease-out; }
+        .flash-update { animation: flashHighlight 1.2s ease-out forwards; }
+        .flash-danger  { animation: flashDanger 1.2s ease-out; }
     </style>
 </head>
 <body>
@@ -249,21 +331,22 @@
     <div class="dashboard" id="dashboard">
         <div class="stats-area" id="stats-area"></div>
         <div class="inventory-area">
-            <div class="inventory-title">持有物品</div>
+            <div class="inventory-title">持有物品 (Inventory)</div>
             <div class="inventory-tags" id="inventory-list"></div>
         </div>
     </div>
 
     <div class="narrative-area" id="narrative-area">
-        <p style="color:#888; text-align:center; margin-top:120px;">
-            点击下方按钮开始你的故事
+        <p class="placeholder" style="color:#6b7280; text-align:center; margin-top:120px; font-weight:300; letter-spacing:2px;">
+            ✦ 点击下方按钮，唤醒属于你的故事 ✦
         </p>
     </div>
 
     <div class="control-area" id="control-area">
         <button class="start-btn" id="start-btn" onclick="startGame()">开始游戏</button>
+        <button class="start-btn" id="cocreate-btn" onclick="goCocreate()" style="background:rgba(99,102,241,0.3);border-color:#818cf8;color:#c7d2fe;">共创故事</button>
         <div class="loading-text" id="loading-text" style="display:none">
-            <div class="spinner"></div> 命运正在交织...
+            <div class="spinner"></div> 命运的丝线正在交织...
         </div>
     </div>
 </div>
@@ -304,30 +387,20 @@ function connectSSE() {
     eventSource.addEventListener('token', (e) => {
         const data = JSON.parse(e.data);
         tokenCharCount += data.text.length;
-        // First token of a new round — clear loading, show progress
         if (!tokenContainer) {
             showLoading(false);
             const placeholder = document.getElementById('narrative-area').querySelector('.placeholder');
             if (placeholder) placeholder.remove();
             tokenContainer = document.createElement('div');
-            tokenContainer.className = 'system-message';
-            tokenContainer.style.marginBottom = '20px';
-            tokenContainer.innerHTML = '正在生成... <span class="progress">已接收 ' + tokenCharCount + ' 字</span>';
+            tokenContainer.style.display = 'none'; 
             document.getElementById('narrative-area').appendChild(tokenContainer);
-        } else {
-            // Update live character count
-            const progressEl = tokenContainer.querySelector('.progress');
-            if (progressEl) progressEl.textContent = '已接收 ' + tokenCharCount + ' 字';
         }
-        scrollToBottom();
     });
 
     eventSource.addEventListener('segment', (e) => {
         const data = JSON.parse(e.data);
         segmentQueue.push(data.text);
-        // Start paced display if not already running
         if (!segmentTimer) {
-            // First segment — clear progress indicator
             if (tokenContainer) {
                 tokenContainer.remove();
                 tokenContainer = null;
@@ -363,48 +436,60 @@ function connectSSE() {
 
     eventSource.addEventListener('done', (e) => {
         showLoading(false);
-        // If no choices rendered, the story continues automatically
         if (!currentChoices) {
             showLoading(true);
         }
     });
 
-    eventSource.addEventListener('heartbeat', () => {
-        // keepalive — nothing to do
-    });
+    eventSource.addEventListener('heartbeat', () => {});
 
-    eventSource.onerror = () => {
-        // EventSource will auto-reconnect
-    };
+    eventSource.onerror = () => {};
 }
 
 // ── Game actions ───────────────────────────────────────────────────
 async function startGame() {
-    const startBtn = document.getElementById('start-btn');
-    startBtn.style.display = 'none';
+    document.getElementById('start-btn').style.display = 'none';
+    document.getElementById('cocreate-btn').style.display = 'none';
     clearNarrative();
     showLoading(true);
 
+    // Check for co-creation result from the cocreate page
+    const cocreateResult = sessionStorage.getItem('cocreate_result');
+    const body = {};
+    if (cocreateResult) {
+        try {
+            const parsed = JSON.parse(cocreateResult);
+            body.story_config = parsed.story_config;
+            body.outline_text = parsed.outline_text;
+            sessionStorage.removeItem('cocreate_result');
+        } catch (_) {}
+    }
+
     try {
-        const data = await apiPost('/api/game/new');
+        const data = await apiPost('/api/game/new', body);
         sessionId = data.session_id;
         connectSSE();
     } catch (err) {
         appendSystem('⚠ ' + err.message);
         showLoading(false);
-        startBtn.style.display = 'block';
+        document.getElementById('start-btn').style.display = 'block';
+        document.getElementById('cocreate-btn').style.display = 'block';
     }
 }
 
-async function submitChoice(index) {
-    // Capture choice before clearing
-    const choice = currentChoices ? currentChoices.find(c => c.index === index) : null;
-    hideChoices();  // clears currentChoices, tokenContainer, shows loading
+function goCocreate() {
+    window.location.href = '/cocreate';
+}
 
-    // Show what the player chose
+async function submitChoice(index) {
+    const choice = currentChoices ? currentChoices.find(c => c.index === index) : null;
+    hideChoices();
+
     if (choice) {
         const actionDiv = document.createElement('div');
         actionDiv.className = 'player-action';
+        // 添加轻微的动画效果
+        actionDiv.style.animation = 'fadeIn 0.4s ease-out'; 
         actionDiv.innerText = `> ${choice.label}`;
         document.getElementById('narrative-area').appendChild(actionDiv);
         scrollToBottom();
@@ -412,7 +497,6 @@ async function submitChoice(index) {
 
     try {
         await apiPost(`/api/game/${sessionId}/choice`, { choice_key: String(index) });
-        // SSE stream will deliver the next round automatically
     } catch (err) {
         appendSystem('⚠ ' + err.message);
         showLoading(false);
@@ -421,8 +505,6 @@ async function submitChoice(index) {
 
 // ── UI updates ─────────────────────────────────────────────────────
 function appendSegment(text) {
-    // Called by drainSegmentQueue for paced rendering.
-    // Also used for choice-action labels and other single-line inserts.
     showLoading(false);
     const area = document.getElementById('narrative-area');
 
@@ -430,15 +512,15 @@ function appendSegment(text) {
     if (placeholder) placeholder.remove();
 
     const container = document.createElement('div');
-    container.style.marginBottom = '20px';
-    container.style.animation = 'fadeIn 0.3s ease-in';
+    container.style.marginBottom = '22px';
+    container.style.animation = 'fadeIn 0.5s ease-out';
+    container.style.textAlign = 'center';
     container.textContent = text;
     area.appendChild(container);
     scrollToBottom();
 }
 
 function drainSegmentQueue() {
-    // Pop one segment and display it. Keep going with a delay.
     if (segmentQueue.length === 0) {
         clearInterval(segmentTimer);
         segmentTimer = null;
@@ -447,7 +529,6 @@ function drainSegmentQueue() {
     const text = segmentQueue.shift();
     appendSegment(text);
 
-    // If queue still has content, schedule next pop
     if (segmentQueue.length > 0 && !segmentTimer) {
         segmentTimer = setInterval(() => {
             if (segmentQueue.length === 0) {
@@ -456,7 +537,7 @@ function drainSegmentQueue() {
                 return;
             }
             appendSegment(segmentQueue.shift());
-        }, 350);  // ~350ms between segments — comfortable reading pace
+        }, 3000);  // 3s between segments
     }
 }
 
@@ -486,7 +567,8 @@ function renderChoices(options) {
     options.forEach(opt => {
         const btn = document.createElement('button');
         btn.className = 'choice-btn';
-        btn.textContent = `[${opt.index}] ${opt.label}`;
+        // 去掉前面的数字索引，让按钮看起来更简洁现代
+        btn.textContent = opt.label;
         btn.onclick = () => submitChoice(opt.index);
         btn.id = 'choice-' + opt.index;
         ctrl.appendChild(btn);
@@ -496,11 +578,10 @@ function renderChoices(options) {
 function hideChoices() {
     document.querySelectorAll('.choice-btn').forEach(b => b.remove());
     currentChoices = null;
-    tokenContainer = null;   // reset for next round
+    tokenContainer = null;  
     tokenCharCount = 0;
-    segmentQueue = [];        // clear any pending segments
+    segmentQueue = [];      
     if (segmentTimer) { clearInterval(segmentTimer); segmentTimer = null; }
-    // Switch to loading spinner until tokens arrive
     showLoading(true);
 }
 
@@ -522,15 +603,13 @@ function updateDashboard(stateVars) {
     statsArea.innerHTML = '';
     invList.innerHTML = '';
 
-    // Use the first 3 numeric variables as stat bars
-    // String vars become tags, list vars go to inventory
-    const barColors = ['#45a29e', '#9b59b6', '#e67e22', '#3498db', '#e74c3c'];
+    // 更新为更现代的 Tailwind 色系
+    const barColors = ['#2dd4bf', '#818cf8', '#fbbf24', '#38bdf8', '#f43f5e'];
     let colorIdx = 0;
     let barCount = 0;
 
     for (const [name, value] of Object.entries(stateVars || {})) {
         if (typeof value === 'number' && barCount < 5) {
-            // Render as a stat bar
             const pct = Math.min(100, Math.max(0, value));
             const row = document.createElement('div');
             row.className = 'stat-row';
@@ -539,17 +618,16 @@ function updateDashboard(stateVars) {
             const color = barColors[colorIdx % barColors.length];
             colorIdx++;
 
-            // Flash animation if value dropped
             const prev = lastStateVars[name];
             if (typeof prev === 'number' && prev > value) {
                 row.classList.add('flash-danger');
-                setTimeout(() => row.classList.remove('flash-danger'), 1000);
+                setTimeout(() => row.classList.remove('flash-danger'), 1200);
             }
 
             row.innerHTML = `
                 <div class="stat-label">${name}</div>
                 <div class="stat-bar-bg">
-                    <div class="stat-bar-fill" style="width:${pct}%;background:${color}"></div>
+                    <div class="stat-bar-fill" style="width:${pct}%;background:${color};box-shadow: 0 0 10px ${color}80"></div>
                 </div>
                 <div class="stat-value">${value}</div>
             `;
@@ -557,17 +635,12 @@ function updateDashboard(stateVars) {
             barCount++;
 
         } else if (typeof value === 'string') {
-            // Render as a tag
             const tag = document.createElement('div');
             tag.className = 'inv-tag';
             tag.textContent = `${name}: ${value}`;
-            tag.style.display = 'inline-block';
-            tag.style.marginRight = '8px';
-            tag.style.marginBottom = '4px';
             invList.appendChild(tag);
 
         } else if (Array.isArray(value) && value.length > 0) {
-            // List items
             value.forEach(item => {
                 const tag = document.createElement('div');
                 tag.className = 'inv-tag';

@@ -11,6 +11,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Callable
 
+from storyloom.config import MAX_RETRIES
 from storyloom.io.api_client import ApiClient
 from storyloom.core.context_manager import ContextManager
 from storyloom.io.display import Display
@@ -475,29 +476,49 @@ class GameLoop:
         # Build messages array (Round 1 only has user message)
         messages = [{"role": "user", "content": r1_prompt}]
 
-        # Stream API response token by token
+        # Stream API response with retry on parse failure
         collected: list[str] = []
         ttft: float | None = None
         tokens: dict | None = None
+        parsed = None
+        response = ""
 
-        for chunk in self.api_client.stream_chat_iter(messages):
-            if chunk.get("done"):
-                tokens = chunk.get("usage")
-            else:
-                if chunk.get("ttft") is not None:
-                    ttft = chunk["ttft"]
-                collected.append(chunk["delta"])
-                yield {"type": "token", "text": chunk["delta"]}
+        for attempt in range(MAX_RETRIES + 1):
+            collected.clear()
+            ttft = None
+            tokens = None
 
-        response = "".join(collected)
+            for chunk in self.api_client.stream_chat_iter(messages):
+                if chunk.get("done"):
+                    tokens = chunk.get("usage")
+                else:
+                    if chunk.get("ttft") is not None:
+                        ttft = chunk["ttft"]
+                    collected.append(chunk["delta"])
+                    if attempt == 0:  # yield tokens only on first attempt
+                        yield {"type": "token", "text": chunk["delta"]}
 
-        # Parse response
-        try:
-            parsed = XmlParser.parse(response)
-        except Exception as e:
-            self._format_error = str(e)
-            yield {"type": "error", "message": str(e)}
-            return
+            response = self._preprocess_xml("".join(collected))
+
+            try:
+                parsed = XmlParser.parse(response)
+                break  # success — exit retry loop
+            except Exception as e:
+                if attempt < MAX_RETRIES:
+                    # Ask LLM to fix the format and retry
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            f"XML parse error: {e}. "
+                            "Please fix the XML formatting and re-output "
+                            "the COMPLETE story from <story> to </story>. "
+                            "Make sure all tags are properly closed."
+                        ),
+                    })
+                else:
+                    self._format_error = str(e)
+                    yield {"type": "error", "message": str(e)}
+                    return
 
         # Store in context manager
         self._context_mgr.set_round1(r1_prompt, response)
@@ -730,43 +751,64 @@ class GameLoop:
         messages = self._context_mgr.get_messages()
         messages.append({"role": "user", "content": rn_context})
 
-        # ── Step 6: Stream API response ─────────────────────────────
+        # ── Step 6: Stream API response with retry on parse failure ─
         collected: list[str] = []
         ttft: float | None = None
         tokens: dict | None = None
+        parsed = None
+        response = ""
+        self._format_error = None
 
-        for chunk in self.api_client.stream_chat_iter(messages):
-            if chunk.get("done"):
-                tokens = chunk.get("usage")
-            else:
-                if chunk.get("ttft") is not None:
-                    ttft = chunk["ttft"]
-                collected.append(chunk["delta"])
-                yield {"type": "token", "text": chunk["delta"]}
+        for attempt in range(MAX_RETRIES + 1):
+            collected.clear()
+            ttft = None
+            tokens = None
 
-        response = "".join(collected)
+            for chunk in self.api_client.stream_chat_iter(messages):
+                if chunk.get("done"):
+                    tokens = chunk.get("usage")
+                else:
+                    if chunk.get("ttft") is not None:
+                        ttft = chunk["ttft"]
+                    collected.append(chunk["delta"])
+                    if attempt == 0:  # yield tokens only on first attempt
+                        yield {"type": "token", "text": chunk["delta"]}
 
-        # ── Step 7: Parse response ──────────────────────────────────
-        self._format_error = None  # clear previous error
-        try:
-            parsed = XmlParser.parse(response)
-        except Exception as e:
-            self._format_error = str(e)
-            self._notify(RoundRecord(
-                round_number=self._context_mgr.round_count + 1,
-                messages_sent=messages,
-                raw_response=response,
-                parsed=None,
-                ttft=ttft,
-                tokens=tokens,
-                timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                node=self.current_node,
-                selected_branch=selected_branch,
-            ))
-            yield {"type": "error", "message": str(e)}
-            return
+            response = self._preprocess_xml("".join(collected))
 
-        # ── Step 8: Store round in context manager ──────────────────
+            try:
+                parsed = XmlParser.parse(response)
+                break  # success — exit retry loop
+            except Exception as e:
+                self._format_error = str(e)
+                if attempt < MAX_RETRIES:
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            f"XML parse error: {e}. "
+                            "Please fix the XML formatting and re-output "
+                            "the COMPLETE story from <story> to </story>. "
+                            "Make sure all tags are properly closed."
+                        ),
+                    })
+                else:
+                    self._notify(RoundRecord(
+                        round_number=self._context_mgr.round_count + 1,
+                        messages_sent=messages,
+                        raw_response=response,
+                        parsed=None,
+                        ttft=ttft,
+                        tokens=tokens,
+                        timestamp=time.strftime(
+                            "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+                        ),
+                        node=self.current_node,
+                        selected_branch=selected_branch,
+                    ))
+                    yield {"type": "error", "message": str(e)}
+                    return
+
+        # ── Step 7: Store round in context manager ──────────────────
         self._context_mgr.add_round(rn_context, response, selected_branch)
 
         # ── Step 9: Apply this round's unconditional sets ───────────
@@ -884,6 +926,24 @@ class GameLoop:
             parsed=self.last_parsed,
             round_number=self._context_mgr.round_count,
         )
+
+    # ── XML Preprocessing ────────────────────────────────────────
+
+    @staticmethod
+    def _preprocess_xml(text: str) -> str:
+        """Strip control characters that break XML parsing.
+
+        Removes ASCII control chars (0x00–0x1F) except tab, newline,
+        carriage return. Also strips Unicode zero-width spaces and
+        other invisible codepoints that confuse ElementTree.
+        """
+        # Strip ASCII control chars except \t \n \r
+        text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
+        # Strip Unicode zero-width / invisible codepoints
+        text = text.replace("​", "").replace("‌", "").replace(
+            "‍", ""
+        ).replace("﻿", "")
+        return text
 
     # ── Event Emission ───────────────────────────────────────────
 

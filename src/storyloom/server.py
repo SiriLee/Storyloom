@@ -7,6 +7,7 @@ Run with:
 import asyncio
 import json
 import os
+import re
 import threading
 import time
 import uuid
@@ -18,11 +19,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
+from storyloom.i18n import init_i18n
 from storyloom.io.api_client import ApiClient
+from storyloom.core.co_create import CoCreateFlow, CoCreationAborted
 from storyloom.core.game_loop import GameLoop, GameState
 from storyloom.main import DEFAULT_STORY_CONFIG, SAMPLE_OUTLINE
 from storyloom.parser.streaming_parser import StreamingXmlParser, EventType
+from storyloom.web_cocreate import WebCoCreateDisplay
 from storyloom.web_display import WebDisplay
+
+# Initialize i18n for web server (same locale dir as CLI)
+init_i18n()
 
 # ── Request models ──────────────────────────────────────────────────
 
@@ -85,7 +92,14 @@ app.add_middleware(
 
 # ── Static files ────────────────────────────────────────────────────
 
-_WEB_DIR = Path(__file__).resolve().parent / "web"
+# Resolve frontend/ directory relative to this source file.
+# Walk up from __file__ until we find a directory containing 'frontend/index.html'.
+_WEB_DIR = Path(__file__).resolve().parent
+for _ in range(5):
+    _WEB_DIR = _WEB_DIR.parent
+    if (_WEB_DIR / "frontend" / "index.html").exists():
+        _WEB_DIR = _WEB_DIR / "frontend"
+        break
 
 
 @app.get("/")
@@ -156,6 +170,8 @@ def _run_stream_round_in_thread(
     """
     wd = session.web_display
     wd.show_wait_message("故事生成中...")
+    # Push initial state snapshot so the dashboard renders immediately
+    wd.show_state(session.game_loop.game_state.state_vars)
 
     line_buf = ""
     parser = StreamingXmlParser()
@@ -168,15 +184,18 @@ def _run_stream_round_in_thread(
                 token_text = event["text"]
                 wd.show_token(token_text)  # frontend progress counter
 
-                # Feed complete lines to streaming parser
+                # Feed complete lines to streaming parser.
+                # DeepSeek occasionally merges lines (missing \n), so we
+                # also split on NNN|  prefixes that appear mid-buffer.
                 line_buf += token_text
+                line_buf = re.sub(r"(?<!\n)(\d{3}\| )", r"\n\1", line_buf)
                 while "\n" in line_buf:
                     raw_line, line_buf = line_buf.split("\n", 1)
                     for pe in parser.feed_line(raw_line):
                         if pe.type == EventType.SEGMENT and pe.text:
                             wd.buffer_segment_dict({
                                 "type": "segment",
-                                "n": 0,  # approximate; frontend ignores
+                                "n": 0,
                                 "text": pe.text,
                                 "position": pe.position,
                                 "branch": None,
@@ -185,6 +204,10 @@ def _run_stream_round_in_thread(
             elif etype == "segment":
                 # Skip — streaming parser already emitted these in real time
                 pass
+
+            elif etype == "state":
+                # GameLoop now yields state after applying sets
+                wd.show_state(event["vars"])
 
             elif etype == "options":
                 wd.buffer_choices_raw(event["choices"])
@@ -284,7 +307,12 @@ async def stream_story(session_id: str, request: Request):
             if await request.is_disconnected():
                 return
 
-            # Drain real-time tokens (push as single string for efficiency)
+            # Drain state FIRST — dashboard should render before text
+            state = wd.drain_state()
+            if state:
+                yield _sse("state", state)
+
+            # Drain real-time tokens (progress counter, not displayed)
             token_text = wd.drain_tokens()
             if token_text:
                 yield _sse("token", {"type": "token", "text": token_text})
@@ -299,11 +327,6 @@ async def stream_story(session_id: str, request: Request):
             choices = wd.drain_choices()
             if choices:
                 yield _sse("choices", choices)
-
-            # Drain state
-            state = wd.drain_state()
-            if state:
-                yield _sse("state", state)
 
             # Drain status messages → wait events
             for msg in wd.drain_status():
@@ -426,6 +449,153 @@ async def end_session(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
     sd.done.set()  # unblock any waiting SSE consumer
     return {"message": "Session ended"}
+
+
+# ── Co-creation routes ──────────────────────────────────────────────
+
+
+class SeedRequest(BaseModel):
+    seed: str
+
+
+# Separate session store for co-creation
+_cocreate_sessions: dict[str, WebCoCreateDisplay] = {}
+_cocreate_lock = threading.Lock()
+
+
+@app.get("/cocreate")
+async def serve_cocreate():
+    """Serve the co-creation frontend."""
+    return FileResponse(_WEB_DIR / "cocreate.html")
+
+
+@app.post("/api/cocreate")
+async def start_cocreate(req: SeedRequest):
+    """Start the co-creation flow with a seed idea.
+
+    Spawns a background thread running CoCreateFlow.run().
+    Returns a session_id for the SSE stream.
+    """
+    try:
+        api_client = ApiClient()
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    display = WebCoCreateDisplay()
+    flow = CoCreateFlow(api_client, display)
+
+    session_id = uuid.uuid4().hex[:12]
+    with _cocreate_lock:
+        _cocreate_sessions[session_id] = display
+
+    def _run():
+        try:
+            result = flow.run()
+            display.set_result(result.story_config, result.outline_text)
+        except CoCreationAborted:
+            display.set_error("aborted")
+        except Exception as e:
+            display.set_error(str(e))
+        finally:
+            display.signal_done()
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+
+    return {"session_id": session_id}
+
+
+@app.get("/api/cocreate/{session_id}/stream")
+async def stream_cocreate(session_id: str, request: Request):
+    """SSE endpoint for co-creation progress."""
+    with _cocreate_lock:
+        display = _cocreate_sessions.get(session_id)
+    if display is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    async def event_generator():
+        last_heartbeat = time.monotonic()
+        was_prompting = False
+
+        while True:
+            if await request.is_disconnected():
+                return
+
+            # Drain output text
+            out_text = display.drain_output()
+            if out_text:
+                yield _sse("output", {"type": "output", "text": out_text})
+
+            # Drain status → wait events
+            for msg in display.drain_status():
+                yield _sse("wait", {"type": "wait", "message": msg})
+
+            # Drain errors
+            for err in display.drain_errors():
+                yield _sse("error", {"type": "error", "message": err})
+
+            # Check for prompt (waiting for user input)
+            if display.has_prompt and not was_prompting:
+                was_prompting = True
+                yield _sse(
+                    "prompt",
+                    {"type": "prompt", "text": display.drain_prompt()},
+                )
+            elif not display.has_prompt:
+                was_prompting = False
+
+            # Check if done
+            if display.done.is_set():
+                if display.error_msg:
+                    yield _sse(
+                        "error",
+                        {"type": "error", "message": display.error_msg},
+                    )
+                else:
+                    yield _sse("result", display.result)
+                return
+
+            # Heartbeat
+            now_ts = time.monotonic()
+            if now_ts - last_heartbeat > 15:
+                yield _sse("heartbeat", {"type": "heartbeat"})
+                last_heartbeat = now_ts
+
+            await asyncio.sleep(0.1)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post("/api/cocreate/{session_id}/input")
+async def cocreate_input(session_id: str, req: dict):
+    """Submit user's answer to the current co-creation prompt."""
+    with _cocreate_lock:
+        display = _cocreate_sessions.get(session_id)
+    if display is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    answer = req.get("answer", "")
+    display.submit_answer(answer)
+    return {"message": "ok"}
+
+
+@app.post("/api/cocreate/{session_id}/abort")
+async def cocreate_abort(session_id: str):
+    """Abort the co-creation flow."""
+    with _cocreate_lock:
+        display = _cocreate_sessions.pop(session_id, None)
+    if display is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    display.submit_answer("退出")
+    return {"message": "aborted"}
 
 
 # ── SSE formatting helper ───────────────────────────────────────────
