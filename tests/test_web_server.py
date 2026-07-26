@@ -209,7 +209,7 @@ class TestCoCreateRetrySend:
 
 
 SAMPLE_STORY_CONFIG = {
-    "genre": "cyberpunk", "tier": "short", "label": "Test",
+    "genre": "cyberpunk", "tier": "short", "title": "Test",
     "language": "zh-CN", "setting": "Test world",
     "protagonist_name": "Tester",
     "protagonist_identity": "Hacker",
@@ -248,7 +248,7 @@ class TestCoCreateGenerate:
         data = res.json()
         assert data["status"] == "ok"
         assert data["game_id"] == "test-game-123"
-        assert data["story_config"]["label"] == "Test"
+        assert data["story_config"]["title"] == "Test"
         # GameLoop stored for later start
         assert sessions.get_game("test-game-123") is mock_gl
         # Co-create session cleaned up — game is now live

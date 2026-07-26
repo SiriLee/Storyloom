@@ -76,7 +76,7 @@ game_state.rejected_changes = []
 
 ### 3.1 目录结构
 
-`saves/` 下每个游戏拥有独立的子目录，目录名格式为 `{label}_{compact_ts}`（`compact_ts` 为紧凑 UTC 时间戳，不含文件系统非法字符，确保唯一性与跨平台兼容）。每个游戏目录内可包含多个存档文件：
+`saves/` 下每个游戏拥有独立的子目录，目录名格式为 `{title}_{compact_ts}`（`compact_ts` 为紧凑 UTC 时间戳，不含文件系统非法字符，确保唯一性与跨平台兼容）。每个游戏目录内可包含多个存档文件：
 
 ```
 saves/
@@ -119,7 +119,7 @@ saves/
 
 | 字段 | 存储时机 | 说明 |
 |------|---------|------|
-| `metadata.label` | 共创结束后首次写入 | 来源于 `story_config.label` |
+| `metadata.title` | 共创结束后首次写入 | 来源于 `story_config.title` |
 | `metadata.created_at` | 首次写入时设定 | 之后不变 |
 | `metadata.updated_at` | 每次 `save()` 写入时更新 | 存档数据最后修改时间。仅反映存档文件内容变化（checkpoint 或 init），不因读档而变 |
 | `outline` | 每次 checkpoint 时更新 | 每个节点含 id / title / goal / status / summary / routes。status 标记推进状态，summary 在 checkpoint 时写入当前节点 |
@@ -221,4 +221,4 @@ saves/
 | 8 | **静默错误** | 微小校验错误（number 越界 clamp）不展示给用户，但记入 `rejected_changes` 在下轮 Prompt 告知 LLM |
 | 9 | **常量引用** | 统一使用 §A 中定义的常量名，禁止在业务代码中硬编码数值 |
 | 10 | **编号宽容** | 叙事段编号偏差（跳号、重复、起始非 1）不触发重试——内容质量优先于编号准确性 |
-| 11 | **存档原子写入** | 先写 `{label}.tmp`，再原子重命名到目标文件 |
+| 11 | **存档原子写入** | 先写 `{title}.tmp`，再原子重命名到目标文件 |

@@ -449,7 +449,7 @@
 
        Layout:
          header:  ← Back button (top-left)
-         content: story label (title) + setting text (centered)
+         content: story title + setting text (centered)
                   + Begin Adventure button → Round 1 prompt
        ═══════════════════════════════════════════════════════════════ */
 
@@ -512,7 +512,7 @@
             });
     }
 
-    /** Render the preview content with story label, setting, and
+    /** Render the preview content with story title, setting, and
      *  Begin Adventure button that starts the game. */
     function _renderPreviewContent(config) {
         const gameId = GameState.gameId;
@@ -524,7 +524,7 @@
                 </div>
 
                 <div class="gp-content">
-                    <h1 class="gp-label">${esc(config.label)}</h1>
+                    <h1 class="gp-label">${esc(config.title)}</h1>
                     <p class="gp-setting">${esc(config.setting || "")}</p>
 
                     <button class="gp-start-btn" id="gp-start">
@@ -555,7 +555,7 @@
         }
 
         GameState.gameId = gameId;
-        const label = (GameState.storyConfig && GameState.storyConfig.label)
+        const title = (GameState.storyConfig && GameState.storyConfig.title)
             || gameId;
 
         /* Close any existing SSE connection before rendering */
@@ -565,7 +565,7 @@
 
         /* Clear the app shell — GameView builds its own DOM */
         app.innerHTML = "";
-        GameView.render(app, gameId, label);
+        GameView.render(app, gameId, title);
     }
 
     /* ═══════════════════════════════════════════════════════════════
@@ -604,7 +604,7 @@
             list.innerHTML = games.map(g => `
                 <div class="sv-card" data-game-id="${esc(g.game_id)}">
                     <div class="sv-card-main">
-                        <span class="sv-card-label">${esc(g.label)}</span>
+                        <span class="sv-card-label">${esc(g.title)}</span>
                         <div class="sv-card-meta">
                             <span>${esc(g.genre || "?")}</span>
                             <span>${g.save_count} ${esc(_("saves"))}</span>
@@ -698,7 +698,7 @@
         ]).then(([saves, games]) => {
             const game = games.find(g => g.game_id === gameId);
             document.getElementById("sv-cp-title").textContent =
-                game ? game.label : gameId;
+                game ? game.title : gameId;
 
             saves.sort((a, b) => (b.saved_at || "").localeCompare(a.saved_at || ""));
 
@@ -773,22 +773,22 @@
        adventure log.  Delegates to AdventureLogView.render().
 
        Layout:
-         header:  ← Back button (top-left) + story label + [Export] (disabled)
+         header:  ← Back button (top-left) + story title + [Export] (disabled)
          content: scrollable log text (no border, white)
        ═══════════════════════════════════════════════════════════════ */
 
     function renderAdventureLog(gameId) {
         GameState.gameId = gameId;
 
-        /* Get story label from GameState (set during game session).
+        /* Get story title from GameState (set during game session).
            Falls back to gameId only when GameState has been reset —
            the label is present in normal flow (coming from game.js
            end modal, where GameState.storyConfig is still populated). */
-        const label = (GameState.storyConfig && GameState.storyConfig.label)
+        const title = (GameState.storyConfig && GameState.storyConfig.title)
             || gameId;
 
         app.innerHTML = "";
-        AdventureLogView.render(app, gameId, label);
+        AdventureLogView.render(app, gameId, title);
     }
 
     /* ── Confirm Popup (delete confirmation) ───────────────────────── */

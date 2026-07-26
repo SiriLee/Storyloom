@@ -60,9 +60,9 @@ class GameSession:
             ``(GameLoop, game_id)`` — UI uses *game_id* for subsequent
             save operations (list, delete, etc.).
         """
-        label = result.story_config.get("label", "untitled")
+        title = result.story_config.get("title", "untitled")
         game_dir, game_id, created_at = SaveManager.create_game(
-            self._saves_root, label
+            self._saves_root, title
         )
 
         init_data = self._build_init_dict(result, created_at)
@@ -96,11 +96,11 @@ class GameSession:
         gl.set_save_manager(sm)
         self._game_loop = gl
         # Track last played so "Continue" can find this save in O(1).
-        label = data.get("metadata", {}).get(
-            "label", data.get("story_config", {}).get("label", "")
+        title = data.get("metadata", {}).get(
+            "title", data.get("story_config", {}).get("title", "")
         )
         SaveManager.write_last_played(
-            self._saves_root, game_id, label, filename,
+            self._saves_root, game_id, title, filename,
         )
         return gl
 
@@ -129,7 +129,7 @@ class GameSession:
                 descending (most recent first).
 
         Returns:
-            List of ``{game_id, label, language, genre, tier,
+            List of ``{game_id, title, language, genre, tier,
             created_at, save_count[, last_played_at]}`` dicts.
         """
         games = SaveManager.list_games(self._saves_root, enrich=enrich_last_played)
@@ -173,7 +173,7 @@ class GameSession:
         """
         sc = copy.deepcopy(result.story_config)
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        label = sc.get("label", "untitled")
+        title = sc.get("title", "untitled")
 
         # Initialize state_vars from variable definitions
         state_vars: dict[str, int | str] = {}
@@ -203,7 +203,7 @@ class GameSession:
         return {
             "version": SAVE_VERSION,
             "metadata": {
-                "label": label,
+                "title": title,
                 "created_at": created_at,
                 "updated_at": now,
             },

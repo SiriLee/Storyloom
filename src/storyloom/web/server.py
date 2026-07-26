@@ -570,7 +570,7 @@ async def game_adventure_log(game_id: str):
 async def saves_last_played():
     """Return the last-played game + save (O(1) via ``.last_played.json``).
 
-    Returns ``{game_id, game_label, save_file, played_at}`` or 404.
+    Returns ``{game_id, game_title, save_file, played_at}`` or 404.
     """
     data = SaveManager.read_last_played(_game_session._saves_root)
     if data is None:

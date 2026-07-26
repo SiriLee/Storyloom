@@ -190,7 +190,7 @@ if user_wants_to_generate():
 ```python
 @dataclass
 class CoCreationResult:
-    story_config: dict    # genre, tier, label, setting, protagonist, variables, ...
+    story_config: dict    # genre, tier, title, setting, protagonist, variables, ...
     outline_text: str     # formatted outline string for PromptBuilder
     outline_nodes: list   # structured node data for GameLoop / progress display
 ```
@@ -203,9 +203,9 @@ construction, and auto-save wiring.
 
 The engine validates all LLM output during generation:
 
-- **story_config:** required fields (genre, tier, label, protagonist_name,
+- **story_config:** required fields (genre, tier, title, protagonist_name,
   protagonist_identity, protagonist_traits, tone, conflict, characters),
-  tier must be short/medium/long, label 5–15 chars.
+  tier must be short/medium/long, title 1-30 chars.
 - **variables:** count caps (≤3 total, ≤2 numeric, ≤1 string),
   name uniqueness, numeric range [0, 100], no illegal chars.
 - **outline:** all route targets exist in node IDs, final node has no

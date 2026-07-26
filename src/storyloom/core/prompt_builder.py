@@ -400,7 +400,7 @@ class PromptBuilder:
         Returns:
             Prompt string for adventure log generation.
         """
-        story_label = story_config.get("label", "Untitled Adventure")
+        title = story_config.get("title", "Untitled Adventure")
         language = story_config.get("language", DEFAULT_LANGUAGE)
 
         # ── Story Background ──────────────────────────────────────
@@ -453,7 +453,7 @@ Use Markdown format. Write in the story's language ({language}).
 a ↳ summary of what actually happened — use these as the basis for each chapter recap.
 [active] is the final node. [pending] nodes were skipped due to branching.)
 
-## Adventure Recap: {story_label}
+## Adventure Recap: {title}
 
 Write a chapter-by-chapter recap based on the outline and summaries above.
 

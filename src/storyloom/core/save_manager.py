@@ -49,9 +49,9 @@ class SaveManager:
         self._dir.mkdir(parents=True, exist_ok=True)
 
     @classmethod
-    def _sanitize(cls, label: str) -> str:
+    def _sanitize(cls, title: str) -> str:
         """Replace filesystem-illegal characters with ``_``."""
-        return cls.ILLEGAL_CHARS_RE.sub("_", label)
+        return cls.ILLEGAL_CHARS_RE.sub("_", title)
 
     @staticmethod
     def _compact_ts() -> str:
@@ -96,11 +96,11 @@ class SaveManager:
         os.replace(tmp_path, target_path)
 
         # Update last-played tracking so "Continue" picks up this save.
-        label = save_data.get("metadata", {}).get(
-            "label", save_data.get("story_config", {}).get("label", "")
+        title = save_data.get("metadata", {}).get(
+            "title", save_data.get("story_config", {}).get("title", "")
         )
         SaveManager.write_last_played(
-            str(self._dir.parent), self._dir.name, label, filename,
+            str(self._dir.parent), self._dir.name, title, filename,
         )
         return filename
 
@@ -252,7 +252,7 @@ class SaveManager:
 
     @staticmethod
     def write_last_played(
-        root: str, game_id: str, game_label: str, save_file: str
+        root: str, game_id: str, game_title: str, save_file: str
     ) -> None:
         """Write ``.last_played.json`` in *root*.  Atomic write.
 
@@ -263,7 +263,7 @@ class SaveManager:
         """
         data = {
             "game_id": game_id,
-            "game_label": game_label,
+            "game_title": game_title,
             "save_file": save_file,
             "played_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
@@ -310,12 +310,12 @@ class SaveManager:
         return data
 
     @staticmethod
-    def create_game(root: str, label: str) -> tuple[str, str, str]:
+    def create_game(root: str, title: str) -> tuple[str, str, str]:
         """Create a new game directory under *root*.
 
         Args:
             root: Root saves directory, e.g. ``"saves"``.
-            label: Story label (used in directory name).
+            title: Story title (used in directory name).
 
         Returns:
             ``(game_dir, game_id, created_at)`` where *game_dir* is the
@@ -326,10 +326,10 @@ class SaveManager:
         root_path = Path(root)
         root_path.mkdir(parents=True, exist_ok=True)
         created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        safe_label = SaveManager.ILLEGAL_CHARS_RE.sub("_", label)
+        safe_title = SaveManager.ILLEGAL_CHARS_RE.sub("_", title)
         # Compact timestamp for directory name — colons in ISO 8601
         # extended format (HH:MM:SS) are invalid on Windows filesystems.
-        game_id = f"{safe_label}_{SaveManager._compact_ts()}"
+        game_id = f"{safe_title}_{SaveManager._compact_ts()}"
         game_dir = root_path / game_id
         game_dir.mkdir(exist_ok=False)
         return str(game_dir), game_id, created_at
@@ -346,7 +346,7 @@ class SaveManager:
                     per game, no full iteration).
 
         Returns:
-            List of ``{game_id, label, language, genre, tier,
+            List of ``{game_id, title, language, genre, tier,
             created_at, save_count[, last_played_at]}`` dicts.
         """
         root_path = Path(root)
@@ -370,7 +370,7 @@ class SaveManager:
             save_count = len(save_files)
             game_data = {
                 "game_id": game_dir.name,
-                "label": meta.get("label", game_dir.name),
+                "title": meta.get("title", game_dir.name),
                 "language": sc.get("language", ""),
                 "genre": sc.get("genre", ""),
                 "tier": sc.get("tier", ""),

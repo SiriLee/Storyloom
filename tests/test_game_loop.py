@@ -12,7 +12,7 @@ from storyloom.parser import SetOperation
 SAMPLE_STORY_CONFIG = {
     "genre": "赛博朋克冒险",
     "tier": "medium",
-    "label": "霓虹深渊",
+    "title": "霓虹深渊",
     "setting": "2087年新东京地下城",
     "protagonist_name": "林焰",
     "protagonist_identity": "前荒坂安全顾问",

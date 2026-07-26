@@ -7,7 +7,7 @@ from storyloom.core.prompt_builder import PromptBuilder
 SAMPLE_STORY_CONFIG = {
     "genre": "赛博朋克冒险",
     "tier": "medium",
-    "label": "霓虹深渊",
+    "title": "霓虹深渊",
     "setting": "2087年新东京地下城",
     "protagonist_name": "林焰",
     "protagonist_identity": "前荒坂安全顾问，现自由佣兵",
@@ -259,7 +259,7 @@ class TestBuildRoundN:
 class TestAdventureLogPrompt:
     def test_build_adventure_log_prompt_contains_label(self):
         pb = PromptBuilder()
-        config = {"label": "霓虹深渊", "genre": "cyberpunk"}
+        config = {"title": "霓虹深渊", "genre": "cyberpunk"}
         state_vars = {"体力": 25}
         outline = "ch1_intro [completed] — 序章\n  ↳ 抵达边陲小镇"
 
@@ -269,7 +269,7 @@ class TestAdventureLogPrompt:
 
     def test_build_adventure_log_prompt_shows_outline(self):
         pb = PromptBuilder()
-        config = {"label": "test", "genre": "fantasy"}
+        config = {"title": "test", "genre": "fantasy"}
         state_vars = {"魔力": 50}
         outline = "ch1_start [completed] — 开始\n  ↳ first checkpoint"
 
@@ -281,7 +281,7 @@ class TestAdventureLogPrompt:
 
     def test_build_adventure_log_prompt_empty_outline(self):
         pb = PromptBuilder()
-        config = {"label": "test"}
+        config = {"title": "test"}
         state_vars = {}
         prompt = pb.build_adventure_log_prompt(config, state_vars, "")
         assert "Adventure Recap" in prompt
@@ -290,7 +290,7 @@ class TestAdventureLogPrompt:
     def test_build_adventure_log_prompt_includes_background(self):
         pb = PromptBuilder()
         config = {
-            "label": "test",
+            "title": "test",
             "genre": "赛博朋克冒险",
             "setting": "2087年新东京",
             "protagonist_name": "林焰",
@@ -313,7 +313,7 @@ class TestAdventureLogPrompt:
     def test_build_adventure_log_prompt_with_summaries_in_outline(self):
         """Summaries are now embedded in outline_text via ↳ lines."""
         pb = PromptBuilder()
-        config = {"label": "test"}
+        config = {"title": "test"}
         state_vars = {}
         outline = "ch1 [completed] — 序章\n  ↳ 抵达边境小镇"
 

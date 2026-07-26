@@ -92,7 +92,7 @@ class DevObserver:
         self._write_file(
             "checks.txt",
             f"══ Co-Create Result ══\n"
-            f"Label: {story_config.get('label', '?')}\n"
+            f"Title: {story_config.get('title', '?')}\n"
             f"Genre: {story_config.get('genre', '?')}\n"
             f"Tier: {story_config.get('tier', '?')}\n"
             f"Outline:\n{outline_text}\n"

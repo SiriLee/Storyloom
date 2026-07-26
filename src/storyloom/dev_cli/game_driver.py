@@ -216,7 +216,7 @@ def run_co_create(
         observer.record_co_create_response(flow.messages)
         observer.record_co_create_result(
             result.story_config, result.outline_text)
-    print(f"\n[Story: {result.story_config.get('label', '?')}]")
+    print(f"\n[Story: {result.story_config.get('title', '?')}]")
     print(f"[Genre: {result.story_config.get('genre', '?')}]")
     print(f"[Outline: {len(result.outline_nodes)} nodes]\n")
     return result
@@ -505,7 +505,7 @@ def run_load_save(session: GameSession, ctrl: DisplayController,
             _ask("Press Enter to go back")
             return
         for i, g in enumerate(games):
-            print(f"  [{i + 1}] {g.get('label', '?')} "
+            print(f"  [{i + 1}] {g.get('title', '?')} "
                   f"({g.get('genre', '?')}, "
                   f"{g.get('save_count', 0)} saves)")
         print("  [0] Back")
@@ -517,12 +517,12 @@ def run_load_save(session: GameSession, ctrl: DisplayController,
             continue
         game = games[int(pick) - 1]
         game_id = game["game_id"]
-        game_label = game.get("label", game_id)
+        game_title = game.get("title", game_id)
 
         # ── Level 2: Save list ───────────────────────────────────
         while True:
             saves = session.list_saves(game_id)
-            print(f"\nGame: {game_label} "
+            print(f"\nGame: {game_title} "
                   f"({game.get('genre', '?')}, "
                   f"{len(saves)} saves)")
             if not saves:
@@ -540,11 +540,11 @@ def run_load_save(session: GameSession, ctrl: DisplayController,
             if pick in ("0", "b", "back"):
                 break
             if pick.lower() == "d":
-                ans = _ask(f"Delete game '{game_label}' and ALL its saves? "
+                ans = _ask(f"Delete game '{game_title}' and ALL its saves? "
                            f"This cannot be undone. (y/n)").strip().lower()
                 if ans in ("y", "yes"):
                     if session.delete_game(game_id):
-                        print(f"  Game '{game_label}' deleted.")
+                        print(f"  Game '{game_title}' deleted.")
                         break  # return to Level 1
                     else:
                         _error(f"Failed to delete game '{game_id}'.")
@@ -653,7 +653,7 @@ def dev_main(argv: list[str] | None = None) -> None:
         print("  [1] New Game")
         if games:
             tracked = SaveManager.read_last_played(session._saves_root)
-            hint = tracked["game_label"] if tracked else games[0].get("label", "?")
+            hint = tracked["game_title"] if tracked else games[0].get("title", "?")
             print(f"  [2] Continue ({hint})")
         else:
             print("  [2] Continue")

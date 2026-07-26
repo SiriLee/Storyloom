@@ -21,7 +21,7 @@ def _test_api_client():
 
 
 SAMPLE_STORY_CONFIG = {
-    "genre": "test", "tier": "short", "label": "test-story",
+    "genre": "test", "tier": "short", "title": "test-story",
     "language": "zh-CN",
     "setting": "", "protagonist_name": "T",
     "protagonist_identity": "Tester",

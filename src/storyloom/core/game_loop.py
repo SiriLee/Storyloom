@@ -1089,7 +1089,7 @@ class GameLoop:
             })
 
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        label = self.story_config.get("label", "untitled")
+        title = self.story_config.get("title", "untitled")
 
         # Preserve original created_at; set on first save only.
         if self._created_at is None:
@@ -1098,7 +1098,7 @@ class GameLoop:
         return {
             "version": SAVE_VERSION,
             "metadata": {
-                "label": label,
+                "title": title,
                 "created_at": self._created_at,
                 "updated_at": now,
             },

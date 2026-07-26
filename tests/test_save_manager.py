@@ -23,13 +23,13 @@ class TestSaveManagerInstance:
         return {
             "version": 1,
             "metadata": {
-                "label": "test-story",
+                "title": "test-story",
                 "created_at": "2026-01-01T00:00:00Z",
                 "updated_at": "2026-01-01T00:00:00Z",
             },
             "config": {"temperature": None},
             "story_config": {
-                "label": "test-story",
+                "title": "test-story",
                 "genre": "fantasy",
                 "tier": "short",
                 "variables": [],
@@ -131,7 +131,7 @@ class TestSaveManagerInstance:
 
     def test_load_missing_fields_raises(self, game_dir):
         sm = SaveManager(game_dir)
-        save_data = {"version": 1, "metadata": {"label": "bad"}}
+        save_data = {"version": 1, "metadata": {"title": "bad"}}
         filename = sm.save(save_data, cp_title="test")
         with pytest.raises(ValueError, match="Missing required"):
             sm.load(filename)
@@ -179,9 +179,9 @@ class TestSaveManagerStatic:
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
             "version": 1,
-            "metadata": {"label": "my_story", "created_at": "2026-01-01T00:00:00Z", "updated_at": ""},
+            "metadata": {"title": "my_story", "created_at": "2026-01-01T00:00:00Z", "updated_at": ""},
             "config": {"temperature": None},
-            "story_config": {"label": "my_story", "language": "zh-CN", "genre": "fantasy", "tier": "short", "variables": []},
+            "story_config": {"title": "my_story", "language": "zh-CN", "genre": "fantasy", "tier": "short", "variables": []},
             "state_vars": {},
             "outline": [],
             "progress": {"current_node": "", "checkpoint_history": [], "checkpoint_snapshots": {}},
@@ -189,7 +189,7 @@ class TestSaveManagerStatic:
         games = SaveManager.list_games(root)
         assert len(games) == 1
         assert games[0]["game_id"] == game_id
-        assert games[0]["label"] == "my_story"
+        assert games[0]["title"] == "my_story"
         assert games[0]["save_count"] == 1
         assert "last_played_at" not in games[0]
 
@@ -198,9 +198,9 @@ class TestSaveManagerStatic:
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
             "version": 1,
-            "metadata": {"label": "test", "created_at": "2026-01-01T00:00:00Z", "updated_at": ""},
+            "metadata": {"title": "test", "created_at": "2026-01-01T00:00:00Z", "updated_at": ""},
             "config": {"temperature": None},
-            "story_config": {"label": "test", "variables": []},
+            "story_config": {"title": "test", "variables": []},
             "state_vars": {},
             "outline": [],
             "progress": {"current_node": "", "checkpoint_history": [], "checkpoint_snapshots": {}},
@@ -235,7 +235,7 @@ class TestLastPlayedTracking:
         data = SaveManager.read_last_played(root)
         assert data is not None
         assert data["game_id"] == "g1"
-        assert data["game_label"] == "My Story"
+        assert data["game_title"] == "My Story"
         assert data["save_file"] == "save.json"
         assert re.match(
             r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", data["played_at"]
@@ -297,9 +297,9 @@ class TestLastPlayedTracking:
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
             "version": 1,
-            "metadata": {"label": "test"},
+            "metadata": {"title": "test"},
             "config": {},
-            "story_config": {"label": "test", "variables": []},
+            "story_config": {"title": "test", "variables": []},
             "state_vars": {},
             "outline": [],
             "progress": {"current_node": ""},
@@ -316,9 +316,9 @@ class TestLastPlayedTracking:
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
             "version": 1,
-            "metadata": {"label": "test"},
+            "metadata": {"title": "test"},
             "config": {},
-            "story_config": {"label": "test", "variables": []},
+            "story_config": {"title": "test", "variables": []},
             "state_vars": {},
             "outline": [],
             "progress": {"current_node": ""},
@@ -334,9 +334,9 @@ class TestLastPlayedTracking:
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
             "version": 1,
-            "metadata": {"label": "test"},
+            "metadata": {"title": "test"},
             "config": {},
-            "story_config": {"label": "test", "variables": []},
+            "story_config": {"title": "test", "variables": []},
             "state_vars": {},
             "outline": [],
             "progress": {"current_node": ""},

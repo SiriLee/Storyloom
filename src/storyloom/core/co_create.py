@@ -8,8 +8,8 @@ from string import Template
 from storyloom.io.api_client import ApiClient, ApiError
 from storyloom.i18n import _, get_current_lang
 from storyloom.config import (
-    STORY_LABEL_MIN_CHARS,
-    STORY_LABEL_MAX_CHARS,
+    STORY_TITLE_MIN_CHARS,
+    STORY_TITLE_MAX_CHARS,
     VARIABLE_CAP,
     VARIABLE_NUMERIC_CAP,
     VARIABLE_LABEL_CAP,
@@ -67,7 +67,7 @@ class CoCreateParser:
         return result
 
     REQUIRED_CONFIG_FIELDS = [
-        "genre", "tier", "label",
+        "genre", "tier", "title",
         "protagonist_name", "protagonist_identity",
         "protagonist_traits", "tone", "conflict", "characters",
     ]
@@ -122,15 +122,15 @@ class CoCreateParser:
                 f"{', '.join(sorted(CoCreateParser.VALID_TIERS))}"
             )
 
-        # Validate label length
-        label = result.get("label", "")
-        if len(label) < STORY_LABEL_MIN_CHARS:
+        # Validate title length
+        title_val = result.get("title", "")
+        if len(title_val) < STORY_TITLE_MIN_CHARS:
             raise ValueError(
-                f"Label '{label}' too short (min {STORY_LABEL_MIN_CHARS} chars)"
+                f"Title \'{title_val}' too short (min {STORY_TITLE_MIN_CHARS} chars)"
             )
-        if len(label) > STORY_LABEL_MAX_CHARS:
+        if len(title_val) > STORY_TITLE_MAX_CHARS:
             raise ValueError(
-                f"Label '{label}' too long (max {STORY_LABEL_MAX_CHARS} chars)"
+                f"Title \'{title_val}' too long (max {STORY_TITLE_MAX_CHARS} chars)"
             )
 
         # setting defaults to empty string
@@ -474,7 +474,7 @@ Show genuine curiosity about the user's choices. Acknowledge their previous answ
 
 CO_CREATE_GENERATION_PROMPT = Template("""You are a story setup generator. Based on the conversation above, produce a complete, structured story configuration for a text adventure game.
 
-Write ALL story content — label, setting, character names, node titles, goals, and variable names — in this language: $language.
+Write ALL story content — title, setting, character names, node titles, goals, and variable names — in this language: $language.
 
 # Output Format
 
@@ -488,7 +488,7 @@ Below is a complete format example (a short cyberpunk story in English):
 === story_config ===
 genre: cyberpunk thriller
 tier: short
-label: Neon Depths
+title: Neon Depths
 language: en
 setting: In 2087 Neo-Tokyo, data is the only currency that matters. A rogue biochip from a corporate R&D lab has surfaced on the black market — carrying information that could rewrite the global order.
 protagonist_name: Kael
@@ -548,7 +548,7 @@ All fields below are REQUIRED (non-empty). INI-style `key: value`. Multi-line va
 
 **genre** — Free-form. e.g. "cyberpunk thriller", "wuxia adventure".
 **tier** — Exactly one of: `short`, `medium`, `long`. Determines outline node count.
-**label** — $label_hint
+**title** — $title_hint
 **language** — $language
 **setting** — Story blurb. 2-4 sentences: world, protagonist, stakes.
 **protagonist_name** — Name in story language.
@@ -661,7 +661,7 @@ class CoCreateFlow:
     def _build_generation_prompt() -> str:
         """Build the language-aware generation prompt (user message).
 
-        Injects the output language, a language-specific label hint, and
+        Injects the output language, a language-specific title hint, and
         the tier-to-node-count ranges.  The format example is inline in
         the template (English, like the narrative prompt's Kael example)
         — the LLM learns structure from it, not story content.
@@ -675,7 +675,7 @@ class CoCreateFlow:
         )
         return CO_CREATE_GENERATION_PROMPT.substitute(
             language=lang,
-            label_hint=meta["label_hint"],
+            title_hint=meta["title_hint"],
             node_count_hint=node_count_hint,
         )
 

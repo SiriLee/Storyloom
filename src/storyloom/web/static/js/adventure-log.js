@@ -5,7 +5,7 @@
    Route: #adventure-log/{gameId}
 
    Flow:
-     1. render(container, gameId, label) — build DOM, start polling
+     1. render(container, gameId, title) — build DOM, start polling
      2. _fetchLog() → GET /api/game/{id}/adventure-log
         → "ok"      → display text
         → "pending" → retry after 1s
@@ -27,7 +27,7 @@ const AdventureLogView = (function () {
     let _pollCount = 0;
     const MAX_POLL_RETRIES = 30;    // 30 s timeout — matches dev_cli 30 s
     let _logText = null;            // raw Markdown text for export
-    let _label = null;              // story name for export filename
+    let _title = null;              // story name for export filename
 
     /** HTML entity escape (same pattern as display.js, router.js). */
     function escHtml(s) {
@@ -45,14 +45,14 @@ const AdventureLogView = (function () {
     /** Render the adventure log view.
      *  @param {Element} container — DOM element to render into
      *  @param {string} gameId
-     *  @param {string} label — story name for the top bar */
-    function render(container, gameId, label) {
+     *  @param {string} title — story name for the top bar */
+    function render(container, gameId, title) {
         _container = container;
         _gameId = gameId;
-        _label = label || null;
+        _title = title || null;
         _logText = null;
 
-        _buildDOM(label);
+        _buildDOM(title);
         _fetchLog();
     }
 
@@ -60,14 +60,14 @@ const AdventureLogView = (function () {
        DOM Construction
        ═══════════════════════════════════════════════════════════════ */
 
-    function _buildDOM(label) {
+    function _buildDOM(title) {
         _container.innerHTML = `
             <div class="al-view">
                 <!-- Top bar -->
                 <div class="al-header">
                     <button class="cc-back-btn" id="al-back"
                             title="${_("Back to Menu")}">${Icons.arrowLeft()}</button>
-                    <span class="al-label">${escHtml(label)}</span>
+                    <span class="al-label">${escHtml(title)}</span>
                     <button class="al-export-btn" id="al-export" disabled>
                         ${_("Export")}
                     </button>
@@ -168,7 +168,7 @@ const AdventureLogView = (function () {
     function _exportLog() {
         if (!_logText) return;
 
-        const safeName = (_label || "adventure").replace(/[\\/:*?"<>|]/g, "-");
+        const safeName = (_title || "adventure").replace(/[\\/:*?"<>|]/g, "-");
         const filename = `${safeName} - Adventure Log.md`;
         const blob = new Blob([_logText], { type: "text/markdown;charset=utf-8" });
         const url = URL.createObjectURL(blob);
