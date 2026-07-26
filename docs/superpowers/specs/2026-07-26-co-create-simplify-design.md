@@ -47,23 +47,20 @@
     {
       "name": "Kael",
       "role": "protagonist",
-      "description": "Former corporate security consultant turned freelance operative",
-      "appearance": "Tall, sharp-eyed, with short dark hair and a faint scar across the jaw. Wears a worn synth-leather coat over tactical gear.",
-      "traits": "Calculating, morally grey, fiercely loyal"
+      "description": "Former corporate security consultant turned freelance operative. Calculating, morally grey, fiercely loyal",
+      "appearance": "Tall, sharp-eyed, with short dark hair and a faint scar across the jaw. Wears a worn synth-leather coat over tactical gear."
     },
     {
       "name": "Mouse",
       "role": "supporting",
-      "description": "Underground info broker. Uneasy ally with old debts — knows the chip's real value.",
-      "appearance": "Short and wiry, with nervous hands and augmented eyes that flicker blue when scanning data streams. Dresses in layers of faded street fashion.",
-      "traits": "Slippery, resourceful, paranoid"
+      "description": "Underground info broker. Uneasy ally with old debts — knows the chip's real value. Slippery, resourceful, paranoid",
+      "appearance": "Short and wiry, with nervous hands and augmented eyes that flicker blue when scanning data streams. Dresses in layers of faded street fashion."
     },
     {
       "name": "Michiko",
       "role": "supporting",
-      "description": "Arasaka security director. Former mentor — conflicted loyalties between duty and old ties.",
-      "appearance": "Impeccably sharp in a tailored black suit, silver-streaked hair pulled tight. Cold smile, eyes that miss nothing.",
-      "traits": "Cold, efficient, pragmatic"
+      "description": "Arasaka security director. Former mentor — conflicted loyalties between duty and old ties. Cold, efficient, pragmatic",
+      "appearance": "Impeccably sharp in a tailored black suit, silver-streaked hair pulled tight. Cold smile, eyes that miss nothing."
     }
   ],
   "locations": [
@@ -158,9 +155,8 @@
 |------|------|------|------|
 | `name` | string | ✅ | 角色名（故事语言） |
 | `role` | `"protagonist"` \| `"supporting"` \| `"antagonist"` | ✅ | 角色类型 |
-| `description` | string | ✅ | 身份介绍说明。主角：身份背景；其他角色：身份 + 与主角的关系 |
+| `description` | string | ✅ | 角色描述。2-3 句：身份背景 + 性格特质。主角：你是谁、什么性格；其他角色：身份、与主角的关系、性格特点 |
 | `appearance` | string | ✅ | 外貌描述。2-3 句：体态、面容、着装风格。图像模式的角色立绘生成参考 |
-| `traits` | string | ✅ | 2-3 个核心性格特质，逗号分隔 |
 
 至少 1 个元素，其中恰好 1 个 `role: "protagonist"`。
 
@@ -242,7 +238,7 @@ LLM JSON 输出经过校验后直接作为 `CoCreationResult` 的数据部分，
 | 解析方式 | 5 套手动解析器 | `json.loads()` |
 | story_config 字段数 | 11（含 variables 嵌套） | 4 |
 | characters | story_config 内字符串字段 | 顶层数组，结构化子字段 |
-| characters 字段 | `name \| role \| relationship` 管道格式 | `name`, `role`, `description`, `appearance`, `traits` |
+| characters 字段 | `name \| role \| relationship` 管道格式 | `name`, `role`, `description`, `appearance` |
 | locations | 不存在 | 顶层数组 |
 | variables | `story_config.variables` 嵌套 | 顶层数组 |
 | protagonist | story_config 内 3 个独立字段 | `characters` 中 `role: "protagonist"` 识别 |
@@ -259,7 +255,7 @@ LLM JSON 输出经过校验后直接作为 `CoCreationResult` 的数据部分，
 ```
 game_state = GameState()
 game_state.story_config   = {tier, title, language, premise}    ← 4 fields
-game_state.characters     = [{name, role, description, appearance, traits}, ...]  ← NEW
+game_state.characters     = [{name, role, description, appearance}, ...]  ← NEW
 game_state.locations      = [{id, name, description}, ...]      ← NEW
 game_state.variables      = [{name, type, initial}, ...]        ← MOVED: was nested in story_config
 game_state.state_vars     = init_from_variables(variables)
@@ -356,7 +352,7 @@ game_state.rejected_changes = []
 | `story_config.premise` | 非空字符串 |
 | `characters` | 非空数组，恰好 1 个 `role: "protagonist"` |
 | `characters[].role` | `"protagonist"` / `"supporting"` / `"antagonist"` |
-| `characters[].name/description/appearance/traits` | 非空字符串 |
+| `characters[].name/description/appearance` | 非空字符串 |
 | `locations` | 非空数组 |
 | `locations[].id` | 非空，英文 snake_case |
 | `locations[].name/description` | 非空字符串 |
