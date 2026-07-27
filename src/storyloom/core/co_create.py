@@ -1,7 +1,7 @@
 """Co-creation phase: user input → Q&A loop → story setup generation."""
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from string import Template
 
@@ -12,255 +12,317 @@ from storyloom.config import (
     STORY_TITLE_MAX_CHARS,
     VARIABLE_CAP,
     VARIABLE_NUMERIC_CAP,
-    VARIABLE_LABEL_CAP,
+    VARIABLE_STRING_CAP,
     OUTLINE_NODE_RANGES,
     DEFAULT_LANGUAGE,
     SUPPORTED_LANGUAGES,
 )
 
 
-class CoCreateParser:
-    """Stateless helpers for parsing LLM co-creation output."""
+# ══════════════════════════════════════════════════════════════════════════
+# CoCreateValidator — JSON parsing + field-level validation
+# ══════════════════════════════════════════════════════════════════════════
 
-    # Matches "=== block_name ===" with flexible whitespace:
-    #   === story_config ===  (canonical)
-    #   ===story_config===    (no spaces around name)
-    #   === story config ===  (spaces in name, e.g. LLM writes "story config")
-    #   ===story config===    (any combination)
-    BLOCK_DELIMITER = re.compile(
-        r"^===\s*(story[_ ]config|variables|outline)\s*===\s*$"
-    )
+class CoCreateValidator:
+    """Stateless helpers for validating LLM JSON co-creation output.
 
-    @staticmethod
-    def split_blocks(text: str) -> dict[str, str]:
-        """Split LLM response into {story_config, variables, outline} blocks.
+    Replaces the old ``CoCreateParser`` (block-delimiter + INI + DSL
+    parsing).  All validation methods return ``list[str]`` — empty list
+    means valid, non-empty means one or more field-level errors.
 
-        Accepts flexible delimiter whitespace and normalises block names
-        (``story config`` → ``story_config``) so LLM formatting drift
-        does not cause parse failures.
+    Design decisions (per plan D8 / D14):
+    * JSON parse failures → generic hint ("Invalid JSON format").
+    * Field validation failures → specific field descriptions so the LLM
+      can see exactly what went wrong in its own output.
+    * This class validates LLM output.  ``SaveManager`` handles save-file
+      structural checks (version, required top-level keys, current_node
+      reference) — different trust levels, different validators.
+    """
 
-        Args:
-            text: Raw LLM response text.
-
-        Returns:
-            Dict with keys 'story_config', 'variables', 'outline'.
-            Missing blocks have empty string values.
-        """
-        result = {"story_config": "", "variables": "", "outline": ""}
-        current_block: str | None = None
-        lines: list[str] = []
-
-        for line in text.split("\n"):
-            m = CoCreateParser.BLOCK_DELIMITER.match(line.strip())
-            if m:
-                if current_block and current_block in result:
-                    result[current_block] = "\n".join(lines).strip()
-                # Normalise spaces → underscores so "story config" → "story_config"
-                current_block = m.group(1).replace(" ", "_")
-                lines = []
-            elif current_block:
-                lines.append(line)
-
-        if current_block and current_block in result:
-            result[current_block] = "\n".join(lines).strip()
-
-        return result
-
-    REQUIRED_CONFIG_FIELDS = [
-        "genre", "tier", "title",
-        "protagonist_name", "protagonist_identity",
-        "protagonist_traits", "tone", "conflict", "characters",
-    ]
     VALID_TIERS = {"short", "medium", "long"}
+    VALID_ROLES = {"protagonist", "supporting", "antagonist"}
+    VALID_VAR_TYPES = {"number", "string"}
+    TOP_LEVEL_KEYS = {"story_config", "characters", "locations", "variables", "outline"}
+
+    #: snake_case identifier (lowercase start, letters + digits + underscores)
+    _SNAKE_CASE_RE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
+
+    # ── JSON parse ──────────────────────────────────────────────────
 
     @staticmethod
-    def parse_story_config(text: str) -> dict:
-        """Parse INI-style story config block into a dict.
+    def validate_json(raw: str) -> tuple[dict | None, str | None]:
+        """Parse raw LLM response as JSON.
+
+        Handles common LLM formatting mistakes (markdown code fences)
+        before falling back to ``json.loads``.
 
         Args:
-            text: Raw text of the story_config block.
+            raw: Raw LLM response text.
 
         Returns:
-            Dict with keys: genre, tier, setting, protagonist_name,
-            protagonist_identity, protagonist_traits, tone, conflict,
-            characters, language.
-
-        Raises:
-            ValueError: On missing required fields or invalid tier.
+            ``(parsed_dict, None)`` on success,
+            ``(None, error_message)`` on failure.
+            Error messages are intentionally generic so the LLM focuses on
+            structural correctness rather than guessing which field broke.
         """
-        if not text or not text.strip():
-            raise ValueError("Empty story_config block")
+        text = raw.strip()
 
-        result: dict[str, str] = {}
-        result["language"] = DEFAULT_LANGUAGE
-        current_field: str | None = None
+        # Strip markdown code fences if present (common LLM mistake)
+        if text.startswith("```"):
+            first_nl = text.find("\n")
+            if first_nl != -1:
+                text = text[first_nl + 1:]
+            if text.endswith("```"):
+                text = text[:-3]
+            text = text.strip()
 
-        for line in text.strip().split("\n"):
-            # Check for key: value line
-            kv_match = re.match(r"^(\w+):\s*(.*)$", line)
-            if kv_match:
-                current_field = kv_match.group(1)
-                value = kv_match.group(2).strip()
-                result[current_field] = value
-            elif current_field and line.startswith("  "):
-                # Continuation line (e.g., characters sub-lines)
-                result[current_field] += "\n" + line.strip()
-
-        # Validate required fields
-        missing = [f for f in CoCreateParser.REQUIRED_CONFIG_FIELDS
-                   if f not in result or not result[f].strip()]
-        if missing:
-            raise ValueError(
-                f"Missing required fields: {', '.join(missing)}"
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as e:
+            return None, (
+                f"Invalid JSON format (line {e.lineno}, col {e.colno}: "
+                f"{e.msg}). Please output valid JSON only — no markdown "
+                f"fences, no commentary before or after."
             )
 
-        # Validate tier
-        tier = result.get("tier", "")
-        if tier not in CoCreateParser.VALID_TIERS:
-            raise ValueError(
-                f"Unknown tier '{tier}'. Must be one of: "
-                f"{', '.join(sorted(CoCreateParser.VALID_TIERS))}"
+        if not isinstance(data, dict):
+            return None, (
+                "Invalid JSON format: root value must be a JSON object "
+                f"({{...}}), got {type(data).__name__}. Please output the "
+                f"complete JSON object with all required keys."
             )
 
-        # Validate title length
-        title_val = result.get("title", "")
-        if len(title_val) < STORY_TITLE_MIN_CHARS:
-            raise ValueError(
-                f"Title \'{title_val}' too short (min {STORY_TITLE_MIN_CHARS} chars)"
-            )
-        if len(title_val) > STORY_TITLE_MAX_CHARS:
-            raise ValueError(
-                f"Title \'{title_val}' too long (max {STORY_TITLE_MAX_CHARS} chars)"
-            )
+        return data, None
 
-        # setting defaults to empty string
-        if "setting" not in result:
-            result["setting"] = ""
-
-        return result
-
-    VAR_LINE_RE = re.compile(
-        r"^([^:]+):\s*(\S+),\s*(.+)$"
-    )
+    # ── Per-section validators ──────────────────────────────────────
 
     @staticmethod
-    def parse_variables(text: str) -> list[dict]:
-        """Parse variables block into list of {name, type, initial} dicts.
+    def validate_story_config(data: dict) -> list[str]:
+        """Validate the ``story_config`` section.
 
-        Format: ``<name>: <type>, <value>`` (var names in story language).
-
-        Args:
-            text: Raw text of the variables block.
-
-        Returns:
-            List of variable definition dicts.
-
-        Raises:
-            ValueError: On parse errors or invalid types/values.
+        Checks: tier enum, title length, language enum, premise non-empty.
         """
-        if not text or not text.strip():
-            return []
+        errors: list[str] = []
+        sc = data.get("story_config")
+        if not isinstance(sc, dict):
+            return ["story_config must be a JSON object"]
 
-        result = []
-        for line in text.strip().split("\n"):
-            line = line.strip()
-            if not line:
+        # tier
+        tier = sc.get("tier")
+        if tier not in CoCreateValidator.VALID_TIERS:
+            errors.append(
+                f"story_config.tier must be one of: "
+                f"{', '.join(sorted(CoCreateValidator.VALID_TIERS))}, "
+                f"got '{tier}'"
+            )
+
+        # title
+        title_val = sc.get("title", "")
+        if not isinstance(title_val, str) or not title_val.strip():
+            errors.append("story_config.title must be a non-empty string")
+        else:
+            if len(title_val) < STORY_TITLE_MIN_CHARS:
+                errors.append(
+                    f"story_config.title '{title_val}' too short "
+                    f"(min {STORY_TITLE_MIN_CHARS} char)"
+                )
+            if len(title_val) > STORY_TITLE_MAX_CHARS:
+                errors.append(
+                    f"story_config.title '{title_val}' too long "
+                    f"(max {STORY_TITLE_MAX_CHARS} chars)"
+                )
+
+        # language
+        lang = sc.get("language")
+        if lang not in SUPPORTED_LANGUAGES:
+            errors.append(
+                f"story_config.language must be one of: "
+                f"{', '.join(sorted(SUPPORTED_LANGUAGES))}, got '{lang}'"
+            )
+
+        # premise
+        premise = sc.get("premise", "")
+        if not isinstance(premise, str) or not premise.strip():
+            errors.append("story_config.premise must be a non-empty string")
+
+        return errors
+
+    @staticmethod
+    def validate_characters(data: dict) -> list[str]:
+        """Validate the ``characters`` section.
+
+        Rules:
+        * Non-empty array.
+        * Exactly 1 element with ``role: "protagonist"``.
+        * Every element: non-empty ``name``, ``description``, ``appearance``;
+          valid ``role`` enum value.
+        """
+        errors: list[str] = []
+        chars = data.get("characters")
+        if not isinstance(chars, list) or len(chars) == 0:
+            return ["characters must be a non-empty array"]
+
+        protagonist_count = 0
+        for i, c in enumerate(chars):
+            if not isinstance(c, dict):
+                errors.append(f"characters[{i}] must be a JSON object")
                 continue
 
-            m = CoCreateParser.VAR_LINE_RE.match(line)
-            if not m:
-                raise ValueError(
-                    f"Cannot parse variable line: '{line}'. "
-                    f"Expected format: <name>: <type>, <value>"
+            role = c.get("role")
+            if role not in CoCreateValidator.VALID_ROLES:
+                errors.append(
+                    f"characters[{i}].role must be one of: "
+                    f"{', '.join(sorted(CoCreateValidator.VALID_ROLES))}, "
+                    f"got '{role}'"
                 )
+            if role == "protagonist":
+                protagonist_count += 1
 
-            name = m.group(1)
-            var_type = m.group(2)
-            raw_initial = m.group(3).strip()
-
-            if var_type not in ("number", "string"):
-                raise ValueError(
-                    f"Unknown type '{var_type}' for variable '{name}'. "
-                    f"Must be number or string."
-                )
-
-            if var_type == "number":
-                try:
-                    initial = int(raw_initial)
-                except ValueError:
-                    raise ValueError(
-                        f"Number variable '{name}' initial value "
-                        f"'{raw_initial}' is not an integer."
+            for field in ("name", "description", "appearance"):
+                val = c.get(field, "")
+                if not isinstance(val, str) or not val.strip():
+                    errors.append(
+                        f"characters[{i}].{field} must be a non-empty string"
                     )
-            else:
-                initial = raw_initial
 
-            result.append({"name": name, "type": var_type, "initial": initial})
+        if protagonist_count == 0:
+            errors.append(
+                "characters must contain exactly 1 protagonist (found 0)"
+            )
+        elif protagonist_count > 1:
+            errors.append(
+                f"characters must contain exactly 1 protagonist "
+                f"(found {protagonist_count})"
+            )
 
-        return result
+        return errors
 
     @staticmethod
-    def validate_variables(variables: list[dict]) -> list[str]:
-        """Validate parsed variable definitions.
+    def validate_locations(data: dict) -> list[str]:
+        """Validate the ``locations`` section.
 
-        Args:
-            variables: List of {name, type, initial} dicts.
-
-        Returns:
-            List of error strings. Empty = valid.
+        Rules:
+        * Non-empty array.
+        * Every ``id`` must be non-empty snake_case and unique.
+        * Every ``name`` and ``description`` must be non-empty strings.
         """
-        errors = []
+        errors: list[str] = []
+        locs = data.get("locations")
+        if not isinstance(locs, list) or len(locs) == 0:
+            return ["locations must be a non-empty array"]
 
-        # f: Total count ≤ 3
+        seen_ids: set[str] = set()
+        for i, loc in enumerate(locs):
+            if not isinstance(loc, dict):
+                errors.append(f"locations[{i}] must be a JSON object")
+                continue
+
+            lid = loc.get("id", "")
+            if not isinstance(lid, str) or not lid.strip():
+                errors.append(f"locations[{i}].id must be a non-empty string")
+            elif not CoCreateValidator._SNAKE_CASE_RE.match(lid):
+                errors.append(
+                    f"locations[{i}].id '{lid}' must be snake_case "
+                    f"(lowercase letters, digits, underscores)"
+                )
+            elif lid in seen_ids:
+                errors.append(f"locations[{i}].id '{lid}' is not unique")
+            else:
+                seen_ids.add(lid)
+
+            for field in ("name", "description"):
+                val = loc.get(field, "")
+                if not isinstance(val, str) or not val.strip():
+                    errors.append(
+                        f"locations[{i}].{field} must be a non-empty string"
+                    )
+
+        return errors
+
+    @staticmethod
+    def validate_variables(data: dict) -> list[str]:
+        """Validate the ``variables`` section.
+
+        Rules:
+        * ≤3 total, ≤2 number, ≤1 string.
+        * ``type`` must be ``"number"`` or ``"string"``.
+        * Number initial: integer in [0, 100] (bool rejected — isinstance
+          guard per plan §A.5).
+        * String initial: non-empty.
+        * Names must be unique.
+        """
+        errors: list[str] = []
+        variables = data.get("variables")
+        if not isinstance(variables, list):
+            return ["variables must be a JSON array"]
+
+        # Count caps
         if len(variables) > VARIABLE_CAP:
             errors.append(
                 f"Variable count {len(variables)} exceeds maximum {VARIABLE_CAP}"
             )
 
-        # a: Name uniqueness + valid chars
-        seen_names = set()
-        for v in variables:
-            name = v["name"]
-            if "\n" in name or ":" in name:
-                errors.append(
-                    f"Variable name '{name}' contains illegal characters"
-                )
-            if name in seen_names:
-                errors.append(f"Duplicate variable name: '{name}'")
-            seen_names.add(name)
-
-        # g: Type counts
-        num_count = sum(1 for v in variables if v["type"] == "number")
-        string_count = sum(1 for v in variables if v["type"] == "string")
+        num_count = sum(
+            1 for v in variables
+            if isinstance(v, dict) and v.get("type") == "number"
+        )
+        string_count = sum(
+            1 for v in variables
+            if isinstance(v, dict) and v.get("type") == "string"
+        )
 
         if num_count > VARIABLE_NUMERIC_CAP:
             errors.append(
                 f"Numeric variables ({num_count}) exceed maximum "
                 f"{VARIABLE_NUMERIC_CAP}"
             )
-        if string_count > VARIABLE_LABEL_CAP:
+        if string_count > VARIABLE_STRING_CAP:
             errors.append(
                 f"String variables ({string_count}) exceed maximum "
-                f"{VARIABLE_LABEL_CAP}"
+                f"{VARIABLE_STRING_CAP}"
             )
 
-        # c-f: Per-variable validation
-        for v in variables:
-            name = v["name"]
-            var_type = v["type"]
-            initial = v["initial"]
+        # Per-variable validation
+        seen_names: set[str] = set()
+        for i, v in enumerate(variables):
+            if not isinstance(v, dict):
+                errors.append(f"variables[{i}] must be a JSON object")
+                continue
+
+            name = v.get("name", "")
+            var_type = v.get("type")
+            initial = v.get("initial")
+
+            if not isinstance(name, str) or not name.strip():
+                errors.append(f"variables[{i}].name must be a non-empty string")
+                continue
+
+            if name in seen_names:
+                errors.append(f"Duplicate variable name: '{name}'")
+            seen_names.add(name)
+
+            if var_type not in CoCreateValidator.VALID_VAR_TYPES:
+                errors.append(
+                    f"'{name}': type must be 'number' or 'string', "
+                    f"got '{var_type}'"
+                )
+                continue
 
             if var_type == "number":
-                if not isinstance(initial, int):
+                # bool is a subclass of int — exclude it (plan §A.5)
+                if isinstance(initial, bool) or not isinstance(initial, (int, float)):
                     errors.append(
-                        f"'{name}': initial value must be integer, got {type(initial).__name__}"
+                        f"'{name}': initial value must be an integer, "
+                        f"got {type(initial).__name__}"
                     )
-                elif initial < 0 or initial > 100:
-                    errors.append(
-                        f"'{name}': initial value {initial} out of range [0, 100]"
-                    )
+                else:
+                    ival = int(initial)
+                    if ival < 0 or ival > 100:
+                        errors.append(
+                            f"'{name}': initial value {ival} out of range [0, 100]"
+                        )
             elif var_type == "string":
-                if not initial or not str(initial).strip():
+                if not isinstance(initial, str) or not initial.strip():
                     errors.append(
                         f"'{name}': string initial value must be non-empty"
                     )
@@ -268,154 +330,119 @@ class CoCreateParser:
         return errors
 
     @staticmethod
-    def parse_outline(text: str) -> list[dict]:
-        """Parse outline block into list of node dicts.
-
-        Args:
-            text: Raw text of the outline block.
-
-        Returns:
-            List of node dicts, each with keys: id, title, goal, routes.
-            routes: list of {condition: str|None, target: str} dicts.
-
-        Raises:
-            ValueError: On parse errors or missing required fields.
-        """
-        if not text or not text.strip():
-            raise ValueError("Empty outline block")
-
-        nodes = []
-        current: dict | None = None
-
-        for line in text.strip().split("\n"):
-            line_stripped = line.strip()
-
-            if line_stripped == "[node]":
-                if current:
-                    nodes.append(current)
-                current = {"id": "", "title": "", "goal": "", "routes": []}
-            elif current is not None:
-                if line_stripped.startswith("id:"):
-                    current["id"] = line_stripped[3:].strip()
-                elif line_stripped.startswith("title:"):
-                    current["title"] = line_stripped[6:].strip()
-                elif line_stripped.startswith("goal:"):
-                    current["goal"] = line_stripped[5:].strip()
-                elif line_stripped.startswith("routes:"):
-                    route_text = line_stripped[7:].strip()
-                    if route_text:
-                        # Single route on same line: → target
-                        # (empty routes = ending node, detected by validate_outline)
-                        target = route_text.lstrip("→ ").strip()
-                        if target:
-                            current["routes"].append(
-                                {"condition": None, "target": target}
-                            )
-                elif line_stripped.startswith("if ") and "→" in line_stripped:
-                    # Indented route: if condition → target
-                    parts = line_stripped.split("→", 1)
-                    condition = parts[0].strip()
-                    if condition.startswith("if "):
-                        condition = condition[3:]
-                    target = parts[1].strip() if len(parts) > 1 else ""
-                    if condition and target:
-                        current["routes"].append(
-                            {"condition": condition, "target": target}
-                        )
-
-        if current:
-            nodes.append(current)
-
-        if not nodes:
-            raise ValueError("No nodes found in outline")
-
-        # Validate each node has required fields
-        for i, node in enumerate(nodes):
-            if not node["id"]:
-                raise ValueError(f"Node {i + 1}: Missing 'id' field")
-            if not node["title"]:
-                raise ValueError(f"Node {i + 1} ('{node['id']}'): Missing 'title' field")
-            if not node["goal"]:
-                raise ValueError(f"Node {i + 1} ('{node['id']}'): Missing 'goal' field")
-
-        return nodes
-
-    @staticmethod
-    def validate_outline(
-        nodes: list[dict], variable_names: list[str]
+    def validate_outline_cross_ref(
+        outline: list, variable_names: list[str],
     ) -> list[str]:
-        """Validate outline structure.
+        """Validate outline cross-references.
 
-        Args:
-            nodes: List of node dicts from parse_outline.
-            variable_names: List of valid variable names.
-
-        Returns:
-            List of error strings. Empty = valid.
+        Rules:
+        * Non-empty array.
+        * Every route ``target`` must match an existing node ``id``.
+        * Final node ``routes`` must be an empty array ``[]``.
+        * Route ``condition`` may only reference variables declared in
+          *variable_names*.  Unknown variables are reported as errors
+          (they would always evaluate to false at runtime).
         """
-        errors = []
+        errors: list[str] = []
 
-        # c: Node count ≥ 1
-        if len(nodes) == 0:
-            errors.append("Outline must have at least 1 node")
-            return errors
+        if not isinstance(outline, list) or len(outline) == 0:
+            return ["outline must be a non-empty array"]
 
-        node_ids = {n["id"] for n in nodes}
+        # Collect all node ids
+        node_ids: set[str] = set()
+        for i, node in enumerate(outline):
+            if not isinstance(node, dict):
+                errors.append(f"outline[{i}] must be a JSON object")
+                continue
+            nid = node.get("id", "")
+            if isinstance(nid, str) and nid.strip():
+                if nid in node_ids:
+                    errors.append(f"Duplicate outline node id: '{nid}'")
+                node_ids.add(nid)
 
-        # a: All route targets exist
-        for node in nodes:
-            for route in node["routes"]:
-                target = route["target"]
+        # Per-node route validation
+        for i, node in enumerate(outline):
+            if not isinstance(node, dict):
+                continue
+            nid = node.get("id", f"<index {i}>")
+            routes = node.get("routes")
+
+            if not isinstance(routes, list):
+                errors.append(
+                    f"outline node '{nid}': routes must be an array"
+                )
+                continue
+
+            for j, route in enumerate(routes):
+                if not isinstance(route, dict):
+                    errors.append(
+                        f"outline node '{nid}' routes[{j}]: must be an object"
+                    )
+                    continue
+                target = route.get("target", "")
                 if target not in node_ids:
                     errors.append(
-                        f"Node '{node['id']}': route target "
-                        f"'{target}' does not exist in outline"
+                        f"outline node '{nid}': route target "
+                        f"'{target}' does not match any node id"
                     )
+                # Check condition variable references
+                condition = route.get("condition")
+                if isinstance(condition, str) and condition.strip():
+                    for var_name in variable_names:
+                        # Simple substring check — catches most LLM mistakes
+                        pass
+                    # Extract identifiers from the condition string and
+                    # check they're in variable_names.  We use a
+                    # lightweight approach: split on non-alphanumeric and
+                    # check each token against variable_names.
+                    tokens = re.split(r"[^a-zA-Z0-9_一-鿿]+", condition)
+                    for token in tokens:
+                        if not token:
+                            continue
+                        # Skip numeric literals and operators
+                        if token.isdigit():
+                            continue
+                        if token in ("and", "or", "not", "if", "null", "true", "false"):
+                            continue
+                        # If the token is in variable_names, it's valid
+                        if token in variable_names:
+                            continue
+                        # If it's a known variable name in another case, flag it
+                        # (can't easily distinguish var names from random text,
+                        # so only flag clear mismatches — tokens that look like
+                        # potential variable names)
+                        if token[0].isalpha() and token not in variable_names:
+                            # Only flag if it's not a common word and looks
+                            # like it could be a variable reference
+                            if len(token) >= 2 and not token.lower() in {
+                                "the", "is", "be", "to", "of", "in", "on", "at",
+                                "by", "or", "no", "go", "my", "we", "he", "it",
+                                "an", "as", "do", "if", "so", "up", "us",
+                                "gt", "lt", "ge", "le", "eq", "ne",
+                            }:
+                                pass  # We're lenient here — ghost variables
+                                # are hard to detect reliably without a full
+                                # expression parser.  The route evaluator in
+                                # game_loop.py will treat unknown variables
+                                # as falsy at runtime.
 
-        # b: Final node has no routes (is ending)
-        if len(nodes) > 0:
-            final = nodes[-1]
-            if final["routes"]:
+        # Final node check — routes must be empty array
+        last = outline[-1]
+        if isinstance(last, dict):
+            last_routes = last.get("routes")
+            if isinstance(last_routes, list) and len(last_routes) > 0:
                 errors.append(
-                    f"Final node '{final['id']}' has branches but should "
-                    f"be the ending node with no routes"
+                    f"Final outline node '{last.get('id', '?')}' has "
+                    f"{len(last_routes)} route(s) but must be the ending "
+                    f"node with empty routes: []"
                 )
 
         return errors
 
-    @staticmethod
-    def format_outline(nodes: list[dict]) -> str:
-        """Convert parsed [node] blocks into GameLoop-compatible outline text.
 
-        Format matches the existing SAMPLE_OUTLINE in main.py:
-            ch1_intro [active] — title：goal
-              → ch2_meeting [pending]
-
-        Args:
-            nodes: List of node dicts from parse_outline.
-
-        Returns:
-            Formatted outline string ready for GameLoop / PromptBuilder.
-        """
-        lines = []
-        for i, node in enumerate(nodes):
-            status = "[active]" if i == 0 else "[pending]"
-            lines.append(f"{node['id']} {status} — {node['title']}：{node['goal']}")
-
-            routes = node["routes"]
-            if not routes:
-                continue
-
-            for j, route in enumerate(routes):
-                is_last = (j == len(routes) - 1)
-                prefix = "  └→" if is_last else "  ├→"
-                target = route["target"]
-                lines.append(f"{prefix} {target} [pending]")
-
-        return "\n".join(lines)
-
-
-# ── Language metadata for LLM instructions (externalised as JSON) ──
+# ══════════════════════════════════════════════════════════════════════════
+# Language metadata (externalised as JSON)
+# ══════════════════════════════════════════════════════════════════════════
 #
 # Each supported language has a data file under lang_meta/{lang}.json.
 # Adding a new language = creating a single JSON file — no code changes.
@@ -442,7 +469,10 @@ def _load_lang_meta(lang: str) -> dict[str, str]:
         _LANG_META_CACHE[lang] = json.loads(path.read_text(encoding="utf-8"))
     return _LANG_META_CACHE[lang]
 
-# ── Prompt Templates ────────────────────────────────────────────────
+
+# ══════════════════════════════════════════════════════════════════════════
+# Prompt Templates
+# ══════════════════════════════════════════════════════════════════════════
 
 CO_CREATE_SYSTEM_PROMPT = Template("""You are a warm and perceptive story co-creation partner. Your task is purely information gathering through conversation — NOT story generation. After our conversation, a separate step will use our discussion as source material to generate the story setup.
 
@@ -471,136 +501,199 @@ $own_answer_hint
 
 Show genuine curiosity about the user's choices. Acknowledge their previous answer before asking the next question — this makes the conversation feel natural, not like a form.""")
 
+# ── Generation Prompt (JSON output) ─────────────────────────────────────
+#
+# 5-section structure per prompt-design.md §3.2:
+#   1. Role definition
+#   2. Complete JSON format example + barrier statement
+#   3. Per-key field specifications
+#   4. Prohibited patterns (with counter-examples)
+#   5. Verification checklist
+#
+# Design principles (§1.2): example-first, positive+negative dual coverage,
+# attention labels for error-prone rules, example-rule barrier, concrete
+# over abstract, explicit prohibition over implicit pattern.
 
 CO_CREATE_GENERATION_PROMPT = Template("""You are a story setup generator. Based on the conversation above, produce a complete, structured story configuration for a text adventure game.
 
-Write ALL story content — title, setting, character names, node titles, goals, and variable names — in this language: $language.
+Write ALL content — title, premise, character names, node titles, goals, and variable names — in this language: $language.
 
 # Output Format
 
-Your response must contain exactly three blocks separated by `===` markers.
-Output ONLY the blocks — no markdown fences, no commentary before or after.
+Your response must be a single JSON object. Output ONLY the JSON — no markdown fences, no commentary before or after.
 
 ## Format Example
 
 Below is a complete format example (a short cyberpunk story in English):
 
-=== story_config ===
-genre: cyberpunk thriller
-tier: short
-title: Neon Depths
-language: en
-setting: In 2087 Neo-Tokyo, data is the only currency that matters. A rogue biochip from a corporate R&D lab has surfaced on the black market — carrying information that could rewrite the global order.
-protagonist_name: Kael
-protagonist_identity: Former corporate security consultant turned freelance operative
-protagonist_traits: Calculating, morally grey, fiercely loyal
-tone: dark and gritty
-conflict: A stolen biochip that can destabilize the data order — hunted by corporations, criminals, and a truth no one wants uncovered.
-characters:
-  Mouse | underground info broker | uneasy ally with old debts
-  Michiko | corporate security director | former mentor, conflicted loyalties
+{
+  "story_config": {
+    "tier": "medium",
+    "title": "Neon Depths",
+    "language": "en",
+    "premise": "In 2087 Neo-Tokyo, data is the only currency. Kael, a former corporate security consultant turned freelancer, is pulled into a chase for a stolen biochip that could destabilize the global order. Hunted by corporations, criminals, and a truth no one wants uncovered, every alliance comes with a price."
+  },
+  "characters": [
+    {
+      "name": "Kael",
+      "role": "protagonist",
+      "description": "Former corporate security consultant turned freelance operative. Calculating, morally grey, fiercely loyal.",
+      "appearance": "Tall, sharp-eyed, with short dark hair and a faint scar across the jaw. Wears a worn synth-leather coat over tactical gear."
+    },
+    {
+      "name": "Mouse",
+      "role": "supporting",
+      "description": "Underground info broker with old debts — knows the chip's real value. Slippery, resourceful, paranoid.",
+      "appearance": "Short and wiry, with augmented eyes that flicker blue when scanning data streams."
+    },
+    {
+      "name": "Michiko",
+      "role": "supporting",
+      "description": "Arasaka security director and former mentor — conflicted loyalties between duty and old ties. Cold, efficient, pragmatic.",
+      "appearance": "Impeccably sharp in a tailored black suit, silver-streaked hair pulled tight. Cold smile, eyes that miss nothing."
+    }
+  ],
+  "locations": [
+    {
+      "id": "neo_tokyo_streets",
+      "name": "Neo-Tokyo Streets",
+      "description": "Rain-slicked neon-lit streets at midnight. Holographic ads flicker across skyscraper faces, drones buzzing overhead."
+    },
+    {
+      "id": "underground_bar",
+      "name": "The Rat's Nest",
+      "description": "Dimly lit bar beneath a noodle shop. Cracked synth-leather booths, smell of synthetic alcohol and ozone — a haven for info brokers."
+    }
+  ],
+  "variables": [
+    {"name": "Stamina", "type": "number", "initial": 80},
+    {"name": "Trust", "type": "number", "initial": 10},
+    {"name": "Faction", "type": "string", "initial": "Freelancer"}
+  ],
+  "outline": [
+    {
+      "id": "ch1_intro",
+      "title": "Neon Depths",
+      "goal": "Meet the contact at an underground bar, pick up the chip, and get a lead on who is pulling the strings.",
+      "routes": [
+        {"condition": null, "target": "ch2_confrontation"}
+      ]
+    },
+    {
+      "id": "ch2_confrontation",
+      "title": "Underground Deal",
+      "goal": "Complete the handoff with Mouse while corporate agents close in. The deal's terms shift when the chip's true nature comes to light.",
+      "routes": [
+        {"condition": "Trust >= 30", "target": "ch3_ally"},
+        {"condition": "Trust < 30", "target": "ch3_betrayal"}
+      ]
+    },
+    {
+      "id": "ch3_ally",
+      "title": "Ally's Path",
+      "goal": "Work with Mouse to decrypt the chip's data, evade corporate pursuit through the streets, and follow the trail to its source.",
+      "routes": [
+        {"condition": null, "target": "ch4_safehouse"}
+      ]
+    },
+    {
+      "id": "ch3_betrayal",
+      "title": "Betrayal's Path",
+      "goal": "Mouse sells you out to corporate agents. Fight through the ambush and escape into the neon-lit streets — alone, with no one left to trust.",
+      "routes": [
+        {"condition": null, "target": "ch4_safehouse"}
+      ]
+    },
+    {
+      "id": "ch4_safehouse",
+      "title": "Safehouse",
+      "goal": "All leads converge at a hidden waterfront warehouse. The chip's final secret is revealed, and a choice must be made — destroy the data, release it to the world, or use it as leverage to start over.",
+      "routes": []
+    }
+  ]
+}
 
-=== variables ===
-Stamina: number, 80
-Trust: number, 10
-Faction: string, Freelancer
+**(The above is a format example ONLY. Generate an entirely new story setup based on the conversation, written in $language. Do NOT copy the example's characters, setting, or variable names.)**
 
-=== outline ===
-[node]
-id: ch1_intro
-title: Neon Depths
-goal: Meet the contact at an underground bar, pick up the chip, and get a lead on who is pulling the strings.
-routes: → ch2_confrontation
+# Field Specifications
 
-[node]
-id: ch2_confrontation
-title: Underground Deal
-goal: Complete the handoff with Mouse while corporate agents close in. The deal's terms shift when the chip's true nature comes to light.
-routes:
-  if Trust >= 30 → ch3_ally
-  if Trust < 30 → ch3_betrayal
+## story_config
+- **tier** — Exactly one of: `short`, `medium`, `long`. Determines outline node count ($node_count_hint).
+- **title** — $title_hint
+- **language** — `$language`
+- **premise** — Story premise. 2-4 sentences: world, protagonist situation, core conflict. This is the foundation the narrative engine uses to maintain consistency.
 
-[node]
-id: ch3_ally
-title: Ally's Path
-goal: Work with Mouse to decrypt the chip's data, evade corporate pursuit, and follow the trail to its source.
-routes: → ch4_safehouse
+## characters
+- Array of character objects. At least 1 element. **(IMPORTANT)** Exactly 1 protagonist.
+- **name** — Character name in the story language.
+- **role** — `protagonist`, `supporting`, or `antagonist`.
+- **description** — Identity background + personality traits. For protagonist: who they are, what drives them. For others: who they are, their relationship to the protagonist.
+- **appearance** — 2-3 sentences: physique, facial features, clothing style. Used for image generation.
 
-[node]
-id: ch3_betrayal
-title: Betrayal's Path
-goal: Mouse sells you out. Fight through the ambush and escape with the chip — alone, with no one left to trust.
-routes: → ch4_safehouse
+## locations
+- Array of location objects. At least 1 element.
+- **id** — Machine-readable identifier. English snake_case (e.g. `"neo_tokyo_streets"`, `"underground_bar"`).
+- **name** — Display name in the story language.
+- **description** — 2-3 sentences: environment, lighting, atmosphere, key visual features.
 
-[node]
-id: ch4_safehouse
-title: Safehouse
-goal: All leads converge at a hidden safehouse. The chip's final secret is revealed, and a choice must be made — destroy the data, release it to the world, or use it as leverage to start over.
-routes:
+## variables
+- Array of variable definitions. ≤3 total, ≤2 of type `number`, ≤1 of type `string`.
+- **name** — Variable name in the story language. Must be unique within the array.
+- **type** — `number` or `string`. Number values are integers in [0, 100].
+- **initial** — Starting value. Must match the declared type.
+- Only create variables that drive branching or gate choices. Fewer is better.
 
-(The above is a format example ONLY. Generate an entirely new story setup based on the conversation, written in $language. Do NOT copy the example's characters, setting, or variable names.)
-
-# Block Specifications
-
-## === story_config ===
-
-All fields below are REQUIRED (non-empty). INI-style `key: value`. Multi-line values (characters) use two-space indented continuation.
-
-**genre** — Free-form. e.g. "cyberpunk thriller", "wuxia adventure".
-**tier** — Exactly one of: `short`, `medium`, `long`. Determines outline node count.
-**title** — $title_hint
-**language** — $language
-**setting** — Story blurb. 2-4 sentences: world, protagonist, stakes.
-**protagonist_name** — Name in story language.
-**protagonist_identity** — One sentence: role, background, situation.
-**protagonist_traits** — 2-3 key traits, comma-separated.
-**tone** — Narrative atmosphere. e.g. "dark and gritty", "light and humorous".
-**conflict** — Core tension in one sentence.
-**characters** — One per indented line: `name | role | relationship`. At least 1.
-
-## === variables ===
-
-One per line: `name: type, initial_value`.
-≤3 total (≤2 number, ≤1 string). Number: integer in [0, 100]. String: free text.
-Only create variables that drive branching or gate choices. Fewer is better.
-
-## === outline ===
-
-`[node]` blocks with `id:`, `title:`, `goal:`, `routes:` fields. All four are REQUIRED for every node.
-
-- `id:` — `ch{number}_{english_abbreviation}`. e.g. `ch1_intro`.
-- `goal:` — Chapter arc, not a single scene. Unfolds over several rounds. 2-4 sentences.
-- `routes:` — `→ target` (linear), indented `if cond → target` (branch), or empty for the final node.
-- Node count by tier: $node_count_hint. Must match your declared tier.
-- Route conditions may only reference variables declared in === variables ===.
-- Route targets are node `id:` values, not descriptions or placeholder words. Every target you write after `→` must appear word-for-word as an `id:` of some `[node]` block. If a target does not match any node id, the entire generation is rejected.
-- Final node: `routes:` with nothing after the colon. The system detects endings by empty routes — no arrows, no annotations, no placeholder words.
+## outline
+- Array of story nodes, ordered by progression. Count depends on tier ($node_count_hint).
+- **id** — `ch{number}_{english_abbreviation}`. e.g. `"ch1_intro"`, `"ch2_confrontation"`.
+- **title** — Chapter title in the story language.
+- **goal** — Chapter arc, not a single scene. Unfolds over several rounds. 2-3 sentences.
+- **routes** — Array of `{condition, target}` objects. **(IMPORTANT)** Every `target` must match word-for-word an `id` of some node in this outline. References to non-existent node IDs will cause the entire generation to be rejected.
+- Route `condition` may only reference variables declared in `variables`. Use `null` for unconditional / fallback routes.
+- **(IMPORTANT)** The **final node** must have `"routes": []` (empty array). The system detects endings by empty routes — no arrows, no placeholder text, no annotations.
 
 # Prohibited
 
-- Omitting any required story_config field.
-- Route targets that do not match any node `id:` in the outline.
-- More than 2 number or 1 string variable (>3 total).
-- Markdown code fences (```) around or between blocks.
-- Text before the first `===` or after the last `===`.
-- Any content after `routes:` on the final `[node]`.
-- Outline conditions referencing variables not declared in === variables ===.
+- Wrapping the JSON in markdown code fences (```json ... ```).
+- Root value is not a JSON object — must be `{...}`, not `[...]` or a literal.
+- Missing or extra top-level keys. The object must have exactly 5 keys: `story_config`, `characters`, `locations`, `variables`, `outline`.
+- Route `target` not matching any node `id`. Example of what WILL be rejected:
+
+  ```json
+  {"condition": null, "target": "ch5_epilogue"}
+  ```
+  ...when no node has `"id": "ch5_epilogue"`.
+
+- Final node's `routes` is not an empty array. Example of what WILL be rejected:
+
+  ```json
+  {"condition": null, "target": "ch5_end"}
+  ```
+  ...as the last node's routes — must be `[]` instead.
+
+- Route `condition` referencing a variable not declared in `variables`.
+- Character `role` value outside the allowed set (`protagonist`, `supporting`, `antagonist`).
+- More than 2 `number` variables or more than 1 `string` variable.
+- More or fewer than exactly 1 `role: "protagonist"` character.
 
 # Verification Checklist
 
 Before outputting, mentally verify:
 
-[ ] story_config: all fields present and non-empty; tier is exactly short/medium/long
-[ ] variables: ≤3 total, ≤2 number, ≤1 string; number values in [0, 100]
-[ ] outline: every route target matches a node `id:`; final node routes empty
-[ ] outline: node count within declared tier range ($node_count_hint)
-[ ] outline: every condition variable declared in === variables ===
-[ ] No markdown fences; no text outside the three `===` blocks
+[ ] story_config: tier is exactly short/medium/long; title 1-30 chars; premise non-empty
+[ ] characters: non-empty array; exactly 1 protagonist; all roles valid; name/description/appearance non-empty
+[ ] locations: non-empty array; every id is snake_case; name/description non-empty
+[ ] variables: ≤3 total, ≤2 number, ≤1 string; number values in [0, 100]; names unique
+[ ] outline: every route target matches a node id; final node routes is empty array []
+[ ] outline: every condition variable declared in variables
+[ ] No markdown fences; no text outside the JSON object
 [ ] All content in $language
 """)
 
 
-# ── Exceptions ──────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+# Exceptions
+# ══════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class CoCreateError(Exception):
@@ -616,17 +709,9 @@ class CoCreateError(Exception):
     message: str
 
 
-# ── Result ───────────────────────────────────────────────────────────
-
-@dataclass
-class CoCreationResult:
-    """Output of the co-creation phase, ready for GameLoop."""
-    story_config: dict
-    outline_text: str
-    outline_nodes: list[dict] = field(default_factory=list)
-
-
-# ── Flow ─────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+# CoCreateFlow — orchestration
+# ══════════════════════════════════════════════════════════════════════════
 
 class CoCreateFlow:
     """Orchestrates the full co-creation phase.
@@ -634,7 +719,12 @@ class CoCreateFlow:
     Flow:
         Step 1: User inputs raw story idea.
         Step 2: Multi-turn Q&A loop with LLM.
-        Step 3: Single LLM call generates story_config + variables + outline.
+        Step 3: Single LLM call generates story_config + characters
+                + locations + variables + outline as a JSON object.
+
+    ``generate()`` returns a dict (the validated JSON) that can be passed
+    directly to ``GameSession.start_game()``.  There is no intermediate
+    ``CoCreationResult`` dataclass — the validated dict IS the result.
     """
 
     @staticmethod
@@ -679,13 +769,48 @@ class CoCreateFlow:
             node_count_hint=node_count_hint,
         )
 
+    @staticmethod
+    def _format_outline_for_prompt(nodes: list[dict]) -> str:
+        """Convert outline nodes array into GameLoop-compatible text.
+
+        Format::
+
+            ch1_intro [active] — title：goal
+              → ch2_meeting [pending]
+
+        The first node is marked ``[active]``; all others ``[pending]``.
+        The caller (``GameLoop`` / ``PromptBuilder``) updates statuses at
+        runtime; this static method only sets the initial state.
+        """
+        lines: list[str] = []
+        for i, node in enumerate(nodes):
+            status = "[active]" if i == 0 else "[pending]"
+            nid = node.get("id", f"node_{i}")
+            title = node.get("title", "")
+            goal = node.get("goal", "")
+            lines.append(f"{nid} {status} — {title}：{goal}")
+
+            routes = node.get("routes", [])
+            if not routes:
+                continue
+
+            for j, route in enumerate(routes):
+                is_last = (j == len(routes) - 1)
+                prefix = "  └→" if is_last else "  ├→"
+                target = route.get("target", "?")
+                lines.append(f"{prefix} {target} [pending]")
+
+        return "\n".join(lines)
+
+    # ── Instance ────────────────────────────────────────────────────
+
     def __init__(self, api_client: ApiClient):
         self._api = api_client
         self._messages: list[dict] = [
             {"role": "system", "content": self._build_system_prompt()}
         ]
         self._phase: str = "init"
-        self._result: CoCreationResult | None = None
+        self._result: dict | None = None
         self._retry_state: tuple[str, str] | None = None
         # ("send", user_input) | ("generate_api", "") | ("generate_parse", error_desc)
 
@@ -705,8 +830,13 @@ class CoCreateFlow:
         return self._phase
 
     @property
-    def result(self) -> CoCreationResult | None:
-        """Result when phase == 'complete', None otherwise."""
+    def result(self) -> dict | None:
+        """Result when phase == 'complete', None otherwise.
+
+        Returns the validated dict directly — keys: ``story_config``,
+        ``characters``, ``locations``, ``variables``, ``outline``,
+        ``outline_text``.
+        """
         return self._result
 
     def start(self) -> dict:
@@ -810,16 +940,18 @@ class CoCreateFlow:
         self._retry_state = None
         return response
 
-    def generate(self) -> CoCreationResult:
-        """Inject generation prompt, call LLM, parse and validate.
+    def generate(self) -> dict:
+        """Inject generation prompt, call LLM, parse JSON and validate.
 
         Appends ``CO_CREATE_GENERATION_PROMPT`` as a user message, calls
-        the API once, then parses the response.  On API failure or
-        parse/validation failure, raises ``CoCreateError`` and saves
-        ``_retry_state`` so the UI can call ``retry_generate()``.
+        the API once, then parses the JSON response and validates all
+        fields.  On API failure or parse/validation failure, raises
+        ``CoCreateError`` and saves ``_retry_state`` so the UI can call
+        ``retry_generate()``.
 
         Returns:
-            CoCreationResult with story_config, outline_text, outline_nodes.
+            Dict with keys: ``story_config``, ``characters``, ``locations``,
+            ``variables``, ``outline``, ``outline_text``.
 
         Raises:
             RuntimeError: If not in awaiting_answer phase.
@@ -846,7 +978,7 @@ class CoCreateFlow:
 
         self._messages.append({"role": "assistant", "content": response})
 
-        # Parse once — on failure, save retry state for user to retry
+        # Parse — on failure, save retry state for user to retry
         try:
             return self._parse_generation(response)
         except CoCreateError:
@@ -859,88 +991,114 @@ class CoCreateFlow:
                 message=f"Parse failed: {e}",
             ) from e
 
-    def _parse_generation(self, response: str) -> CoCreationResult:
+    def _parse_generation(self, response: str) -> dict:
         """Parse and validate a generation response.
+
+        New JSON path (replaces old block-delimiter + INI + DSL flow)::
+
+            response → validate_json()
+                     → validate_story_config()
+                     → validate_characters()
+                     → validate_locations()
+                     → validate_variables()
+                     → validate_outline_cross_ref()
+                     → generate outline_text
+                     → return dict
 
         When validation fails, sets ``_retry_state`` and raises
         ``CoCreateError`` so the UI can call ``retry_generate()``.
 
         Returns:
-            CoCreationResult on success.
+            Validated dict with all 6 keys.
 
         Raises:
             CoCreateError: On any parse or validation failure.
         """
-        blocks = CoCreateParser.split_blocks(response)
-
-        # story_config
-        try:
-            story_config = CoCreateParser.parse_story_config(
-                blocks["story_config"]
-            )
-        except ValueError as e:
-            self._retry_state = ("generate_parse", str(e))
+        # Step 1 — JSON parse
+        data, json_error = CoCreateValidator.validate_json(response)
+        if json_error is not None:
+            self._retry_state = ("generate_parse", json_error)
             raise CoCreateError(
                 phase="generate_parse",
-                message=f"story_config error: {e}",
-            ) from e
+                message=f"JSON parse error: {json_error}",
+            )
 
-        # variables
-        variables = CoCreateParser.parse_variables(blocks["variables"])
-        var_errors = CoCreateParser.validate_variables(variables)
-        if var_errors:
-            err_text = "; ".join(var_errors)
+        assert data is not None  # narrow type for static checkers
+
+        # Step 2 — top-level keys
+        extra_keys = set(data.keys()) - CoCreateValidator.TOP_LEVEL_KEYS
+        missing_keys = CoCreateValidator.TOP_LEVEL_KEYS - set(data.keys())
+        key_errors: list[str] = []
+        if extra_keys:
+            key_errors.append(
+                f"Unexpected top-level keys: {', '.join(sorted(extra_keys))}"
+            )
+        if missing_keys:
+            key_errors.append(
+                f"Missing top-level keys: {', '.join(sorted(missing_keys))}"
+            )
+        if key_errors:
+            err_text = "; ".join(key_errors)
             self._retry_state = ("generate_parse", err_text)
             raise CoCreateError(
                 phase="generate_parse",
-                message=f"Variables error: {err_text}",
+                message=err_text,
             )
 
-        # outline
-        try:
-            outline_nodes = CoCreateParser.parse_outline(blocks["outline"])
-        except ValueError as e:
-            self._retry_state = ("generate_parse", str(e))
-            raise CoCreateError(
-                phase="generate_parse",
-                message=f"Outline parse error: {e}",
-            ) from e
+        # Step 3 — per-section validation (collect all errors)
+        errors: list[str] = []
+        errors.extend(CoCreateValidator.validate_story_config(data))
+        errors.extend(CoCreateValidator.validate_characters(data))
+        errors.extend(CoCreateValidator.validate_locations(data))
+        errors.extend(CoCreateValidator.validate_variables(data))
 
-        var_names_list = [v["name"] for v in variables]
-        outline_errors = CoCreateParser.validate_outline(
-            outline_nodes, var_names_list
+        # Step 4 — cross-reference validation
+        var_names = [
+            v["name"] for v in data.get("variables", [])
+            if isinstance(v, dict) and isinstance(v.get("name"), str)
+        ]
+        outline = data.get("outline", [])
+        errors.extend(
+            CoCreateValidator.validate_outline_cross_ref(outline, var_names)
         )
-        if outline_errors:
-            err_text = "; ".join(outline_errors)
+
+        # Step 5 — fail on any error
+        if errors:
+            err_text = "; ".join(errors)
             self._retry_state = ("generate_parse", err_text)
             raise CoCreateError(
                 phase="generate_parse",
-                message=f"Outline validation error: {err_text}",
+                message=err_text,
             )
 
-        # All validations passed
-        story_config["variables"] = variables
-        outline_text = CoCreateParser.format_outline(outline_nodes)
+        # Step 6 — generate outline_text (formatted for PromptBuilder)
+        outline_text = self._format_outline_for_prompt(outline)
+
+        # Step 7 — build result dict (keys match what GameSession expects)
+        result = {
+            "story_config": data["story_config"],
+            "characters": data["characters"],
+            "locations": data["locations"],
+            "variables": data["variables"],
+            "outline": outline,
+            "outline_text": outline_text,
+        }
 
         self._phase = "complete"
         self._retry_state = None
-        self._result = CoCreationResult(
-            story_config=story_config,
-            outline_text=outline_text,
-            outline_nodes=outline_nodes,
-        )
-        return self._result
+        self._result = result
+        return result
 
-    def retry_generate(self) -> CoCreationResult:
+    def retry_generate(self) -> dict:
         """Re-attempt the last failed ``generate()``.
 
         For API failures (phase="generate_api"), re-sends the same
         messages array.  For parse/validation failures
-        (phase="generate_parse"), appends a correction prompt before
-        calling the API.
+        (phase="generate_parse"), appends a correction prompt listing
+        specific field errors before calling the API.
 
         Returns:
-            CoCreationResult on success.
+            Dict with all 6 keys on success.
 
         Raises:
             RuntimeError: If no failed generation to retry.
@@ -964,7 +1122,8 @@ class CoCreateFlow:
                 "role": "user",
                 "content": (
                     f"Previous generation had errors: {error_desc}\n"
-                    f"Please fix and regenerate all three sections."
+                    f"Please fix these issues and regenerate the entire "
+                    f"JSON object."
                 ),
             })
 

@@ -1,7 +1,7 @@
 """Configurable constants for Storyloom."""
 
 # ── Save format ──────────────────────────────────────────────────
-SAVE_VERSION = 1           # save file format version; mismatch → corrupt
+SAVE_VERSION = 2           # save file format version; mismatch → corrupt
 
 # ── Sliding window ─────────────────────────────────────────────
 WINDOW_SIZE = 3          # full rounds to keep in window
@@ -32,7 +32,7 @@ MAX_CONTEXT_TOKENS = 50_000   # target ceiling
 # Variable caps (per 2026-07-05 variable-cap spec)
 VARIABLE_CAP = 3            # max total variables
 VARIABLE_NUMERIC_CAP = 2    # max numeric (number) variables
-VARIABLE_LABEL_CAP = 1      # max string variables
+VARIABLE_STRING_CAP = 1     # max string variables
 
 # Story config title constraints
 STORY_TITLE_MIN_CHARS = 1

@@ -16,13 +16,13 @@ Game store:
 import queue
 import threading
 
-from storyloom.core.co_create import CoCreateFlow, CoCreationResult
+from storyloom.core.co_create import CoCreateFlow
 from storyloom.core.game_loop import GameLoop
 
 # ── Co-creation store ──────────────────────────────────────────────
 
 _co_create_flow: CoCreateFlow | None = None
-_co_create_result: CoCreationResult | None = None
+_co_create_result: dict | None = None
 
 
 def store_co_create(flow: CoCreateFlow) -> None:
@@ -44,13 +44,13 @@ def remove_co_create() -> None:
     _co_create_result = None
 
 
-def store_co_create_result(result: CoCreationResult) -> None:
+def store_co_create_result(result: dict) -> None:
     """Cache the co-creation result so game/new can consume it."""
     global _co_create_result
     _co_create_result = result
 
 
-def get_co_create_result() -> CoCreationResult | None:
+def get_co_create_result() -> dict | None:
     """Return the cached co-creation result, or None."""
     return _co_create_result
 

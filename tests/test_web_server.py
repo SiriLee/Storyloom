@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from storyloom.core.co_create import CoCreateError, CoCreationResult
+from storyloom.core.co_create import CoCreateError
 from storyloom.core.session import GameSession
 from storyloom.io.api_client import ApiClient
 from storyloom.user_config import UserConfig
@@ -209,22 +209,28 @@ class TestCoCreateRetrySend:
 
 
 SAMPLE_STORY_CONFIG = {
-    "genre": "cyberpunk", "tier": "short", "title": "Test",
-    "language": "zh-CN", "setting": "Test world",
-    "protagonist_name": "Tester",
-    "protagonist_identity": "Hacker",
-    "protagonist_traits": "Brave",
-    "tone": "Dark", "conflict": "Survival", "characters": "NPC | ally",
-    "variables": [{"name": "hp", "type": "number", "initial": 80}],
+    "tier": "short",
+    "title": "Test",
+    "language": "zh-CN",
+    "premise": "A cyberpunk test story.",
 }
 
-SAMPLE_RESULT = CoCreationResult(
-    story_config=SAMPLE_STORY_CONFIG,
-    outline_text="ch1 [active] — Start：Begin",
-    outline_nodes=[
+SAMPLE_RESULT = {
+    "story_config": SAMPLE_STORY_CONFIG,
+    "characters": [
+        {"name": "Tester", "role": "protagonist", "description": "A hacker", "appearance": "Tall"},
+    ],
+    "locations": [
+        {"id": "test_loc", "name": "Test", "description": "A place"},
+    ],
+    "variables": [
+        {"name": "hp", "type": "number", "initial": 80},
+    ],
+    "outline": [
         {"id": "ch1", "title": "Start", "goal": "Begin", "routes": []},
     ],
-)
+    "outline_text": "ch1 [active] — Start：Begin",
+}
 
 
 class TestCoCreateGenerate:

@@ -5,7 +5,7 @@ Per data-model.md §3.1-3.4.
 
 Directory layout::
 
-    saves/{label}_{compact_ts}/
+    saves/{title}_{compact_ts}/
         _init.json              # created at game start
         {cp_title}_{ts}.json    # per-checkpoint saves, appended
 """
@@ -31,6 +31,9 @@ class SaveManager:
 
     REQUIRED_FIELDS = [
         "story_config",
+        "characters",
+        "locations",
+        "variables",
         "state_vars",
         "outline",
         "progress",
@@ -147,11 +150,11 @@ class SaveManager:
                 f"{', '.join(missing)}"
             )
 
-        # Validate story_config has variables
-        if "variables" not in data["story_config"]:
+        # Validate variables is a top-level list (v2 format)
+        if not isinstance(data.get("variables"), list):
             self._remove_corrupt(path)
             raise ValueError(
-                f"Save '{filename}' is corrupt: story_config missing variables"
+                f"Save '{filename}' is corrupt: missing top-level variables"
             )
 
         # Validate current_node exists in outline
@@ -346,7 +349,7 @@ class SaveManager:
                     per game, no full iteration).
 
         Returns:
-            List of ``{game_id, title, language, genre, tier,
+            List of ``{game_id, title, language, premise, tier,
             created_at, save_count[, last_played_at]}`` dicts.
         """
         root_path = Path(root)
@@ -372,7 +375,7 @@ class SaveManager:
                 "game_id": game_dir.name,
                 "title": meta.get("title", game_dir.name),
                 "language": sc.get("language", ""),
-                "genre": sc.get("genre", ""),
+                "premise": sc.get("premise", ""),
                 "tier": sc.get("tier", ""),
                 "created_at": meta.get("created_at", ""),
                 "save_count": save_count,

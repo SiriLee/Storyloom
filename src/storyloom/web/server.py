@@ -242,8 +242,8 @@ async def co_create_generate():
     return {
         "status": "ok",
         "game_id": game_id,
-        "story_config": result.story_config,
-        "outline_text": result.outline_text,
+        "story_config": result["story_config"],
+        "outline_text": result["outline_text"],
     }
 
 
@@ -267,8 +267,8 @@ async def co_create_retry_generate():
     return {
         "status": "ok",
         "game_id": game_id,
-        "story_config": result.story_config,
-        "outline_text": result.outline_text,
+        "story_config": result["story_config"],
+        "outline_text": result["outline_text"],
     }
 
 

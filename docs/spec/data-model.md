@@ -154,7 +154,7 @@ saves/
 | `STORY_TITLE_MAX_CHARS` | 30 | 故事标题最长字符数 |
 | `VARIABLE_CAP` | 3 | 变量总数上限（per 2026-07-05 variable-cap spec） |
 | `VARIABLE_NUMERIC_CAP` | 2 | number 型变量上限 |
-| `VARIABLE_LABEL_CAP` | 1 | string 型变量上限 |
+| `VARIABLE_STRING_CAP` | 1 | string 型变量上限 |
 | `SUPPORTED_LANGUAGES` | `{"zh-CN", "zh-TW", "en"}` | 支持的语言集合 |
 | `DEFAULT_LANGUAGE` | `"en"` | 默认语言（语言未指定或不受支持时的 fallback） |
 

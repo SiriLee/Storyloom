@@ -21,7 +21,7 @@ class TestSaveManagerInstance:
     @pytest.fixture
     def save_data(self):
         return {
-            "version": 1,
+            "version": 2,
             "metadata": {
                 "title": "test-story",
                 "created_at": "2026-01-01T00:00:00Z",
@@ -29,11 +29,14 @@ class TestSaveManagerInstance:
             },
             "config": {"temperature": None},
             "story_config": {
-                "title": "test-story",
-                "genre": "fantasy",
                 "tier": "short",
-                "variables": [],
+                "title": "test-story",
+                "language": "en",
+                "premise": "A test story.",
             },
+            "characters": [],
+            "locations": [],
+            "variables": [],
             "state_vars": {},
             "outline": [
                 {
@@ -131,7 +134,7 @@ class TestSaveManagerInstance:
 
     def test_load_missing_fields_raises(self, game_dir):
         sm = SaveManager(game_dir)
-        save_data = {"version": 1, "metadata": {"title": "bad"}}
+        save_data = {"version": 2, "metadata": {"title": "bad"}}
         filename = sm.save(save_data, cp_title="test")
         with pytest.raises(ValueError, match="Missing required"):
             sm.load(filename)
@@ -178,10 +181,13 @@ class TestSaveManagerStatic:
         _, game_id, _ = SaveManager.create_game(root, "my_story")
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
-            "version": 1,
+            "version": 2,
             "metadata": {"title": "my_story", "created_at": "2026-01-01T00:00:00Z", "updated_at": ""},
             "config": {"temperature": None},
-            "story_config": {"title": "my_story", "language": "zh-CN", "genre": "fantasy", "tier": "short", "variables": []},
+            "story_config": {"tier": "short", "title": "my_story", "language": "zh-CN", "premise": "A fantasy story."},
+            "characters": [],
+            "locations": [],
+            "variables": [],
             "state_vars": {},
             "outline": [],
             "progress": {"current_node": "", "checkpoint_history": [], "checkpoint_snapshots": {}},
@@ -197,10 +203,13 @@ class TestSaveManagerStatic:
         _, game_id, _ = SaveManager.create_game(root, "test")
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
-            "version": 1,
+            "version": 2,
             "metadata": {"title": "test", "created_at": "2026-01-01T00:00:00Z", "updated_at": ""},
             "config": {"temperature": None},
-            "story_config": {"title": "test", "variables": []},
+            "story_config": {"tier": "short", "title": "test", "language": "en", "premise": "A test."},
+            "characters": [],
+            "locations": [],
+            "variables": [],
             "state_vars": {},
             "outline": [],
             "progress": {"current_node": "", "checkpoint_history": [], "checkpoint_snapshots": {}},
@@ -296,10 +305,13 @@ class TestLastPlayedTracking:
         _, game_id, _ = SaveManager.create_game(root, "test")
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
-            "version": 1,
+            "version": 2,
             "metadata": {"title": "test"},
             "config": {},
-            "story_config": {"title": "test", "variables": []},
+            "story_config": {"tier": "short", "title": "test", "language": "en", "premise": "A test."},
+            "characters": [],
+            "locations": [],
+            "variables": [],
             "state_vars": {},
             "outline": [],
             "progress": {"current_node": ""},
@@ -315,10 +327,13 @@ class TestLastPlayedTracking:
         _, game_id, _ = SaveManager.create_game(root, "test")
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
-            "version": 1,
+            "version": 2,
             "metadata": {"title": "test"},
             "config": {},
-            "story_config": {"title": "test", "variables": []},
+            "story_config": {"tier": "short", "title": "test", "language": "en", "premise": "A test."},
+            "characters": [],
+            "locations": [],
+            "variables": [],
             "state_vars": {},
             "outline": [],
             "progress": {"current_node": ""},
@@ -333,10 +348,13 @@ class TestLastPlayedTracking:
         _, game_id, _ = SaveManager.create_game(root, "test")
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
-            "version": 1,
+            "version": 2,
             "metadata": {"title": "test"},
             "config": {},
-            "story_config": {"title": "test", "variables": []},
+            "story_config": {"tier": "short", "title": "test", "language": "en", "premise": "A test."},
+            "characters": [],
+            "locations": [],
+            "variables": [],
             "state_vars": {},
             "outline": [],
             "progress": {"current_node": ""},

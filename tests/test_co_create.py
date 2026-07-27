@@ -1,534 +1,497 @@
-"""Tests for co-create parser and flow."""
+"""Tests for co-create validator and flow."""
 import pytest
-from storyloom.core.co_create import CoCreateParser
+from storyloom.core.co_create import CoCreateValidator, CoCreateFlow, CoCreateError
 from storyloom.io.api_client import ApiError
 from storyloom.i18n import init_i18n
 init_i18n("en")  # Use English for deterministic test output
 
 
-class TestSplitBlocks:
-    """Tests for _split_blocks — splitting LLM response into 3 sections."""
+# ══════════════════════════════════════════════════════════════════════════
+# Full JSON generation response (v2 format)
+# ══════════════════════════════════════════════════════════════════════════
 
-    def test_split_three_blocks(self):
-        text = """=== story_config ===
-genre: fantasy
-tier: short
-
-=== variables ===
-hp: number, 80
-
-=== outline ===
-[node]
-id: ch1
-title: start
-goal: begin
-routes:"""
-        result = CoCreateParser.split_blocks(text)
-        assert "genre: fantasy" in result["story_config"]
-        assert "hp: number" in result["variables"]
-        assert "[node]" in result["outline"]
-
-    def test_split_missing_block_sets_empty(self):
-        text = """=== story_config ===
-genre: fantasy
-tier: short"""
-        result = CoCreateParser.split_blocks(text)
-        assert result["story_config"] != ""
-        assert result["variables"] == ""
-        assert result["outline"] == ""
-
-    def test_split_empty_text_returns_all_empty(self):
-        result = CoCreateParser.split_blocks("")
-        assert result == {"story_config": "", "variables": "", "outline": ""}
-
-    def test_split_handles_spurious_delimiters_in_content(self):
-        """Lines containing === that are not block delimiters should be kept as content."""
-        text = """=== story_config ===
-genre: fantasy
-note: use === sparingly
-tier: short
-
-=== variables ===
-hp: number, 80
-
-=== outline ===
-[node]
-id: ch1"""
-        result = CoCreateParser.split_blocks(text)
-        assert "use === sparingly" in result["story_config"]
-        assert "hp: number" in result["variables"]
-
-    def test_split_no_spaces_around_block_name(self):
-        """===story_config=== (no spaces around name) should still parse."""
-        text = """===story_config===
-genre: fantasy
-tier: short
-
-===variables===
-hp: number, 80
-
-===outline===
-[node]
-id: ch1"""
-        result = CoCreateParser.split_blocks(text)
-        assert "genre: fantasy" in result["story_config"]
-        assert "hp: number" in result["variables"]
-        assert "[node]" in result["outline"]
-
-    def test_split_spaces_in_block_name(self):
-        """=== story config === (spaces in name) should normalise to story_config."""
-        text = """=== story config ===
-genre: fantasy
-tier: short
-
-=== variables ===
-hp: number, 80
-
-=== outline ===
-[node]
-id: ch1"""
-        result = CoCreateParser.split_blocks(text)
-        assert "genre: fantasy" in result["story_config"]
-        assert "hp: number" in result["variables"]
-        assert "[node]" in result["outline"]
-
-    def test_split_mixed_spacing_block_name(self):
-        """===story config=== (mixed: no outer spaces, space in name)."""
-        text = """===story config===
-genre: fantasy
-tier: short
-
-=== variables ===
-hp: number, 80
-
-=== outline ===
-[node]
-id: ch1"""
-        result = CoCreateParser.split_blocks(text)
-        assert "genre: fantasy" in result["story_config"]
-        assert "hp: number" in result["variables"]
-
-    def test_split_asymmetric_spacing(self):
-        """=== story_config=== (space only on left) should still match."""
-        text = """=== story_config===
-genre: fantasy
-tier: short
-
-=== variables ===
-hp: number, 80
-
-=== outline ===
-[node]
-id: ch1"""
-        result = CoCreateParser.split_blocks(text)
-        assert "genre: fantasy" in result["story_config"]
+FULL_GENERATION_RESPONSE = """{
+  "story_config": {
+    "tier": "medium",
+    "title": "Neon Depths",
+    "language": "zh-CN",
+    "premise": "2087年新东京，数据是唯一货币。林焰，前荒坂安全顾问转自由佣兵，卷入了一场争夺被盗生物芯片的追逐。"
+  },
+  "characters": [
+    {
+      "name": "林焰",
+      "role": "protagonist",
+      "description": "前荒坂安全顾问，现自由佣兵。冷静、道德灰色、 fiercely loyal",
+      "appearance": "身材高大，眼神锐利，黑色短发，下颌有一道淡淡的疤痕。穿着磨损的合成皮外套搭配战术装备。"
+    },
+    {
+      "name": "耗子",
+      "role": "supporting",
+      "description": "地下情报贩子，有旧债未清。滑头、足智多谋、偏执",
+      "appearance": "矮小精瘦，动作敏捷，增强眼睛扫描数据流时闪烁蓝光。穿着褪色的街头时尚。"
+    },
+    {
+      "name": "美智子",
+      "role": "supporting",
+      "description": "荒坂安全主管，前导师。忠于职责与旧日情谊之间挣扎",
+      "appearance": "穿着无可挑剔的黑色西装，银发紧束。冷笑中带着洞察一切的眼神。"
+    }
+  ],
+  "locations": [
+    {
+      "id": "neo_tokyo_streets",
+      "name": "新东京街头",
+      "description": "午夜霓虹闪烁的街道，全息广告在摩天大楼表面闪烁。"
+    },
+    {
+      "id": "underground_bar",
+      "name": "鼠巢酒吧",
+      "description": "面馆下方的昏暗地下酒吧，闪烁的霓虹招牌。"
+    }
+  ],
+  "variables": [
+    {"name": "体力", "type": "number", "initial": 80},
+    {"name": "信任度", "type": "number", "initial": 10},
+    {"name": "所属势力", "type": "string", "initial": "自由佣兵"}
+  ],
+  "outline": [
+    {
+      "id": "ch1_intro",
+      "title": "霓虹深渊",
+      "goal": "在地下城酒吧感受氛围，获取情报",
+      "routes": [
+        {"condition": null, "target": "ch2_meeting"}
+      ]
+    },
+    {
+      "id": "ch2_meeting",
+      "title": "地下交易",
+      "goal": "与耗子会面完成芯片交易",
+      "routes": [
+        {"condition": "信任度 >= 30", "target": "ch3_ally"},
+        {"condition": "信任度 < 30", "target": "ch3_betrayal"}
+      ]
+    },
+    {
+      "id": "ch3_ally",
+      "title": "盟友之路",
+      "goal": "通过地下网络逃离",
+      "routes": [
+        {"condition": null, "target": "ch4_safehouse"}
+      ]
+    },
+    {
+      "id": "ch3_betrayal",
+      "title": "背叛之路",
+      "goal": "杀出重围",
+      "routes": [
+        {"condition": null, "target": "ch4_safehouse"}
+      ]
+    },
+    {
+      "id": "ch4_safehouse",
+      "title": "安全屋",
+      "goal": "揭开芯片秘密",
+      "routes": []
+    }
+  ]
+}"""
 
 
-class TestParseStoryConfig:
-    """Tests for parse_story_config — INI-style key: value parsing."""
+# ══════════════════════════════════════════════════════════════════════════
+# CoCreateValidator tests
+# ══════════════════════════════════════════════════════════════════════════
 
-    VALID_CONFIG = """genre: 赛博朋克冒险
-tier: medium
-title: test-story
-setting: 2087年新东京地下城
-protagonist_name: 林焰
-protagonist_identity: 前荒坂安全顾问，现自由佣兵
-protagonist_traits: 冷静、道德灰色
-tone: 黑暗冷峻
-conflict: 一枚神秘芯片正在寻找宿主
-characters:
-  耗子 | 地下情报贩子 | 亦敌亦友
-  美智子 | 荒坂安全主管 | 前上司"""
+class TestCoCreateValidatorJson:
+    """Tests for validate_json()."""
 
-    def test_parse_complete_valid_config(self):
-        result = CoCreateParser.parse_story_config(self.VALID_CONFIG)
-        assert result["genre"] == "赛博朋克冒险"
-        assert result["tier"] == "medium"
-        assert result["setting"] == "2087年新东京地下城"
-        assert result["protagonist_name"] == "林焰"
-        assert result["protagonist_identity"] == "前荒坂安全顾问，现自由佣兵"
-        assert result["protagonist_traits"] == "冷静、道德灰色"
-        assert result["tone"] == "黑暗冷峻"
-        assert result["conflict"] == "一枚神秘芯片正在寻找宿主"
-        assert "耗子" in result["characters"]
-        assert "美智子" in result["characters"]
+    def test_valid_json_returns_dict(self):
+        data, error = CoCreateValidator.validate_json('{"a": 1}')
+        assert data == {"a": 1}
+        assert error is None
 
-    def test_parse_without_setting_still_works(self):
-        text = """genre: fantasy
-tier: short
-title: test-story
-setting:
-protagonist_name: Kael
-protagonist_identity: mercenary
-protagonist_traits: brave
-tone: dark
-conflict: a war
-characters:
-  Mouse | spy | friend"""
-        result = CoCreateParser.parse_story_config(text)
-        assert result["setting"] == ""
-        assert result["genre"] == "fantasy"
+    def test_invalid_json_returns_error(self):
+        data, error = CoCreateValidator.validate_json("not json")
+        assert data is None
+        assert error is not None
+        assert "Invalid JSON format" in error
 
-    def test_missing_required_field_raises_parse_error(self):
-        text = """genre: fantasy
-tier: short
-title: test-story
-protagonist_name: Kael
-protagonist_identity: mercenary
-protagonist_traits: brave
-tone: dark
-conflict: a war"""
-        with pytest.raises(ValueError, match="Missing required fields"):
-            CoCreateParser.parse_story_config(text)
+    def test_markdown_fence_is_stripped(self):
+        text = '```json\n{"a": 1}\n```'
+        data, error = CoCreateValidator.validate_json(text)
+        assert data == {"a": 1}
+        assert error is None
 
-    def test_invalid_tier_raises_parse_error(self):
-        text = """genre: fantasy
-tier: epic
-title: test-story
-setting: somewhere
-protagonist_name: Kael
-protagonist_identity: mercenary
-protagonist_traits: brave
-tone: dark
-conflict: a war
-characters:
-  Mouse | spy | friend"""
-        with pytest.raises(ValueError, match="Unknown tier"):
-            CoCreateParser.parse_story_config(text)
+    def test_markdown_fence_no_lang_tag(self):
+        text = '```\n{"a": 1}\n```'
+        data, error = CoCreateValidator.validate_json(text)
+        assert data == {"a": 1}
+        assert error is None
 
-    def test_empty_text_raises_parse_error(self):
-        with pytest.raises(ValueError, match="Empty"):
-            CoCreateParser.parse_story_config("")
+    def test_array_root_is_rejected(self):
+        data, error = CoCreateValidator.validate_json('[1, 2, 3]')
+        assert data is None
+        assert error is not None
+        assert "object" in error.lower()
 
-    def test_characters_single_entry(self):
-        text = """genre: fantasy
-tier: short
-title: test-story
-setting: somewhere
-protagonist_name: Kael
-protagonist_identity: mercenary
-protagonist_traits: brave
-tone: dark
-conflict: a war
-characters:
-  Mouse | spy | friend"""
-        result = CoCreateParser.parse_story_config(text)
-        assert "Mouse" in result["characters"]
+    def test_string_root_is_rejected(self):
+        data, error = CoCreateValidator.validate_json('"hello"')
+        assert data is None
+        assert error is not None
 
-    def test_language_field_defaults(self):
-        """language field defaults to DEFAULT_LANGUAGE if not provided."""
-        result = CoCreateParser.parse_story_config(self.VALID_CONFIG)
-        assert result.get("language", "en") == "en"
+    def test_empty_string_is_invalid_json(self):
+        data, error = CoCreateValidator.validate_json("")
+        assert data is None
+        assert error is not None
 
 
-class TestParseVariables:
-    """Tests for parse_variables."""
+class TestCoCreateValidatorStoryConfig:
+    """Tests for validate_story_config()."""
 
-    VALID_VARS = """体力: number, 80
-信任度: number, 10
-所属势力: string, 自由佣兵"""
+    def test_valid_story_config_passes(self):
+        data = {
+            "story_config": {
+                "tier": "medium",
+                "title": "霓虹深渊",
+                "language": "zh-CN",
+                "premise": "一个赛博朋克故事",
+            }
+        }
+        errors = CoCreateValidator.validate_story_config(data)
+        assert errors == []
 
-    def test_parse_three_valid_variables(self):
-        result = CoCreateParser.parse_variables(self.VALID_VARS)
-        assert len(result) == 3
-        assert result[0] == {"name": "体力", "type": "number", "initial": 80}
-        assert result[1] == {"name": "信任度", "type": "number", "initial": 10}
-        assert result[2] == {"name": "所属势力", "type": "string", "initial": "自由佣兵"}
+    def test_invalid_tier(self):
+        data = {"story_config": {"tier": "epic", "title": "测试", "language": "en", "premise": "test"}}
+        errors = CoCreateValidator.validate_story_config(data)
+        assert any("tier" in e for e in errors)
 
-    def test_parse_single_variable(self):
-        text = "理智值: number, 50"
-        result = CoCreateParser.parse_variables(text)
-        assert len(result) == 1
-        assert result[0]["name"] == "理智值"
+    def test_title_too_long(self):
+        data = {"story_config": {"tier": "short", "title": "a" * 31, "language": "en", "premise": "test"}}
+        errors = CoCreateValidator.validate_story_config(data)
+        assert any("title" in e.lower() and "long" in e.lower() for e in errors)
 
-    def test_empty_text_returns_empty_variables(self):
-        result = CoCreateParser.parse_variables("")
-        assert result == []
+    def test_empty_title(self):
+        data = {"story_config": {"tier": "short", "title": "", "language": "en", "premise": "test"}}
+        errors = CoCreateValidator.validate_story_config(data)
+        assert any("title" in e.lower() for e in errors)
 
-    def test_malformed_line_raises_parse_error(self):
-        text = "bad line without proper format"
-        with pytest.raises(ValueError, match="Cannot parse variable"):
-            CoCreateParser.parse_variables(text)
+    def test_invalid_language(self):
+        data = {"story_config": {"tier": "short", "title": "测试", "language": "fr", "premise": "test"}}
+        errors = CoCreateValidator.validate_story_config(data)
+        assert any("language" in e for e in errors)
 
-    def test_unknown_type_raises_parse_error(self):
-        text = "体力: boolean, true"
-        with pytest.raises(ValueError, match="Unknown type"):
-            CoCreateParser.parse_variables(text)
+    def test_empty_premise(self):
+        data = {"story_config": {"tier": "short", "title": "测试", "language": "en", "premise": ""}}
+        errors = CoCreateValidator.validate_story_config(data)
+        assert any("premise" in e.lower() for e in errors)
 
-    def test_number_initial_not_integer_raises_parse_error(self):
-        text = "体力: number, high"
-        with pytest.raises(ValueError, match="integer"):
-            CoCreateParser.parse_variables(text)
-
-    def test_name_with_illegal_colon_raises_parse_error(self):
-        text = "体:力: number, 80"
-        with pytest.raises(ValueError, match="Cannot parse variable"):
-            CoCreateParser.parse_variables(text)
+    def test_missing_story_config_key(self):
+        data = {}
+        errors = CoCreateValidator.validate_story_config(data)
+        assert len(errors) == 1
+        assert "object" in errors[0].lower()
 
 
-class TestValidateVariables:
-    """Tests for validate_variables."""
+class TestCoCreateValidatorCharacters:
+    """Tests for validate_characters()."""
 
-    def test_all_valid_passes(self):
-        vars_list = [
-            {"name": "体力", "type": "number", "initial": 80},
-            {"name": "信任度", "type": "number", "initial": 10},
-            {"name": "所属势力", "type": "string", "initial": "自由佣兵"},
-        ]
-        errors = CoCreateParser.validate_variables(vars_list)
+    def test_valid_characters_passes(self):
+        data = {
+            "characters": [
+                {"name": "林焰", "role": "protagonist", "description": "佣兵", "appearance": "高大"},
+                {"name": "耗子", "role": "supporting", "description": "情报贩子", "appearance": "矮小"},
+            ]
+        }
+        errors = CoCreateValidator.validate_characters(data)
+        assert errors == []
+
+    def test_antagonist_role_is_valid(self):
+        data = {
+            "characters": [
+                {"name": "Hero", "role": "protagonist", "description": "hero desc", "appearance": "tall"},
+                {"name": "Villain", "role": "antagonist", "description": "villain desc", "appearance": "dark"},
+            ]
+        }
+        errors = CoCreateValidator.validate_characters(data)
+        assert errors == []
+
+    def test_empty_array_is_rejected(self):
+        data = {"characters": []}
+        errors = CoCreateValidator.validate_characters(data)
+        assert len(errors) >= 1
+
+    def test_missing_protagonist(self):
+        data = {
+            "characters": [
+                {"name": "NPC", "role": "supporting", "description": "someone", "appearance": "plain"},
+            ]
+        }
+        errors = CoCreateValidator.validate_characters(data)
+        assert any("protagonist" in e.lower() for e in errors)
+
+    def test_multiple_protagonists(self):
+        data = {
+            "characters": [
+                {"name": "A", "role": "protagonist", "description": "d", "appearance": "a"},
+                {"name": "B", "role": "protagonist", "description": "d", "appearance": "b"},
+            ]
+        }
+        errors = CoCreateValidator.validate_characters(data)
+        assert any("2" in e or "exactly 1" in e.lower() for e in errors)
+
+    def test_invalid_role(self):
+        data = {
+            "characters": [
+                {"name": "Hero", "role": "protagonist", "description": "d", "appearance": "a"},
+                {"name": "NPC", "role": "extra", "description": "d", "appearance": "b"},
+            ]
+        }
+        errors = CoCreateValidator.validate_characters(data)
+        assert any("role" in e for e in errors)
+
+    def test_missing_required_field(self):
+        data = {
+            "characters": [
+                {"name": "Hero", "role": "protagonist", "description": "", "appearance": "tall"},
+            ]
+        }
+        errors = CoCreateValidator.validate_characters(data)
+        assert any("description" in e for e in errors)
+
+    def test_missing_name(self):
+        data = {
+            "characters": [
+                {"name": "", "role": "protagonist", "description": "someone", "appearance": "tall"},
+            ]
+        }
+        errors = CoCreateValidator.validate_characters(data)
+        assert any("name" in e for e in errors)
+
+
+class TestCoCreateValidatorLocations:
+    """Tests for validate_locations()."""
+
+    def test_valid_locations_passes(self):
+        data = {
+            "locations": [
+                {"id": "neo_tokyo_streets", "name": "新东京街头", "description": "霓虹街道"},
+                {"id": "underground_bar", "name": "鼠巢", "description": "地下酒吧"},
+            ]
+        }
+        errors = CoCreateValidator.validate_locations(data)
+        assert errors == []
+
+    def test_empty_array_is_rejected(self):
+        data = {"locations": []}
+        errors = CoCreateValidator.validate_locations(data)
+        assert len(errors) >= 1
+
+    def test_non_snake_case_id(self):
+        data = {
+            "locations": [
+                {"id": "Neo Tokyo", "name": "新东京", "description": "desc"},
+            ]
+        }
+        errors = CoCreateValidator.validate_locations(data)
+        assert any("snake_case" in e for e in errors)
+
+    def test_empty_id(self):
+        data = {
+            "locations": [
+                {"id": "", "name": "某地", "description": "desc"},
+            ]
+        }
+        errors = CoCreateValidator.validate_locations(data)
+        assert any("id" in e for e in errors)
+
+    def test_duplicate_id(self):
+        data = {
+            "locations": [
+                {"id": "same_id", "name": "A", "description": "desc a"},
+                {"id": "same_id", "name": "B", "description": "desc b"},
+            ]
+        }
+        errors = CoCreateValidator.validate_locations(data)
+        assert any("unique" in e for e in errors)
+
+    def test_missing_name(self):
+        data = {
+            "locations": [
+                {"id": "test_loc", "name": "", "description": "desc"},
+            ]
+        }
+        errors = CoCreateValidator.validate_locations(data)
+        assert any("name" in e for e in errors)
+
+    def test_missing_description(self):
+        data = {
+            "locations": [
+                {"id": "test_loc", "name": "某地", "description": ""},
+            ]
+        }
+        errors = CoCreateValidator.validate_locations(data)
+        assert any("description" in e for e in errors)
+
+
+class TestCoCreateValidatorVariables:
+    """Tests for validate_variables()."""
+
+    def test_valid_variables_passes(self):
+        data = {
+            "variables": [
+                {"name": "体力", "type": "number", "initial": 80},
+                {"name": "信任度", "type": "number", "initial": 10},
+                {"name": "所属势力", "type": "string", "initial": "自由佣兵"},
+            ]
+        }
+        errors = CoCreateValidator.validate_variables(data)
         assert errors == []
 
     def test_count_exceeds_cap(self):
-        vars_list = [
-            {"name": f"var{i}", "type": "number", "initial": 50}
-            for i in range(4)
-        ]
-        errors = CoCreateParser.validate_variables(vars_list)
+        data = {
+            "variables": [
+                {"name": f"var{i}", "type": "number", "initial": 50}
+                for i in range(4)
+            ]
+        }
+        errors = CoCreateValidator.validate_variables(data)
         assert any("exceeds maximum 3" in e for e in errors)
 
     def test_too_many_numeric(self):
-        vars_list = [
-            {"name": "a", "type": "number", "initial": 50},
-            {"name": "b", "type": "number", "initial": 50},
-            {"name": "c", "type": "number", "initial": 50},
-        ]
-        errors = CoCreateParser.validate_variables(vars_list)
+        data = {
+            "variables": [
+                {"name": "a", "type": "number", "initial": 50},
+                {"name": "b", "type": "number", "initial": 50},
+                {"name": "c", "type": "number", "initial": 50},
+            ]
+        }
+        errors = CoCreateValidator.validate_variables(data)
         assert any("numeric" in e.lower() for e in errors)
 
     def test_too_many_strings(self):
-        vars_list = [
-            {"name": "a", "type": "string", "initial": "x"},
-            {"name": "b", "type": "string", "initial": "y"},
-            {"name": "c", "type": "number", "initial": 50},
-        ]
-        errors = CoCreateParser.validate_variables(vars_list)
+        data = {
+            "variables": [
+                {"name": "a", "type": "string", "initial": "x"},
+                {"name": "b", "type": "string", "initial": "y"},
+                {"name": "c", "type": "number", "initial": 50},
+            ]
+        }
+        errors = CoCreateValidator.validate_variables(data)
         assert any("string" in e.lower() for e in errors)
 
     def test_number_out_of_bounds(self):
-        vars_list = [
-            {"name": "体力", "type": "number", "initial": 150},
-        ]
-        errors = CoCreateParser.validate_variables(vars_list)
+        data = {
+            "variables": [
+                {"name": "体力", "type": "number", "initial": 150},
+            ]
+        }
+        errors = CoCreateValidator.validate_variables(data)
         assert any("out of range" in e for e in errors)
 
     def test_number_below_zero(self):
-        vars_list = [
-            {"name": "体力", "type": "number", "initial": -10},
-        ]
-        errors = CoCreateParser.validate_variables(vars_list)
-        assert len(errors) >= 1
+        data = {
+            "variables": [
+                {"name": "体力", "type": "number", "initial": -10},
+            ]
+        }
+        errors = CoCreateValidator.validate_variables(data)
+        assert any("out of range" in e for e in errors)
+
+    def test_bool_rejected_for_number(self):
+        """bool is an int subclass — must be rejected per plan §A.5."""
+        data = {
+            "variables": [
+                {"name": "flag", "type": "number", "initial": True},
+            ]
+        }
+        errors = CoCreateValidator.validate_variables(data)
+        assert any("integer" in e.lower() or "bool" in str(e).lower() for e in errors)
 
     def test_string_empty_initial(self):
-        vars_list = [
-            {"name": "tag", "type": "string", "initial": ""},
-        ]
-        errors = CoCreateParser.validate_variables(vars_list)
-        assert any("empty" in e.lower() or "非空" in e for e in errors)
+        data = {
+            "variables": [
+                {"name": "tag", "type": "string", "initial": ""},
+            ]
+        }
+        errors = CoCreateValidator.validate_variables(data)
+        assert any("empty" in e.lower() or "non-empty" in e.lower() for e in errors)
 
     def test_duplicate_names(self):
-        vars_list = [
-            {"name": "体力", "type": "number", "initial": 80},
-            {"name": "体力", "type": "number", "initial": 50},
-        ]
-        errors = CoCreateParser.validate_variables(vars_list)
-        assert any("duplicate" in e.lower() or "重复" in e for e in errors)
+        data = {
+            "variables": [
+                {"name": "体力", "type": "number", "initial": 80},
+                {"name": "体力", "type": "number", "initial": 50},
+            ]
+        }
+        errors = CoCreateValidator.validate_variables(data)
+        assert any("duplicate" in e.lower() for e in errors)
 
-class TestParseOutline:
-    """Tests for parse_outline — [node] block parsing."""
+    def test_invalid_type(self):
+        data = {
+            "variables": [
+                {"name": "x", "type": "boolean", "initial": True},
+            ]
+        }
+        errors = CoCreateValidator.validate_variables(data)
+        assert any("type" in e for e in errors)
 
-    VALID_OUTLINE = """[node]
-id: ch1_intro
-title: 霓虹深渊
-goal: 在地下城酒吧感受氛围
-routes: → ch2_meeting
-
-[node]
-id: ch2_meeting
-title: 地下交易
-goal: 与耗子会面
-routes:
-  if 信任度 >= 30 → ch3_ally
-  if 信任度 < 30 → ch3_betrayal
-
-[node]
-id: ch3_ally
-title: 盟友之路
-goal: 通过地下网络逃离
-routes: → ch4_safehouse
-
-[node]
-id: ch3_betrayal
-title: 背叛之路
-goal: 杀出重围
-routes: → ch4_safehouse
-
-[node]
-id: ch4_safehouse
-title: 安全屋
-goal: 揭开芯片秘密
-routes:"""
-
-    def test_parse_valid_branching_outline(self):
-        nodes = CoCreateParser.parse_outline(self.VALID_OUTLINE)
-        assert len(nodes) == 5
-        assert nodes[0]["id"] == "ch1_intro"
-        assert nodes[0]["title"] == "霓虹深渊"
-        assert nodes[0]["goal"] == "在地下城酒吧感受氛围"
-        assert nodes[0]["routes"] == [{"condition": None, "target": "ch2_meeting"}]
-
-    def test_parse_branching_node(self):
-        nodes = CoCreateParser.parse_outline(self.VALID_OUTLINE)
-        ch2 = nodes[1]
-        assert ch2["id"] == "ch2_meeting"
-        assert len(ch2["routes"]) == 2
-        assert ch2["routes"][0] == {"condition": "信任度 >= 30", "target": "ch3_ally"}
-        assert ch2["routes"][1] == {"condition": "信任度 < 30", "target": "ch3_betrayal"}
-
-    def test_parse_ending_node(self):
-        nodes = CoCreateParser.parse_outline(self.VALID_OUTLINE)
-        ending = nodes[4]
-        assert ending["id"] == "ch4_safehouse"
-        assert ending["routes"] == []
-
-    def test_parse_linear_outline(self):
-        text = """[node]
-id: ch1
-title: start
-goal: begin
-routes: → ch2
-
-[node]
-id: ch2
-title: end
-goal: finish
-routes:"""
-        nodes = CoCreateParser.parse_outline(text)
-        assert len(nodes) == 2
-
-    def test_parse_no_routes_field(self):
-        text = """[node]
-id: ch1
-title: only
-goal: solo"""
-        nodes = CoCreateParser.parse_outline(text)
-        assert len(nodes) == 1
-        assert nodes[0]["routes"] == []
-
-    def test_empty_outline_raises_parse_error(self):
-        with pytest.raises(ValueError, match="Empty|No nodes"):
-            CoCreateParser.parse_outline("")
-
-    def test_node_without_id_raises_parse_error(self):
-        text = """[node]
-title: missing id
-goal: something"""
-        with pytest.raises(ValueError, match="Missing 'id'"):
-            CoCreateParser.parse_outline(text)
-
-    def test_node_without_title_raises_parse_error(self):
-        text = """[node]
-id: ch1
-goal: something"""
-        with pytest.raises(ValueError, match="Missing 'title'"):
-            CoCreateParser.parse_outline(text)
-
-
-class TestValidateOutline:
-    """Tests for validate_outline."""
-
-    def _make_nodes(self, *ids_and_targets):
-        nodes = []
-        for node_id, routes in ids_and_targets:
-            nodes.append({
-                "id": node_id,
-                "title": node_id,
-                "goal": "test",
-                "routes": [
-                    {"condition": c, "target": t} for c, t in routes
-                ],
-            })
-        return nodes
-
-    def test_all_valid_passes(self):
-        nodes = self._make_nodes(
-            ("ch1", [(None, "ch2")]),
-            ("ch2", [(None, "ch3")]),
-            ("ch3", []),
-        )
-        errors = CoCreateParser.validate_outline(nodes, ["hp"])
+    def test_empty_variables_array_passes(self):
+        data = {"variables": []}
+        errors = CoCreateValidator.validate_variables(data)
         assert errors == []
 
-    def test_route_target_missing_rejected(self):
-        nodes = self._make_nodes(
-            ("ch1", [(None, "ch2")]),
-            ("ch2", [(None, "ch99")]),
-        )
-        errors = CoCreateParser.validate_outline(nodes, [])
+
+class TestCoCreateValidatorOutline:
+    """Tests for validate_outline_cross_ref()."""
+
+    def test_valid_outline_passes(self):
+        outline = [
+            {"id": "ch1", "title": "开始", "goal": "start", "routes": [
+                {"condition": None, "target": "ch2"},
+            ]},
+            {"id": "ch2", "title": "结束", "goal": "end", "routes": []},
+        ]
+        errors = CoCreateValidator.validate_outline_cross_ref(outline, ["hp"])
+        assert errors == []
+
+    def test_empty_array_is_rejected(self):
+        errors = CoCreateValidator.validate_outline_cross_ref([], [])
+        assert len(errors) >= 1
+
+    def test_route_target_missing(self):
+        outline = [
+            {"id": "ch1", "title": "t", "goal": "g", "routes": [
+                {"condition": None, "target": "ch99"},
+            ]},
+            {"id": "ch2", "title": "t", "goal": "g", "routes": []},
+        ]
+        errors = CoCreateValidator.validate_outline_cross_ref(outline, [])
         assert any("ch99" in e for e in errors)
 
-    def test_final_node_has_branches_rejected(self):
-        nodes = self._make_nodes(
-            ("ch1", [(None, "ch2")]),
-            ("ch2", [(None, "ch3")]),
-            ("ch3", [(None, "ch1")]),
-        )
-        errors = CoCreateParser.validate_outline(nodes, [])
-        assert any("final" in e.lower() or "最后" in e for e in errors)
-
-    def test_zero_nodes_rejected(self):
-        errors = CoCreateParser.validate_outline([], [])
-        assert any("1" in e for e in errors)
-
-    def test_unknown_variable_in_condition_warns_only(self):
-        nodes = self._make_nodes(
-            ("ch1", [("unknown_var > 10", "ch2")]),
-            ("ch2", []),
-        )
-        errors = CoCreateParser.validate_outline(nodes, ["hp"])
-        assert not errors
-
-
-class TestFormatOutline:
-    """Tests for format_outline — convert [node] blocks to GameLoop format."""
-
-    def test_format_simple_linear_outline(self):
-        nodes = [
-            {"id": "ch1", "title": "开始", "goal": "开场",
-             "routes": [{"condition": None, "target": "ch2"}]},
-            {"id": "ch2", "title": "结局", "goal": "收尾",
-             "routes": []},
+    def test_final_node_has_branches(self):
+        outline = [
+            {"id": "ch1", "title": "t", "goal": "g", "routes": [
+                {"condition": None, "target": "ch2"},
+            ]},
+            {"id": "ch2", "title": "t", "goal": "g", "routes": [
+                {"condition": None, "target": "ch1"},
+            ]},
         ]
-        result = CoCreateParser.format_outline(nodes)
-        assert "ch1 [active] — 开始：开场" in result
-        assert "→ ch2 [pending]" in result
-        assert "ch2 [pending] — 结局：收尾" in result
+        errors = CoCreateValidator.validate_outline_cross_ref(outline, [])
+        assert any("final" in e.lower() for e in errors)
 
-    def test_format_branching_outline(self):
-        nodes = [
-            {"id": "ch1", "title": "起点", "goal": "start",
-             "routes": [
-                 {"condition": "a > 5", "target": "ch2a"},
-                 {"condition": "a <= 5", "target": "ch2b"},
-             ]},
-            {"id": "ch2a", "title": "A路", "goal": "path a",
-             "routes": []},
-            {"id": "ch2b", "title": "B路", "goal": "path b",
-             "routes": []},
+    def test_duplicate_node_ids(self):
+        outline = [
+            {"id": "ch1", "title": "a", "goal": "g", "routes": []},
+            {"id": "ch1", "title": "b", "goal": "g", "routes": []},
         ]
-        result = CoCreateParser.format_outline(nodes)
-        assert "├→ ch2a [pending]" in result
-        assert "└→ ch2b [pending]" in result
-
-    def test_format_ending_node_no_routes(self):
-        nodes = [
-            {"id": "ch1", "title": "终", "goal": "end", "routes": []},
-        ]
-        result = CoCreateParser.format_outline(nodes)
-        assert "ch1 [active]" in result
-        assert "→" not in result
+        errors = CoCreateValidator.validate_outline_cross_ref(outline, [])
+        assert any("duplicate" in e.lower() for e in errors)
 
 
-# ── Integration Tests ────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+# Integration helpers
+# ══════════════════════════════════════════════════════════════════════════
 
 class MockApiClient:
     """Mock API client that returns predefined responses."""
@@ -557,34 +520,30 @@ def make_mock_api_client():
     return MockApiClient()
 
 
+# ══════════════════════════════════════════════════════════════════════════
+# CoCreateFlow state machine tests
+# ══════════════════════════════════════════════════════════════════════════
+
 class TestCoCreateFlowStateMachineProperties:
     """Tests for phase, result properties."""
 
     def test_initial_phase_is_init(self):
-        """phase returns 'init' before start() is called."""
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         flow = CoCreateFlow(api)
         assert flow.phase == "init"
 
     def test_result_is_none_initially(self):
-        """result is None before co-creation completes."""
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         flow = CoCreateFlow(api)
         assert flow.result is None
 
     def test_phase_transitions_after_start(self):
-        """phase changes to 'awaiting_idea' after start()."""
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         flow = CoCreateFlow(api)
         flow.start()
         assert flow.phase == "awaiting_idea"
 
     def test_abort_changes_phase(self):
-        """abort() sets phase to 'aborted'."""
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         flow = CoCreateFlow(api)
         flow.abort()
@@ -595,7 +554,6 @@ class TestCoCreateFlowStart:
     """Tests for start() method."""
 
     def test_start_returns_awaiting_idea_event(self):
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         flow = CoCreateFlow(api)
         event = flow.start()
@@ -605,7 +563,6 @@ class TestCoCreateFlowStart:
         assert len(event["prompt"]) > 0
 
     def test_start_sets_phase(self):
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         flow = CoCreateFlow(api)
         assert flow.phase == "init"
@@ -613,7 +570,6 @@ class TestCoCreateFlowStart:
         assert flow.phase == "awaiting_idea"
 
     def test_start_raises_if_already_started(self):
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         flow = CoCreateFlow(api)
         flow.start()
@@ -621,71 +577,16 @@ class TestCoCreateFlowStart:
             flow.start()
 
 
-FULL_GENERATION_RESPONSE = """=== story_config ===
-genre: 赛博朋克冒险
-tier: medium
-title: test-story
-setting: 2087年新东京地下城
-protagonist_name: 林焰
-protagonist_identity: 前荒坂安全顾问，现自由佣兵
-protagonist_traits: 冷静、道德灰色
-tone: 黑暗冷峻
-conflict: 一枚神秘芯片正在寻找宿主
-characters:
-  耗子 | 地下情报贩子 | 亦敌亦友
-  美智子 | 荒坂安全主管 | 前上司
-
-=== variables ===
-体力: number, 80
-信任度: number, 10
-所属势力: string, 自由佣兵
-
-=== outline ===
-[node]
-id: ch1_intro
-title: 霓虹深渊
-goal: 在地下城酒吧感受氛围
-routes: → ch2_meeting
-
-[node]
-id: ch2_meeting
-title: 地下交易
-goal: 与耗子会面
-routes:
-  if 信任度 >= 30 → ch3_ally
-  if 信任度 < 30 → ch3_betrayal
-
-[node]
-id: ch3_ally
-title: 盟友之路
-goal: 通过地下网络逃离
-routes: → ch4_safehouse
-
-[node]
-id: ch3_betrayal
-title: 背叛之路
-goal: 杀出重围
-routes: → ch4_safehouse
-
-[node]
-id: ch4_safehouse
-title: 安全屋
-goal: 揭开芯片秘密
-routes:"""
-
-
 class TestCoCreateFlowSend:
     """Tests for send() method — pure message forward, returns str."""
 
     def test_send_before_start_raises(self):
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         flow = CoCreateFlow(api)
         with pytest.raises(RuntimeError, match="call start\\(\\) first"):
             flow.send("anything")
 
     def test_send_after_abort_raises(self):
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         flow = CoCreateFlow(api)
         flow._phase = "aborted"
@@ -693,7 +594,6 @@ class TestCoCreateFlowSend:
             flow.send("anything")
 
     def test_send_empty_input_raises_value_error(self):
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         flow = CoCreateFlow(api)
         flow.start()
@@ -701,7 +601,6 @@ class TestCoCreateFlowSend:
             flow.send("")
 
     def test_send_returns_str_not_dict(self):
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         api.chat = lambda msgs: "What era would you like?"
         flow = CoCreateFlow(api)
@@ -714,7 +613,6 @@ class TestCoCreateFlowSend:
         assert flow.phase == "awaiting_answer"
 
     def test_send_from_awaiting_idea_transitions_to_awaiting_answer(self):
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         api.chat = lambda msgs: "First question?"
         flow = CoCreateFlow(api)
@@ -726,7 +624,6 @@ class TestCoCreateFlowSend:
 
     def test_send_no_keyword_detection(self):
         """send() does NOT parse user input for start/quit keywords."""
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         api.chat = lambda msgs: "Interesting, tell me more."
         flow = CoCreateFlow(api)
@@ -744,7 +641,6 @@ class TestCoCreateFlowSend:
         assert flow.phase == "awaiting_answer"
 
     def test_send_appends_to_messages(self):
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         api.chat = lambda msgs: "reply"
         flow = CoCreateFlow(api)
@@ -766,7 +662,6 @@ class TestCoCreateFlowSendEndToEnd:
 
     def test_full_flow_success(self):
         """Idea → Q&A → generate → complete."""
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient(responses=[
             "你想玩什么题材的故事？",
             FULL_GENERATION_RESPONSE,
@@ -777,16 +672,16 @@ class TestCoCreateFlowSendEndToEnd:
         assert reply == "你想玩什么题材的故事？"
 
         result = flow.generate()
-        assert result.story_config["genre"] == "赛博朋克冒险"
-        assert result.story_config["tier"] == "medium"
-        assert len(result.story_config["variables"]) == 3
-        assert "ch1_intro [active]" in result.outline_text
+        assert result["story_config"]["tier"] == "medium"
+        assert result["story_config"]["title"] == "Neon Depths"
+        assert len(result["variables"]) == 3
+        assert len(result["outline"]) == 5
+        assert "ch1_intro [active]" in result["outline_text"]
         assert flow.phase == "complete"
         assert flow.result is result
 
     def test_multi_turn_qa_before_generate(self):
         """Multiple Q&A rounds, then generate."""
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient(responses=[
             "Q1: What genre?",
             "Q2: What era?",
@@ -802,11 +697,10 @@ class TestCoCreateFlowSendEndToEnd:
         assert r2 == "Q2: What era?"
 
         result = flow.generate()
-        assert result.story_config["genre"] == "赛博朋克冒险"
+        assert result["story_config"]["title"] == "Neon Depths"
 
     def test_user_aborts_during_qa(self):
         """abort() changes phase, independent of send()."""
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient(responses=["What genre?"])
         flow = CoCreateFlow(api)
         flow.start()
@@ -817,23 +711,9 @@ class TestCoCreateFlowSendEndToEnd:
 
     def test_generate_validation_fails_raises_cocreate_error(self):
         """Parse validation failure → CoCreateError with phase='generate_parse'."""
-        from storyloom.core.co_create import CoCreateFlow, CoCreateError
         api = make_mock_api_client()
-        api.chat = lambda msgs: (
-            "=== story_config ===\n"
-            "genre: test\ntier: short\nlabel: 测试故事书\n"
-            "setting: Test\nprotagonist_name: T\n"
-            "protagonist_identity: Tester\nprotagonist_traits: Brave\n"
-            "tone: Dark\nconflict: Test\ncharacters:\n  Foo | ally\n"
-            "=== variables ===\n"
-            "a: number, 80\n"
-            "b: number, 50\n"
-            "c: number, 30\n"
-            "d: string, foo\n"
-            "=== outline ===\n"
-            "[node]\nid: ch1\ntitle: Start\ngoal: Begin\nroutes: → ch2\n"
-            "[node]\nid: ch2\ntitle: End\ngoal: Finish\nroutes:\n"
-        )
+        # Return invalid JSON (array instead of object)
+        api.chat = lambda msgs: '[1, 2, 3]'
         flow = CoCreateFlow(api)
         flow._messages = [
             {"role": "system", "content": "test"},
@@ -848,32 +728,34 @@ class TestCoCreateFlowSendEndToEnd:
         assert flow._retry_state is not None
         assert flow._retry_state[0] == "generate_parse"
 
+    def test_generate_field_validation_fails(self):
+        """Field validation errors → CoCreateError with phase='generate_parse'."""
+        api = make_mock_api_client()
+        # Return JSON with invalid tier
+        api.chat = lambda msgs: (
+            '{"story_config":{"tier":"epic","title":"Test","language":"en","premise":"p"},'
+            '"characters":[{"name":"Hero","role":"protagonist","description":"d","appearance":"a"}],'
+            '"locations":[{"id":"test","name":"Test","description":"desc"}],'
+            '"variables":[],'
+            '"outline":[{"id":"ch1","title":"Start","goal":"Begin","routes":[]}]}'
+        )
+        flow = CoCreateFlow(api)
+        flow._messages = [
+            {"role": "system", "content": "test"},
+            {"role": "user", "content": "idea"},
+            {"role": "assistant", "content": "q"},
+        ]
+        flow._phase = "awaiting_answer"
+
+        with pytest.raises(CoCreateError) as exc_info:
+            flow.generate()
+        assert exc_info.value.phase == "generate_parse"
+        assert "tier" in exc_info.value.message.lower()
+
     def test_retry_generate_after_parse_failure(self):
         """After parse failure, retry_generate() adds correction, re-calls API."""
-        from storyloom.core.co_create import CoCreateFlow, CoCreateError
-        BAD = """=== story_config ===
-genre: fantasy
-tier: epic
-title: test-story
-setting: somewhere
-protagonist_name: Kael
-protagonist_identity: warrior
-protagonist_traits: brave
-tone: dark
-conflict: a war
-characters:
-  Mouse | spy | friend
-
-=== variables ===
-hp: number, 80
-
-=== outline ===
-[node]
-id: ch1
-title: start
-goal: begin
-routes:"""
-        api = MockApiClient(responses=[BAD, FULL_GENERATION_RESPONSE])
+        BAD_JSON = '{"bad": "json"}'
+        api = MockApiClient(responses=[BAD_JSON, FULL_GENERATION_RESPONSE])
         flow = CoCreateFlow(api)
         flow._messages = [
             {"role": "system", "content": "test"},
@@ -890,13 +772,12 @@ routes:"""
 
         # retry_generate() adds correction, calls API, succeeds
         result = flow.retry_generate()
-        assert result.story_config["tier"] == "medium"
+        assert result["story_config"]["tier"] == "medium"
         assert flow.phase == "complete"
         assert flow._retry_state is None
 
     def test_retry_generate_raises_when_no_failure(self):
         """retry_generate() raises RuntimeError when no previous failure."""
-        from storyloom.core.co_create import CoCreateFlow
         api = make_mock_api_client()
         flow = CoCreateFlow(api)
         flow._phase = "awaiting_answer"
@@ -906,7 +787,6 @@ routes:"""
 
     def test_generate_before_first_send_raises(self):
         """generate() before any Q&A raises RuntimeError."""
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient()
         flow = CoCreateFlow(api)
         flow.start()
@@ -920,7 +800,6 @@ class TestCoCreateFlowSendErrors:
 
     def test_send_raises_cocreate_error_on_api_failure(self):
         """API fails → CoCreateError raised with phase='send'."""
-        from storyloom.core.co_create import CoCreateFlow, CoCreateError
         api = make_mock_api_client()
         api.chat = lambda msgs: (_ for _ in ()).throw(ApiError("fail"))
         flow = CoCreateFlow(api)
@@ -935,7 +814,6 @@ class TestCoCreateFlowSendErrors:
 
     def test_send_preserves_message_on_failure(self):
         """API failure keeps user message in _messages for retry."""
-        from storyloom.core.co_create import CoCreateFlow, CoCreateError
         api = make_mock_api_client()
         api.chat = lambda msgs: (_ for _ in ()).throw(ApiError("fail"))
         flow = CoCreateFlow(api)
@@ -952,7 +830,6 @@ class TestCoCreateFlowSendErrors:
 
     def test_send_sets_retry_state_on_failure(self):
         """API failure sets _retry_state to ('send', user_input)."""
-        from storyloom.core.co_create import CoCreateFlow, CoCreateError
         api = make_mock_api_client()
         api.chat = lambda msgs: (_ for _ in ()).throw(ApiError("fail"))
         flow = CoCreateFlow(api)
@@ -969,7 +846,6 @@ class TestCoCreateFlowSendErrors:
 
     def test_retry_send_raises_when_no_failure(self):
         """retry_send() raises RuntimeError when no previous failure."""
-        from storyloom.core.co_create import CoCreateFlow
         api = make_mock_api_client()
         flow = CoCreateFlow(api)
         flow.start()
@@ -979,7 +855,6 @@ class TestCoCreateFlowSendErrors:
 
     def test_retry_send_reattempts_api(self):
         """After send fails, retry_send() re-calls API and returns reply."""
-        from storyloom.core.co_create import CoCreateFlow, CoCreateError
         api = make_mock_api_client()
         api.chat = lambda msgs: "Hello from retry!"
         flow = CoCreateFlow(api)
@@ -996,7 +871,6 @@ class TestCoCreateFlowSendErrors:
 
     def test_retry_send_clears_state_on_success(self):
         """retry_send() clears _retry_state after success."""
-        from storyloom.core.co_create import CoCreateFlow
         api = make_mock_api_client()
         api.chat = lambda msgs: "ok"
         flow = CoCreateFlow(api)
@@ -1009,7 +883,6 @@ class TestCoCreateFlowSendErrors:
 
     def test_retry_send_reraises_api_error(self):
         """retry_send() raises CoCreateError again if API still fails."""
-        from storyloom.core.co_create import CoCreateFlow, CoCreateError
         api = make_mock_api_client()
         api.chat = lambda msgs: (_ for _ in ()).throw(ApiError("still broken"))
         flow = CoCreateFlow(api)
@@ -1025,10 +898,9 @@ class TestCoCreateFlowSendErrors:
 
 
 class TestGenerate:
-    """Tests for generate() — inject format prompt, parse, validate."""
+    """Tests for generate() — JSON prompt, parse, validate, return dict."""
 
     def test_generate_success(self):
-        from storyloom.core.co_create import CoCreateFlow
         api = MockApiClient(responses=[FULL_GENERATION_RESPONSE])
         flow = CoCreateFlow(api)
         flow._messages = [
@@ -1039,6 +911,22 @@ class TestGenerate:
         flow._phase = "awaiting_answer"
 
         result = flow.generate()
-        assert result.story_config["genre"] == "赛博朋克冒险"
-        assert len(result.outline_nodes) == 5
+        assert isinstance(result, dict)
+        assert result["story_config"]["tier"] == "medium"
+        assert len(result["outline"]) == 5
+        assert "outline_text" in result
         assert flow.phase == "complete"
+
+    def test_generate_returns_dict_with_all_keys(self):
+        api = MockApiClient(responses=[FULL_GENERATION_RESPONSE])
+        flow = CoCreateFlow(api)
+        flow._messages = [
+            {"role": "system", "content": "test"},
+            {"role": "user", "content": "idea"},
+            {"role": "assistant", "content": "q"},
+        ]
+        flow._phase = "awaiting_answer"
+
+        result = flow.generate()
+        expected_keys = {"story_config", "characters", "locations", "variables", "outline", "outline_text"}
+        assert set(result.keys()) == expected_keys

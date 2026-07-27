@@ -18,7 +18,7 @@ import time
 from storyloom.config import SAVE_VERSION
 from storyloom.io.api_client import ApiClient
 from storyloom.core.save_manager import SaveManager
-from storyloom.core.co_create import CoCreateFlow, CoCreationResult
+from storyloom.core.co_create import CoCreateFlow
 from storyloom.core.game_loop import GameLoop, GameState
 
 
@@ -49,23 +49,28 @@ class GameSession:
     def new_co_create(self) -> CoCreateFlow:
         return CoCreateFlow(self._api_client)
 
-    def start_game(self, result: CoCreationResult) -> tuple[GameLoop, str]:
-        """Create a new game from co-creation result.
+    def start_game(self, data: dict) -> tuple[GameLoop, str]:
+        """Create a new game from co-creation result dict.
 
         1. Create per-game directory under ``saves/``.
-        2. Write ``_init.json`` directly from ``CoCreationResult``.
+        2. Write ``_init.json`` directly from the result dict.
         3. Load via the unified ``load_game()`` path.
+
+        Args:
+            data: Dict returned by ``CoCreateFlow.generate()`` — keys:
+                ``story_config``, ``characters``, ``locations``,
+                ``variables``, ``outline``, ``outline_text``.
 
         Returns:
             ``(GameLoop, game_id)`` — UI uses *game_id* for subsequent
             save operations (list, delete, etc.).
         """
-        title = result.story_config.get("title", "untitled")
+        title = data["story_config"].get("title", "untitled")
         game_dir, game_id, created_at = SaveManager.create_game(
             self._saves_root, title
         )
 
-        init_data = self._build_init_dict(result, created_at)
+        init_data = self._build_init_dict(data, created_at)
         SaveManager(game_dir).save(init_data)  # cp_title=None → _init.json
 
         return self.load_game(game_id, "_init.json"), game_id
@@ -129,7 +134,7 @@ class GameSession:
                 descending (most recent first).
 
         Returns:
-            List of ``{game_id, title, language, genre, tier,
+            List of ``{game_id, title, language, premise, tier,
             created_at, save_count[, last_played_at]}`` dicts.
         """
         games = SaveManager.list_games(self._saves_root, enrich=enrich_last_played)
@@ -164,26 +169,28 @@ class GameSession:
     # ── Helpers ───────────────────────────────────────────────────
 
     @staticmethod
-    def _build_init_dict(result: CoCreationResult, created_at: str) -> dict:
+    def _build_init_dict(data: dict, created_at: str) -> dict:
         """Build ``_init.json`` save dict directly from co-creation result.
 
         No ``GameLoop`` involvement — pure data assembly.
         Format matches ``GameLoop.to_save_dict()`` so that
         ``from_save_dict()`` can consume it identically.
+
+        *data* is the dict returned by ``CoCreateFlow.generate()``.
         """
-        sc = copy.deepcopy(result.story_config)
+        sc = copy.deepcopy(data["story_config"])
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         title = sc.get("title", "untitled")
 
-        # Initialize state_vars from variable definitions
+        # Initialize state_vars from top-level variable definitions
         state_vars: dict[str, int | str] = {}
-        for v in sc.get("variables", []):
+        for v in data.get("variables", []):
             state_vars[v["name"]] = v["initial"]
 
         # Convert outline nodes to save format
         first_node_id = ""
         outline_for_save = []
-        for i, node in enumerate(result.outline_nodes):
+        for i, node in enumerate(data.get("outline", [])):
             nid = node.get("id", "")
             if i == 0:
                 first_node_id = nid
@@ -211,6 +218,9 @@ class GameSession:
                 "temperature": None,
             },
             "story_config": sc,
+            "characters": copy.deepcopy(data.get("characters", [])),
+            "locations": copy.deepcopy(data.get("locations", [])),
+            "variables": copy.deepcopy(data.get("variables", [])),
             "state_vars": state_vars,
             "outline": outline_for_save,
             "progress": {

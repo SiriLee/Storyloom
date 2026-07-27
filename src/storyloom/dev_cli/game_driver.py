@@ -46,7 +46,7 @@ import time
 from pathlib import Path
 
 from storyloom.core.session import GameSession
-from storyloom.core.co_create import CoCreateError, CoCreationResult
+from storyloom.core.co_create import CoCreateError
 from storyloom.core.game_loop import GameLoop
 from storyloom.core.save_manager import SaveManager
 from storyloom.i18n import init_i18n
@@ -129,7 +129,7 @@ def _error(text: str) -> None:
 def run_co_create(
     session: GameSession,
     observer: DevObserver | None = None,
-) -> CoCreationResult | None:
+) -> dict | None:
     """Drive the co-creation Q&A loop.  Returns None if user quits.
 
     UI-level commands (engine does not parse user intent):
@@ -214,11 +214,11 @@ def run_co_create(
         gen_input = flow.messages[-2]["content"]
         observer.record_co_create_prompt(flow.messages[:-2], gen_input)
         observer.record_co_create_response(flow.messages)
-        observer.record_co_create_result(
-            result.story_config, result.outline_text)
-    print(f"\n[Story: {result.story_config.get('title', '?')}]")
-    print(f"[Genre: {result.story_config.get('genre', '?')}]")
-    print(f"[Outline: {len(result.outline_nodes)} nodes]\n")
+        observer.record_co_create_result(result)
+    sc = result["story_config"]
+    print(f"\n[Story: {sc.get('title', '?')}]")
+    print(f"[Premise: {sc.get('premise', '?')[:60]}...]")
+    print(f"[Outline: {len(result['outline'])} nodes]\n")
     return result
 
 
@@ -506,7 +506,7 @@ def run_load_save(session: GameSession, ctrl: DisplayController,
             return
         for i, g in enumerate(games):
             print(f"  [{i + 1}] {g.get('title', '?')} "
-                  f"({g.get('genre', '?')}, "
+                  f"({g.get('premise', '?')}, "
                   f"{g.get('save_count', 0)} saves)")
         print("  [0] Back")
 
@@ -523,7 +523,7 @@ def run_load_save(session: GameSession, ctrl: DisplayController,
         while True:
             saves = session.list_saves(game_id)
             print(f"\nGame: {game_title} "
-                  f"({game.get('genre', '?')}, "
+                  f"({game.get('premise', '?')}, "
                   f"{len(saves)} saves)")
             if not saves:
                 print("  No saves in this game.")

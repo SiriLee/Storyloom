@@ -87,16 +87,17 @@ class DevObserver:
             f"── Round {round_num} ── {ts} [waiting for response...] ──\n",
         )
 
-    def record_co_create_result(self, story_config: dict, outline_text: str) -> None:
-        """Record final co-creation result → checks.txt."""
+    def record_co_create_result(self, data: dict) -> None:
+        """Record final co-creation result dict → checks.txt."""
+        sc = data.get("story_config", {})
         self._write_file(
             "checks.txt",
             f"══ Co-Create Result ══\n"
-            f"Title: {story_config.get('title', '?')}\n"
-            f"Genre: {story_config.get('genre', '?')}\n"
-            f"Tier: {story_config.get('tier', '?')}\n"
-            f"Outline:\n{outline_text}\n"
-            f"Variables: {json.dumps(story_config.get('variables', []), ensure_ascii=False, indent=2)}\n\n",
+            f"Title: {sc.get('title', '?')}\n"
+            f"Premise: {sc.get('premise', '?')}\n"
+            f"Tier: {sc.get('tier', '?')}\n"
+            f"Outline:\n{data.get('outline_text', '')}\n"
+            f"Variables: {json.dumps(data.get('variables', []), ensure_ascii=False, indent=2)}\n\n",
             mode="a",
         )
 

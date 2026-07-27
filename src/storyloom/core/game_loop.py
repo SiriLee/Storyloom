@@ -1233,7 +1233,7 @@ class GameLoop:
         The internal ``_outline_nodes`` can arrive in two shapes depending
         on creation path:
 
-        * **Fresh** (``CoCreateParser.parse_outline``):
+        * **Fresh** (``CoCreateFlow.generate()`` JSON outline):
           ``{id, title, goal, routes: [{condition, target}]}``
         * **Loaded** (``from_save_dict`` → save-file ``outline``):
           ``{node_id, title, goal, status, branches: [str|dict]}``

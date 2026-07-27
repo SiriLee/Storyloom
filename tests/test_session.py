@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import Mock
 
 from storyloom.core.session import GameSession
-from storyloom.core.co_create import CoCreateFlow, CoCreationResult
+from storyloom.core.co_create import CoCreateFlow
 from storyloom.core.game_loop import GameLoop
 from storyloom.user_config import UserConfig
 from storyloom.io.api_client import ApiClient
@@ -21,25 +21,28 @@ def _test_api_client():
 
 
 SAMPLE_STORY_CONFIG = {
-    "genre": "test", "tier": "short", "title": "test-story",
+    "tier": "short",
+    "title": "test-story",
     "language": "zh-CN",
-    "setting": "", "protagonist_name": "T",
-    "protagonist_identity": "Tester",
-    "protagonist_traits": "Brave",
-    "tone": "Dark", "conflict": "Test",
-    "characters": "Foo | ally",
+    "premise": "A test story for unit testing.",
+}
+
+SAMPLE_RESULT = {
+    "story_config": SAMPLE_STORY_CONFIG,
+    "characters": [
+        {"name": "Tester", "role": "protagonist", "description": "A brave tester", "appearance": "Plain"},
+    ],
+    "locations": [
+        {"id": "test_loc", "name": "Test Location", "description": "A test place"},
+    ],
     "variables": [
         {"name": "hp", "type": "number", "initial": 80},
     ],
-}
-
-SAMPLE_RESULT = CoCreationResult(
-    story_config=SAMPLE_STORY_CONFIG,
-    outline_text="ch1 [active] — Start：Begin",
-    outline_nodes=[
+    "outline": [
         {"id": "ch1", "title": "Start", "goal": "Begin", "routes": []},
     ],
-)
+    "outline_text": "ch1 [active] — Start：Begin",
+}
 
 
 class TestGameSessionInit:
