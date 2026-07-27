@@ -8,7 +8,7 @@
 >
 > **架构变更（2026-07-04）**：从每轮独立 system prompt 迁移到**对话式消息数组**（Round 1 永久锚定 + 滑动窗口）。PromptBuilder 构建单条消息的内容，ContextManager 管理 messages 数组结构。
 >
-> **迭代策略**：每次 LLM 生成质量问题的根因分析与 Prompt 调整，均记录到 §6 迭代日志。
+> **迭代策略**：每次 LLM 生成质量问题的根因分析与 Prompt 调整，均记录到工程日志（`docs/engineering-journal.md`）。
 >
 > **阅读约定**：
 > - **规范**：描述 Prompt 的结构、各部分的作用、占位符的来源和填充规则。是 `prompt_builder` 的开发标准。
@@ -294,7 +294,7 @@ Below is a complete format example (a short cyberpunk story in English):
 - **premise** — Story premise. 2-4 sentences: world, protagonist situation, core conflict. This is the foundation the narrative engine uses to maintain consistency.
 
 ## characters
-- Array of character objects. At least 1 element. **(IMPORTANT)** Exactly one must have `role: "protagonist"`.
+- Array of character objects. At least 1 element.
 - **name** — Character name in the story language.
 - **role** — `protagonist`, `supporting`, or `antagonist`.
 - **description** — Identity background + personality traits. For protagonist: who they are, what drives them. For others: who they are, their relationship to the protagonist.
@@ -325,9 +325,7 @@ Below is a complete format example (a short cyberpunk story in English):
 # Prohibited
 
 - Wrapping the JSON in markdown code fences (```json ... ```).
-- Outputting anything before the opening `{` or after the closing `}`.
 - Root value is not a JSON object — must be `{...}`, not `[...]` or a literal.
-- Missing or extra top-level keys — exactly 5 keys: `story_config`, `characters`, `locations`, `variables`, `outline`.
 - Route `target` not matching any node `id`. Example of what WILL be rejected:
 
   ```json
@@ -350,12 +348,10 @@ Below is a complete format example (a short cyberpunk story in English):
 
 Before outputting, mentally verify:
 
-[ ] story_config: all 4 fields present and non-empty; tier is exactly short/medium/long
-[ ] characters: non-empty array; exactly 1 protagonist; all roles valid; name/description/appearance non-empty
-[ ] locations: non-empty array; every id is snake_case; name/description non-empty
-[ ] variables: ≤3 total, ≤2 number, ≤1 string; number initial values in [0, 100]; names unique
+[ ] characters: exactly 1 protagonist; all roles valid
+[ ] locations: non-empty array; every id is snake_case
+[ ] variables: ≤3 total, ≤2 number, ≤1 string;
 [ ] outline: every route target matches a node id; final node routes is empty array []
-[ ] outline: every condition variable is declared in variables
 [ ] No markdown fences; no text outside the JSON object
 [ ] All content in $language
 ```
@@ -837,17 +833,3 @@ Requirements:
 ```
 
 ---
-
-## §6 迭代日志
-
-| 日期 | 变更 | 原因 |
-|------|------|------|
-| 2026-07-04 | 初始版本 | — |
-| 2026-07-04 | v4 模板重构：示例精简(18→11段)、规则结构化、新增6条设计原则 | 6轮30+次测试验证。正确率33%→83%，TTFT 38s→11s。关键改进：(1)独立options节+choice显式规则 (2)checkpoint反例约束 (3)pre-bridge的:main双重覆盖 (4)示例后防续写屏障 (5)bridge/bridge段数上下限+反例 (6)(重要)注意力标签 |
-| 2026-07-04 | 跨题材泛化测试：恋爱/悬疑/古风各3轮 | v4模板在4题材下正确率波动大（1/3~3/3）。发现2个跨题材共性问题：(1) **bridge-before-options** — LLM在options之前插入bridge；(2) **bridge位置偏离** — 慢节奏叙事推迟了交互断点 |
-| 2026-07-04 | **架构迁移：对话式消息数组 + XML 输出格式** | 从每轮 system prompt 迁移到 messages 数组架构。(1) **XML 格式**（`<seg>`/`<choice>`/`<set>`/`<checkpoint>`/`<bridge/>`/`<branch>`）替代 `--- block ---`，frame-v1 测试正确率 100%；(2) **对话式** Round 1 永久锚定 + 滑动窗口（WINDOW_SIZE=3）+ checkpoint 压缩；(3) `context_manager.py`、`prompt_builder.py`、`streaming_parser.py` 替代旧 prompt 组装管线。旧格式 prompt 文件清理归档 |
-| 2026-07-27 | **共创 Prompt 重写：JSON 输出格式** | 数据模型重构（story_config 11→4 字段，新增 characters/locations 结构化数组，variables 移至顶层）。共创生成 Prompt 从三 block INI 格式迁移到单一 JSON 输出：(1) 自定义解析器约 300 行 → `json.loads()`；(2) 5 段式结构（角色定义 → JSON 示例 + 屏障 → 字段规范 → 禁止模式 + 反例 → 自检清单）；(3) §4 Story Context 区域同步精简（Background/Protagonist/Tone/Conflict → Premise + Characters + Locations）；(4) 冒险日志 Story Background 共用 `_format_story_context()` 格式 |
-
----
-
-*本文档为活文档。Prompt 是系统的核心——每次生成质量问题都应追溯至 Prompt，分析原因并迭代。*
