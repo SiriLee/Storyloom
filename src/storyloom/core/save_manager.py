@@ -110,6 +110,10 @@ class SaveManager:
     def load(self, filename: str) -> dict:
         """Load and validate a save file.
 
+        Validation failures raise ``ValueError`` with a descriptive
+        message but do **not** delete the file — the caller (UI) decides
+        whether to keep or remove the save.
+
         Args:
             filename: Exact filename (e.g. ``_init.json`` or
                       ``萌芽之春_20260713T133038Z.json``).
@@ -119,7 +123,8 @@ class SaveManager:
 
         Raises:
             FileNotFoundError: Save does not exist.
-            ValueError: Save is corrupt (file is deleted automatically).
+            ValueError: Save is invalid (outdated version, corrupt JSON,
+                        missing fields, or structural issues).
         """
         path = self._dir / filename
         if not path.exists():
@@ -129,22 +134,20 @@ class SaveManager:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except json.JSONDecodeError:
-            self._remove_corrupt(path)
             raise ValueError(f"Save '{filename}' is corrupt: invalid JSON")
 
         # Validate version
         version = data.get("version")
         if version != SAVE_VERSION:
-            self._remove_corrupt(path)
             raise ValueError(
-                f"Save '{filename}' version {version} unsupported "
-                f"(expected {SAVE_VERSION})"
+                f"Save '{filename}' version {version} is not supported "
+                f"(current version: {SAVE_VERSION}). "
+                f"You can keep the file or delete it manually."
             )
 
         # Validate required top-level fields
         missing = [f for f in self.REQUIRED_FIELDS if f not in data]
         if missing:
-            self._remove_corrupt(path)
             raise ValueError(
                 f"Save '{filename}' is corrupt: Missing required fields: "
                 f"{', '.join(missing)}"
@@ -152,7 +155,6 @@ class SaveManager:
 
         # Validate variables is a top-level list (v2 format)
         if not isinstance(data.get("variables"), list):
-            self._remove_corrupt(path)
             raise ValueError(
                 f"Save '{filename}' is corrupt: missing top-level variables"
             )
@@ -164,7 +166,6 @@ class SaveManager:
                 n.get("node_id", n.get("id", "")) for n in data["outline"]
             }
             if current_node not in node_ids and node_ids:
-                self._remove_corrupt(path)
                 raise ValueError(
                     f"Save '{filename}' is corrupt: current_node "
                     f"'{current_node}' not in outline"

@@ -1,7 +1,7 @@
 """Configurable constants for Storyloom."""
 
 # ── Save format ──────────────────────────────────────────────────
-SAVE_VERSION = 2           # save file format version; mismatch → corrupt
+SAVE_VERSION = 2           # save file format version; mismatch → load error (user decides)
 
 # ── Sliding window ─────────────────────────────────────────────
 WINDOW_SIZE = 3          # full rounds to keep in window

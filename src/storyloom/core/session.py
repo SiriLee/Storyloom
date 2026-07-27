@@ -118,7 +118,9 @@ class GameSession:
 
         Raises:
             FileNotFoundError: Save file or game directory not found.
-            ValueError: Save file is corrupt (deleted automatically).
+            ValueError: Save file is invalid (outdated version, corrupt
+                        JSON, or structural issues).  The file is NOT
+                        deleted — the caller decides whether to keep it.
         """
         sm = SaveManager(os.path.join(self._saves_root, game_id))
         return sm.load(filename)
