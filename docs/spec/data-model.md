@@ -15,20 +15,20 @@
 
 ```
 game_state = GameState()
-game_state.story_config   = {tier, title, language, premise}    ← 4 fields
+game_state.story_config   = {tier, title, language, premise}
 game_state.characters     = [{name, role, description, appearance}, ...]
 game_state.locations      = [{id, name, description}, ...]
-game_state.variables      = [{name, type, initial}, ...]        ← 顶层，原嵌于 story_config
+game_state.variables      = [{name, type, initial}, ...]
 game_state.state_vars     = init_from_variables(variables)      // 初始值深拷贝
 game_state.outline        = [{id, title, goal, routes, +status, +summary}, ...]
-  → 引擎附加 status（首节点 "active"，其余 "pending"）与 summary（初始 null）
-  → LLM 产出 id / title / goal / routes，不输出 status / summary
-game_state.current_node   = outline[0].id           // 当前活跃节点
+  // 引擎附加 status（首节点 "active"，其余 "pending"）与 summary（初始 null）
+  // LLM 产出 id / title / goal / routes，不输出 status / summary
+game_state.current_node   = outline[0].id            // 当前活跃节点
 game_state.checkpoint_snapshots = {}                 // 节点状态快照（为回档预留）
 game_state.bridge_text    = ""                       // 首轮为空
 game_state.rejected_changes = []
 
-进入叙事循环（见 exec-flow.md §4）
+// 进入叙事循环（见 exec-flow.md §4）
 ```
 
 ---
@@ -43,7 +43,7 @@ game_state.rejected_changes = []
 1. 提取 node 属性值（node_id）：
    ├── routes 为空 → 结局节点：设置 ending_flag = true，其余推进逻辑相同
    │   （标记 completed、存入摘要和快照、触发存档）。
-   │   后续 bridge 处检测到此标志时走结局路径（见 exec-flow.md §4.7）
+   │   后续 检测到此标志时走结局路径（见 exec-flow.md §4.7）
    └── routes 非空 → 正常分支节点：评估 route 条件，推进到目标节点
 
 2. 验证 node_id 存在于 outline：
