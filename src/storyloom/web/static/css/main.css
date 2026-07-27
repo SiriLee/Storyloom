@@ -1060,7 +1060,7 @@ button.accent:hover, .btn-accent:hover {
     transform: translateX(4px);
 }
 
-.sv-list--checkpoints .sv-card:hover .sv-card-meta span {
+.sv-list--expandable .sv-card:hover .sv-card-meta span {
     overflow: hidden;
     white-space: normal;
     text-overflow: clip;
@@ -1068,7 +1068,7 @@ button.accent:hover, .btn-accent:hover {
     max-height: 5em;
 }
 
-.sv-list--checkpoints .sv-card:hover .sv-card-time {
+.sv-list--expandable .sv-card:hover .sv-card-time {
     display: none;
 }
 

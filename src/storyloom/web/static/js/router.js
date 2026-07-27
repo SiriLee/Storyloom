@@ -585,7 +585,7 @@
                             title="${esc(_("Back to Menu"))}">${Icons.arrowLeft()}</button>
                     <span class="sv-title">${esc(_("Load Save"))}</span>
                 </div>
-                <div class="sv-list" id="sv-game-list">
+                <div class="sv-list sv-list--expandable" id="sv-game-list">
                     <p class="sv-card-empty">${esc(_("Loading..."))}</p>
                 </div>
             </div>
@@ -663,7 +663,7 @@
                     <span class="sv-title" id="sv-cp-title">${esc(_("Loading..."))}</span>
                     <button class="sv-restart-btn" id="sv-restart">${esc(_("Restart"))}</button>
                 </div>
-                <div class="sv-list sv-list--checkpoints" id="sv-cp-list">
+                <div class="sv-list sv-list--expandable" id="sv-cp-list">
                     <p class="sv-card-empty">${esc(_("Loading..."))}</p>
                 </div>
             </div>
