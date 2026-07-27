@@ -607,7 +607,6 @@
                         <span class="sv-card-label">${esc(g.title)}</span>
                         <div class="sv-card-meta">
                             <span>${esc(g.premise || "?")}</span>
-                            <span>${g.save_count} ${esc(_("saves"))}</span>
                         </div>
                     </div>
                     ${g.last_played_at ? `<span class="sv-card-time">${formatDate(g.last_played_at)}</span>` : ""}
