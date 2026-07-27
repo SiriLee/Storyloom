@@ -6,6 +6,258 @@
 
 ---
 
+## 2026-07-27（周一）
+
+> **概述**：12 次提交，完成共创数据模型 v2 的全面落地——JSON 输出格式、引擎适配、Web 层同步、多项缺陷修复。版本号 1.0.2 → 1.1.0。315 测试全绿。
+
+### 共创 JSON 输出 + 数据模型 v2（Phase 2+3）——核心重构
+
+**背景**：此前 Co-Create 的 `generate()` 使用自定义 `=== block ===` 分隔符 + INI 式变量行 + DSL 式 outline 路由语法。`CoCreateParser` 有 11 个解析方法（`split_blocks()`, `parse_story_config()`, `parse_variables()`, `parse_outline()`, `parse_routes()`...），每种格式有专属 parser——代码脆弱、错误信息不友好、LLM 格式偏离后重试无效。输出格式（`CoCreationResult` dataclass）与存档格式（dict）之间存在转换层。
+
+07-26 的 spec 阶段已确定方案：LLM 输出 JSON → `json.loads()` 一行解析 → 输出格式 = 存档格式（零转换层）。
+
+**决策**（commit `beeb0d3`）：全面重构共创管线——JSON 输出替换块分隔符格式。
+
+**核心变更**：
+
+1. **`CoCreateParser → CoCreateValidator`**：删除全部 11 个旧解析方法，新增 6 个 JSON 验证器：
+   - `validate_json()` — JSON 解析 + 顶层键存在性检查
+   - `validate_story_config()` — 4 字段（tier/title/language/premise）类型 + 约束验证
+   - `validate_characters()` — 数组，每元素 4 字段（name/role/description/appearance）
+   - `validate_locations()` — 数组，每元素 3 字段（id/name/description）
+   - `validate_variables()` — 数组，每元素 3 字段（name/type/initial），类型白名单
+   - `validate_outline_cross_ref()` — route target → node ID 引用完整性 + 变量名 → variables 列表交叉验证
+
+2. **`CoCreationResult` 删除**：`generate()` 直接返回 dict（6 key：`story_config`/`characters`/`locations`/`variables`/`outline`/`outline_text`）——与存档格式完全一致，消除转换层。
+
+3. **`CO_CREATE_GENERATION_PROMPT` 重写**：从 170 行块分隔符格式重写为 5 段 JSON 输出 Prompt（角色定义、完整 JSON 示例 + 屏障、逐块字段规范含正反双重覆盖、禁止模式含反例、自检清单）。完全对齐 `prompt-design.md` §3.2。
+
+4. **存档格式 v2**：`SAVE_VERSION = 2`，顶层新增 `characters`/`locations`/`variables`，`story_config` 缩减为 4 字段（tier/title/language/premise）。
+
+**级联变更**：
+- `session.py`：`start_game(data: dict)` 替代旧的 `CoCreationResult`
+- `save_manager.py`：`REQUIRED_FIELDS` 增加新顶层字段；`list_games()` `genre`→`premise`；`load()` 校验顶层 variables
+- `game_driver.py`、`observer.py`、`web/sessions.py`、`web/server.py`：dict 访问模式
+
+**测试**：315 passed（76 co_create + 239 others）。旧 parser 测试类替换为 6 个新 validator 测试类。全部存档 fixture 更新为 v2 格式。
+
+**依据**：commit `beeb0d3`；`docs/spec/data-model.md` §1-3；`docs/spec/prompt-design.md` §3.2；`docs/api/co-create.md`。
+
+### 叙事引擎适配 v2 数据模型（Phase 4-5）
+
+**背景**：数据模型 v2 新增 `characters`/`locations`/`variables` 为顶层实体，`story_config` 从 11 字段缩减为 4 字段。引擎层所有依赖旧字段（`protagonist`/`genre`/`tone`/`conflict`）和旧变量注入路径（`story_config.get('variables')`）的代码必须同步更新。
+
+**决策**（commit `36ea4f4`）：引擎层全面适配 v2。
+
+**变更明细**：
+
+| 模块 | 变更 |
+|------|------|
+| `GameState.__init__` | 接受 `variables: list[dict]` 直接注入（不再从 story_config 提取） |
+| `GameState.from_dict` | 读取顶层 `variables` 字段 |
+| `GameLoop.__init__` | 新增 `characters`/`locations`/`variables` 三个属性 |
+| `GameLoop.to_save_dict` | 输出 `characters`/`locations`/`variables`；`story_config` 过滤为 canonical 4 字段 |
+| `GameLoop.from_save_dict` | 读取 + 传递新顶层字段 |
+| `GameLoop.stream_round` | `self.variables` 替代 `story_config.get('variables')` |
+| `GameLoop.start_game` | 传递 `characters`/`locations`/`variables` 到 `build_round1` |
+| `GameLoop.run_adventure_log` | 传递 `characters`/`locations` 到 `build_adventure_log_prompt` |
+| `PromptBuilder.ROUND1_PREFIX` | 多字段 Story Context（genre/setting/protagonist/tone/conflict/characters）→ 单一 `{story_context}` 占位符 |
+| `PromptBuilder._format_story_context` | **新增**静态方法——统一 Premise + Characters + Locations 格式，Round 1 和冒险日志共享（plan D15） |
+| `PromptBuilder.build_round1` | 接受 `characters`/`locations`/`variables` 参数；删除旧字段提取逻辑 |
+| `PromptBuilder.build_adventure_log_prompt` | 接受 `characters`/`locations` 参数；使用 `_format_story_context()` |
+
+**设计考量**：
+
+- **`_format_story_context()` 共享**（plan D15）：Round 1 和冒险日志都需展示世界设定——统一格式化方法避免字段罗列逻辑重复。
+- **`ROUND1_PREFIX` 占位符化**（plan D9）：旧模板硬编码 genre/setting/protagonist 等字段名——`{story_context}` 单一占位符使模板与数据模型解耦，未来增减字段不触模板。
+- **`story_config` 过滤**：存档仍保留 `story_config` 对象，但 `to_save_dict()` 仅输出 4 个 canonical 字段——多余的中间态字段不污染持久化层。
+
+**测试**：更新全部 fixture（`SAMPLE_STORY_CONFIG` v2 格式，新增 `SAMPLE_CHARACTERS`/`SAMPLE_LOCATIONS`/`SAMPLE_VARIABLES`）和所有构造/方法调用匹配新签名。315 tests green。
+
+**依据**：commit `36ea4f4`；`docs/spec/data-model.md` §1；plan D9、D15。
+
+### Spec 文档全线同步 v2
+
+**背景**：数据模型 v2 涉及 5 个核心文档的字段名/格式/常量变更。需在代码实现前后完成 spec 层对齐。
+
+**决策**：4 个 commit 分步推进——先设计后实现：
+
+1. **`3423377`** —— data-model.md、exec-flow.md、co-create.md 基础更新：
+   - `data-model.md`：§1 GameState init（4-field story_config，top-level characters/locations/variables），§3 save format（v2），§A.2 常量表（`STORY_TITLE_*`, `zh-TW`, `SAVE_VERSION=2`）
+   - `exec-flow.md`：§1.1 术语更新，§3.4 JSON 流程，§3.5 顶层变量初始化
+   - `api/co-create.md`：`CoCreationResult → dict`，新字段表，验证规则更新
+
+2. **`6efaff1`** —— data-model.md + exec-flow.md 细节打磨：§1 初始化代码块润色；§1–§4 删除代码内部引用，保持概念层面
+
+3. **`74a65c2`** —— prompt-design.md 全文重写：
+   - §3.2：JSON 字段规范（§3.2.2–3.2.6）+ 完整 `CO_CREATE_GENERATION_PROMPT` 文本
+   - §4.2：`{background}/{protagonist}/{tone}/{conflict}/{characters}` → `{story_context}` 单一占位符
+   - §4.4：删除 ~210 行完整中文示例（被 §4.2+§4.3 覆盖）
+   - §5：冒险日志使用 `_format_story_context()` 格式；`{story_label}` → `{title}`
+
+4. **`d3cb4bf`** —— 删除 prompt-design.md §6 迭代日志（重复于本工程日志），header 指向 engineering-journal.md
+
+**依据**：commits `3423377`, `6efaff1`, `74a65c2`, `d3cb4bf`。
+
+### 全局重命名：story-title `label` → `title`
+
+**背景**：数据模型 v2 将故事名称字段从 `label` 改为 `title`——`label` 语义模糊（暗示"标签"，易与 CSS label、UI label 混淆），`title` 是小说/故事的行业标准术语。
+
+**决策**（commit `27abaf8`）：全代码库批量重命名：
+
+| 范围 | 变更 |
+|------|------|
+| 常量 | `STORY_LABEL_*` → `STORY_TITLE_*` |
+| 复合名 | `label_hint`, `game_label`, `safe_label`, `story_label` → `title` 变体 |
+| Dict key | `story_config['label']`, `metadata['label']` → `['title']` |
+| JS | `config.label`, `g.label`, `GameState.storyConfig.label` → `.title` |
+| `lang_meta` | `label_hint` key → `title_hint` |
+| 字面量 | 错误/日志消息中 'Label' → 'Title' |
+| 函数参数 | `save_manager`/`session` 中 `label` → `title` |
+
+**保留项**：`VARIABLE_LABEL_CAP`（不同语义——变量名长度上限，非故事标题）。CSS class 和选择标签保留。
+
+**辅助脚本**：新增 `scripts/rename_label_to_title.py` ——记录此次转换的工具脚本。
+
+**依据**：commit `27abaf8`；314 tests green。
+
+### Characters 字段合并：`traits` → `description`（5→4 字段）
+
+**背景**：plan D10 决策——`traits`（"Calculating, morally grey"）独立字段破坏角色描述内聚性。玩家读到特性列表时缺乏叙事上下文，且写作实践中 traits 自然嵌入 description。
+
+**决策**（commit `410ba9a`）：合并 `traits` 到 `description`，characters 从 5 字段（name/role/description/appearance/traits）缩减为 4 字段（name/role/description/appearance）。同步更新所有规范文档的 JSON 示例、字段表、验证规则。
+
+**依据**：commit `410ba9a`；plan D10。
+
+### 实现计划：共创数据模型重构
+
+**背景**：v2 数据模型重构涉及 24 个文件、8 个阶段——spec 文档、引擎核心、解析器、存储层、Web UI、测试。需要系统化计划确保不遗漏。
+
+**决策**（commit `133047b`）：新增 `docs/superpowers/plans/co-create-data-model-refactoring.md`——8 阶段 24 文件计划，16 项设计决策全部确认：
+
+| 阶段 | 内容 |
+|------|------|
+| Phase 1 | Spec 文档更新（5 文件） |
+| Phase 2 | 共创管线 JSON 化（parser→validator + prompt 重写） |
+| Phase 3 | 存档格式 v2 + CoCreationResult 删除 |
+| Phase 4 | 叙事引擎适配（GameState/GameLoop） |
+| Phase 5 | PromptBuilder 适配 + `_format_story_context` |
+| Phase 6 | Web API/JS 同步 |
+| Phase 7 | 测试更新 |
+| Phase 8 | 验证 + 清理 |
+
+**依据**：commit `133047b`。
+
+### Web JS 字段引用同步 v2
+
+**背景**：引擎层数据模型 v2 后，Web 前端 JS 的字段引用仍指向旧 key（`config.setting`、`g.genre`）→ 游戏列表和预览页面显示 undefined。
+
+**决策**（commit `3c02c51`）：
+- `router.js` 游戏预览：`config.setting` → `config.premise`
+- `router.js` 存档列表卡片：`g.genre` → `g.premise`
+
+**依据**：commit `3c02c51`。
+
+### 存档损坏不自动删除——用户决定
+
+**背景**：`SaveManager.load()` 在版本不匹配/JSON 损坏/字段缺失时将文件标记为 corrupt 并调用 `_remove_corrupt()` 自动删除。静默数据销毁——用户看到 toast "存档损坏，请删除" 但文件已被删，无法手动恢复或检查原始内容。
+
+**决策**（commit `c8f1ff4`）：删除 `load()` 中所有 `_remove_corrupt()` 调用。四种异常路径（版本不匹配、JSON 损坏、字段缺失、结构异常）统一抛 `ValueError` 并保留文件。UI 层 toast 通知用户，用户可重试或手动删除。
+
+同步更新 `config.py` `SAVE_VERSION` 注释和 `session.py` docstring 反映新行为。
+
+**依据**：commit `c8f1ff4`。
+
+### Web UI：存档列表 hover 展开效果统一
+
+**背景**：游戏列表（`#saves`）和 checkpoint 列表（`#saves/{game_id}`）的 hover 卡片展开效果此前用不同 CSS 实现——checkpoint 列表有展开动画，游戏列表没有。视觉风格不统一。
+
+**决策**（commit `538c3a6`）：重命名 CSS modifier `sv-list--checkpoints` → `sv-list--expandable`，同时应用于两个视图。统一 hover 行为：meta 文本展开为多行、时间标签隐藏、卡片右移 + glow。
+
+**依据**：commit `538c3a6`。
+
+### Web UI：游戏列表卡片移除存档数显示
+
+**背景**：游戏列表卡片 meta 区显示 "N saves"——截断时难看，展开时杂乱。存档数是实现细节，不应在主菜单层级展示。
+
+**决策**（commit `ba30649`）：从卡片 meta 移除存档数。i18n 翻译保留在 `.po` 文件中（供未来可能的其他场景复用）。
+
+**依据**：commit `ba30649`。
+
+### 版本 1.1.0
+
+**背景**：本轮交付了数据模型 v2（breaking change：存档格式 `SAVE_VERSION` 1→2）和多项 Web UI 修复——累积变更达到 minor 版本级别。
+
+**决策**：版本号 1.0.2 → 1.1.0，同步更新 `pyproject.toml` 和 `src/storyloom/__init__.py`。
+
+**依据**：commit `9cade00`。
+
+### 打包修复：清理旧产物 + 版本专属 glob
+
+**背景**：`scripts/build.sh` 未在构建前清理 `build/` 和 `dist/` 目录——旧版本的 wheel/sdist 残留在 `dist/` 中被一起复制到 release 目录。release 包体积膨胀且包含过期版本。
+
+**决策**（commit `3bc4e22`）：
+1. 新增 step [0/5]：构建前删除 `build/` 和 `dist/`
+2. Release 目录只复制当前版本专属的 wheel 和 sdist（`storyloom_web-{VERSION}-*.whl` / `storyloom_web-{VERSION}.tar.gz`）
+
+**依据**：commit `3bc4e22`。
+
+---
+
+## 2026-07-26（周日）
+
+> **概述**：共创数据模型 v2 设计阶段——spec 重设计、实现计划、代码基础准备。4 次提交，涵盖从概念到 spec 全流程。
+
+### 共创数据模型重设计——JSON 输出，11→4 字段，独立角色/场景块
+
+**背景**：`CoCreateParser` 的 `=== block ===` 分隔符解析有 11 个 micro-parser，每个有自己的错误格式。`story_config` 有 11 个字段（tier/label/language/genre/setting/protagonist/tone/conflict/synopsis/variables/characters）——混杂了故事元数据、叙事内容、游戏机制变量。`characters` 作为 `story_config` 的内嵌数组，缺少结构化字段（外观、特质）。没有 `locations` 概念——场景定义散落在 setting 和 goal 中。Outline 的 `routes` 字段使用 DSL 语法（`go if A==5` / `go if B>3` / `go`），parser 需要正则匹配箭头、解析条件表达式。
+
+核心洞察：输出格式 = 存档格式——消除 `CoCreationResult → save dict` 的转换层。LLM 的 JSON 输出精确性远高于自定义 DSL——业界共识是 LLM 输出 JSON 的可靠性最高。
+
+**决策**（commit `0bf5140`）：
+
+| 维度 | 旧 | 新 |
+|------|-----|-----|
+| LLM 输出格式 | `=== block ===` 分隔 | JSON（`json.loads()` 一行解析） |
+| story_config 字段 | 11 个混杂字段 | 4 个 canonical 字段（tier/title/language/premise） |
+| 角色表示 | story_config 内嵌数组，3 字段 | top-level 数组，4 字段（name/role/description/appearance） |
+| 场景表示 | 无——散落在 setting/goal | top-level `locations` 数组（id/name/description） |
+| 变量表示 | `=== variables ===` 块，INI 行 | JSON `variables` 数组（name/type/initial） |
+| Outline routes | DSL（`go if A==5`） | 结构化 JSON（`[{target, condition?}]`） |
+| 存档版本 | `SAVE_VERSION = 1` | `SAVE_VERSION = 2` |
+| Parser 代码 | 11 个解析方法 | `CoCreateValidator` 6 个验证方法 |
+
+**spec 文档**（`docs/spec/co-create-data-model-v2.md`——在 spec 提交中内嵌）：完整字段定义、JSON 示例、验证规则、对比表。
+
+**依据**：commit `0bf5140`。
+
+### 标签重命名 + traits 合并——设计确认
+
+**背景**：数据模型 v2 设计中两个字段级决策在 spec 后经过进一步讨论后细化：
+
+1. **`label` → `title`**：`label` 在 Web UI 中与 HTML `<label>` 和 CSS label 产生命名冲突，且在小说领域 `title` 是行业标准术语。
+2. **`traits` → `description` 合并**（plan D10）：`traits`（"Calculating, morally grey"）独立字段破坏角色描述内聚性——角色特质在叙事中自然从 description 中浮现，不应另起一个分离字段。
+
+**决策**：
+1. 全代码库 `label` → `title` 批量重命名（commit `27abaf8`，在次日执行）
+2. Spec 中 characters 从 5 字段（含 traits）简化为 4 字段（commit `410ba9a`）
+
+**依据**：commits `27abaf8`, `410ba9a`。
+
+---
+
+## 2026-07-25（周五）
+
+### 课程文档目录重组
+
+**背景**：课程评估报告 `docs/course/report.md` 及相关课程文档散落在 `docs/` 根目录——与工程规范文档（`spec/`）和工程日志混在一起，语义边界模糊。
+
+**决策**（commit `692fc99`）：将课程相关文档移入 `docs/course/` 统一目录。课程材料与工程文档物理隔离。
+
+**依据**：commit `692fc99`。
+
+---
+
 ## 2026-07-21（周二）
 
 > **概述**：10 次提交，集中在两大领域——共创 Prompt 重构（从"格式叮嘱"到"设计体系"）、打包/Web 缺陷修复。版本号 1.0.1 → 1.0.2。
