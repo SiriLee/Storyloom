@@ -58,7 +58,7 @@
 | 阶段 | 调用时机 | 输出格式 | 详见 |
 |------|---------|---------|------|
 | 追问循环 | 共创 Step 2（多轮） | 自由对话 | §3.1 |
-| 故事生成 | 共创 Step 3（单次调用） | `=== story_config ===` + `=== variables ===` + `=== outline ===` | §3.2–3.4 |
+| 故事生成 | 共创 Step 3（单次调用） | JSON 对象（story_config、characters、locations、variables、outline） | §3.2 |
 | 叙事循环 | 每轮 | XML 文档（`<story>` + `<seg>`/`<choice>`/`<set>`/`<checkpoint>`/`<bridge/>`/`<branch>`） | §4 |
 | 冒险日志 | 结局 | Markdown 纯文本 | §5 |
 
@@ -100,70 +100,265 @@
 
 ---
 
-> §3.2 为统一生成 Prompt——单次 `generate()` 调用产出 `story_config` + `variables` + `outline` 三个块。
-> §1.2 的约束有效性原则适用于此 Prompt；§3.2.2–3.2.4 描述各块的解析格式与校验规则。
+> §3.2 为统一生成 Prompt——单次 `generate()` 调用产出完整 JSON 对象。
+> §1.2 的约束有效性原则适用于此 Prompt；§3.2.2–3.2.6 描述各键的字段规范与校验规则。
 
-### 3.2 故事生成（统一 Prompt）
+### 3.2 故事生成（JSON 输出）
 
 #### 3.2.1 结构与设计
 
-单次 user 消息，要求 LLM 一并输出三个 ``===`` 分隔的块。Prompt 采用 5 段式结构（与 §4 叙事 Prompt 同源设计，交叉一致性约束内嵌于逐块规范中）：
+单次 user 消息，要求 LLM 输出一个 JSON 对象。Prompt 采用 5 段式结构（与 §4 叙事 Prompt 同源设计）：
 
 | 段 | 作用 | 对应原则 |
 |----|------|----------|
 | 角色定义 | 明确任务边界——"基于对话生成设定，非写故事" | — |
-| 完整格式示例 + 屏障 | 英文示例展示三块完整结构与引用关系；显式声明示例仅供格式参考 | 示例先行、示例-规则屏障 |
-| 逐块字段规范 | 每个块的字段含义、约束、必填/可选，route target 引用规则 | 关键处不吝笔墨、具体优于抽象 |
-| 禁止模式 | 逐条列出已知错误模式（缺字段、route 虚悬、超变量上限、markdown 围栏） | 显式禁止优于隐式模式、正反双重覆盖 |
+| 完整 JSON 示例 + 屏障 | 英文示例展示 5 键完整结构与引用关系；显式声明示例仅供格式参考 | 示例先行、示例-规则屏障 |
+| 逐键字段规范 | 每个键的字段含义、约束、必填/可选；route target 引用规则 | 关键处不吝笔墨、具体优于抽象 |
+| 禁止模式 | 逐条列出 JSON 场景下的已知错误模式（含反例片段） | 显式禁止优于隐式模式、正反双重覆盖、反例约束 |
 | 自检清单 | 输出前逐项自查——引导 LLM 生成末尾做结构化验证 | 注意力标签 |
 
-格式示例使用英文（与叙事 Prompt 的 Kael 示例策略一致），输出语言通过 `$language` 占位符控制。语言相关的轻量提示（`label_hint`）通过 `lang_meta/{lang}.json` 注入。
+格式示例使用英文（与 §4 叙事 Prompt 的 Kael 示例策略一致），输出语言通过 `$language` 占位符控制。语言相关的轻量提示（`title_hint`）通过 `lang_meta/{lang}.json` 注入。
 
-#### 3.2.2 story_config 块
+#### 3.2.2 story_config
 
-**字段规范**（INI 风格 `key: value`，续行以 `  ` 缩进）：
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `tier` | `"short"` \| `"medium"` \| `"long"` | 是 | 决定大纲节点数范围 |
+| `title` | string | 是 | 故事标题，$title_hint |
+| `language` | `"en"` \| `"zh-CN"` \| `"zh-TW"` | 是 | 输出语言代码 |
+| `premise` | string | 是 | 2-4 句：世界观、核心冲突、故事前提 |
 
-| 字段 | 必填 | 说明 |
+#### 3.2.3 characters
+
+数组，至少 1 个元素，**恰好 1 个 `role: "protagonist"`**。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 是 | 角色名（故事语言） |
+| `role` | `"protagonist"` \| `"supporting"` \| `"antagonist"` | 是 | 角色类型 |
+| `description` | string | 是 | 身份背景 + 性格特质。主角：身份、性格。配角：身份、与主角关系、性格 |
+| `appearance` | string | 是 | 2-3 句外貌描述。图像模式下的视觉参考 |
+
+#### 3.2.4 locations
+
+数组，至少 1 个元素。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | string | 是 | 英文 snake_case 标识（如 `"underground_bar"`） |
+| `name` | string | 是 | 显示名称（故事语言） |
+| `description` | string | 是 | 2-3 句：环境、氛围、关键特征 |
+
+#### 3.2.5 variables
+
+数组，≤3 总量，≤2 number，≤1 string。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 是 | 变量名（故事语言），不可重复 |
+| `type` | `"number"` \| `"string"` | 是 | number 初始值须在 [0, 100] |
+| `initial` | number \| string | 是 | 初始值 |
+
+#### 3.2.6 outline
+
+数组，至少 1 个元素。节点数量由 tier 决定。
+
+每个节点：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | string | 是 | `ch{number}_{english_abbreviation}`（如 `"ch1_intro"`） |
+| `title` | string | 是 | 章节标题（故事语言） |
+| `goal` | string | 是 | 2-3 句：玩家在此节点需要完成的目标 |
+| `routes` | array | 是 | 分支路由。**末节点须为空数组 `[]`** |
+
+routes 元素：
+
+| 字段 | 类型 | 说明 |
 |------|------|------|
-| `genre` | 是 | 自由文本，如 "cyberpunk thriller"、"古风悬疑" |
-| `tier` | 是 | 精确取值 `short` / `medium` / `long` |
-| `title` | 是 | 简短标识，用于存档文件名（1-30 字符） |
-| `language` | 否 | 语言代码；缺失时使用默认值 |
-| `setting` | 否 | 故事简介，2-4 句；缺失时为空字符串 |
-| `protagonist_name` | 是 | 主角姓名或代号 |
-| `protagonist_identity` | 是 | 一句话身份描述 |
-| `protagonist_traits` | 是 | 2-3 个关键特质 |
-| `tone` | 是 | 叙事氛围，如 "dark and gritty" |
-| `conflict` | 是 | 核心冲突，一句话 |
-| `characters` | 是 | 配角列表，每行 `name \| role \| relationship`，至少 1 个 |
+| `condition` | string \| null | 分支条件（引用 variables 中已声明的变量）；`null` = 无条件兜底 |
+| `target` | string | 目标节点 `id`，**必须精确匹配某个节点的 `id`** |
 
-**解析器**：`CoCreateParser.parse_story_config()`。缺失必填字段或 tier 取值非法 → `ValueError`。
+**交叉引用约束**：route 的 `target` 必须 match 同 outline 中某个节点的 `id`。route 的 `condition` 中引用的变量必须在 `variables` 中已声明。最后节点的 `routes` 须为空数组 `[]`——引擎以此判定结局。
 
-#### 3.2.3 variables 块
+#### Prompt
 
-**格式**：每行 `<name>: <type>, <initial_value>`
+```
+You are a story setup generator. Based on the conversation above, produce a complete, structured story configuration for a text adventure game.
 
-**约束**：
-- 总数 ≤3（`VARIABLE_CAP`）
-- number ≤2（`VARIABLE_NUMERIC_CAP`），初始值 [0, 100] 整数
-- string ≤1（`VARIABLE_LABEL_CAP`），初始值非空
-- 变量名不含 `:` 或换行，不可重复
+Write ALL content — title, premise, character names, node titles, goals, and variable names — in this language: $language.
 
-**解析器**：`CoCreateParser.parse_variables()` + `validate_variables()`。
+# Output Format
 
-#### 3.2.4 outline 块
+Your response must be a single JSON object. Output ONLY the JSON — no markdown fences, no commentary before or after.
 
-**格式**：`[node]` block 序列，每节点含 `id`、`title`、`goal`、`routes` 字段。
+## Format Example
 
-**约束**：
-- 节点数范围：short 5-10 / medium 10-20 / long 20-30（`OUTLINE_NODE_RANGES`）
-- `id` 格式：`ch{序号}_{英文缩写}`
-- `routes` 中每个 target 必须精确匹配同一 outline 中的某个 node `id`
-- route 条件只能引用 variables 块中已声明的变量
-- 最后一个节点的 `routes:` 必须为空（系统以此判定结局）
-- 空 routes 写法：`routes:` 后不写任何内容，不加 `(结局)` 等标注
+Below is a complete format example (a short cyberpunk story in English):
 
-**解析器**：`CoCreateParser.parse_outline()` + `validate_outline()`。
+{
+  "story_config": {
+    "tier": "medium",
+    "title": "Neon Depths",
+    "language": "en",
+    "premise": "In 2087 Neo-Tokyo, data is the only currency. Kael, a former corporate security consultant turned freelancer, is pulled into a chase for a stolen biochip that could destabilize the global order. Hunted by corporations, criminals, and a truth no one wants uncovered, every alliance comes with a price."
+  },
+  "characters": [
+    {
+      "name": "Kael",
+      "role": "protagonist",
+      "description": "Former corporate security consultant turned freelance operative. Calculating, morally grey, fiercely loyal.",
+      "appearance": "Tall, sharp-eyed, with short dark hair and a faint scar across the jaw. Wears a worn synth-leather coat over tactical gear."
+    },
+    {
+      "name": "Mouse",
+      "role": "supporting",
+      "description": "Underground info broker with old debts — knows the chip's real value. Slippery, resourceful, paranoid.",
+      "appearance": "Short and wiry, with augmented eyes that flicker blue when scanning data streams."
+    },
+    {
+      "name": "Michiko",
+      "role": "supporting",
+      "description": "Arasaka security director and former mentor — conflicted loyalties between duty and old ties. Cold, efficient, pragmatic.",
+      "appearance": "Impeccably sharp in a tailored black suit, silver-streaked hair pulled tight. Cold smile, eyes that miss nothing."
+    }
+  ],
+  "locations": [
+    {
+      "id": "neo_tokyo_streets",
+      "name": "Neo-Tokyo Streets",
+      "description": "Rain-slicked neon-lit streets at midnight. Holographic ads flicker across skyscraper faces, drones buzzing overhead."
+    },
+    {
+      "id": "underground_bar",
+      "name": "The Rat's Nest",
+      "description": "Dimly lit bar beneath a noodle shop. Cracked synth-leather booths, smell of synthetic alcohol and ozone — a haven for info brokers."
+    }
+  ],
+  "variables": [
+    {"name": "Stamina", "type": "number", "initial": 80},
+    {"name": "Trust", "type": "number", "initial": 10},
+    {"name": "Faction", "type": "string", "initial": "Freelancer"}
+  ],
+  "outline": [
+    {
+      "id": "ch1_intro",
+      "title": "Neon Depths",
+      "goal": "Meet the contact at an underground bar, pick up the chip, and get a lead on who is pulling the strings.",
+      "routes": [
+        {"condition": null, "target": "ch2_confrontation"}
+      ]
+    },
+    {
+      "id": "ch2_confrontation",
+      "title": "Underground Deal",
+      "goal": "Complete the handoff with Mouse while corporate agents close in. The deal's terms shift when the chip's true nature comes to light.",
+      "routes": [
+        {"condition": "Trust >= 30", "target": "ch3_ally"},
+        {"condition": "Trust < 30", "target": "ch3_betrayal"}
+      ]
+    },
+    {
+      "id": "ch3_ally",
+      "title": "Ally's Path",
+      "goal": "Work with Mouse to decrypt the chip's data, evade corporate pursuit through the streets, and follow the trail to its source.",
+      "routes": [
+        {"condition": null, "target": "ch4_safehouse"}
+      ]
+    },
+    {
+      "id": "ch3_betrayal",
+      "title": "Betrayal's Path",
+      "goal": "Mouse sells you out to corporate agents. Fight through the ambush and escape into the neon-lit streets — alone, with no one left to trust.",
+      "routes": [
+        {"condition": null, "target": "ch4_safehouse"}
+      ]
+    },
+    {
+      "id": "ch4_safehouse",
+      "title": "Safehouse",
+      "goal": "All leads converge at a hidden waterfront warehouse. The chip's final secret is revealed, and a choice must be made — destroy the data, release it to the world, or use it as leverage to start over.",
+      "routes": []
+    }
+  ]
+}
+
+**(The above is a format example ONLY. Generate an entirely new story setup based on the conversation, written in $language. Do NOT copy the example's characters, setting, or variable names.)**
+
+# Field Specifications
+
+## story_config
+- **tier** — Exactly one of: `short`, `medium`, `long`. Determines outline node count ($node_count_hint).
+- **title** — $title_hint
+- **language** — `$language`
+- **premise** — Story premise. 2-4 sentences: world, protagonist situation, core conflict. This is the foundation the narrative engine uses to maintain consistency.
+
+## characters
+- Array of character objects. At least 1 element. **(IMPORTANT)** Exactly one must have `role: "protagonist"`.
+- **name** — Character name in the story language.
+- **role** — `protagonist`, `supporting`, or `antagonist`.
+- **description** — Identity background + personality traits. For protagonist: who they are, what drives them. For others: who they are, their relationship to the protagonist.
+- **appearance** — 2-3 sentences: physique, facial features, clothing style.
+
+## locations
+- Array of location objects. At least 1 element.
+- **id** — Machine-readable identifier. English snake_case (e.g. `"neo_tokyo_streets"`, `"underground_bar"`).
+- **name** — Display name in the story language.
+- **description** — 2-3 sentences: environment, lighting, atmosphere, key visual features.
+
+## variables
+- Array of variable definitions. ≤3 total, ≤2 of type `number`, ≤1 of type `string`.
+- **name** — Variable name in the story language. Must be unique within the array.
+- **type** — `number` or `string`. Number values are integers in [0, 100].
+- **initial** — Starting value. Must match the declared type.
+- Only create variables that drive branching or gate choices. Fewer is better.
+
+## outline
+- Array of story nodes, ordered by progression. Count depends on tier ($node_count_hint).
+- **id** — `ch{number}_{english_abbreviation}`. e.g. `"ch1_intro"`, `"ch2_confrontation"`.
+- **title** — Chapter title in the story language.
+- **goal** — Chapter arc, not a single scene. Unfolds over several rounds. 2-3 sentences.
+- **routes** — Array of `{condition, target}` objects. **(IMPORTANT)** Every `target` must match word-for-word an `id` of some node in this outline. References to non-existent node IDs will cause the entire generation to be rejected.
+- Route `condition` may only reference variables declared in `variables`. Use `null` for unconditional / fallback routes.
+- **(IMPORTANT)** The **final node** must have `"routes": []` (empty array). The system detects endings by empty routes — no arrows, no placeholder text, no annotations.
+
+# Prohibited
+
+- Wrapping the JSON in markdown code fences (```json ... ```).
+- Outputting anything before the opening `{` or after the closing `}`.
+- Root value is not a JSON object — must be `{...}`, not `[...]` or a literal.
+- Missing or extra top-level keys — exactly 5 keys: `story_config`, `characters`, `locations`, `variables`, `outline`.
+- Route `target` not matching any node `id`. Example of what WILL be rejected:
+
+  ```json
+  {"condition": null, "target": "ch5_epilogue"}
+  ```
+  ...when no node has `"id": "ch5_epilogue"`.
+
+- Final node's `routes` is not an empty array. Example of what WILL be rejected:
+
+  ```json
+  {"condition": null, "target": "ch5_end"}
+  ```
+  ...as the last node's routes — must be `[]` instead.
+
+- Route `condition` referencing a variable not declared in `variables`.
+- Character `role` value outside the allowed set (`protagonist`, `supporting`, `antagonist`).
+- More than 2 `number` variables or more than 1 `string` variable.
+
+# Verification Checklist
+
+Before outputting, mentally verify:
+
+[ ] story_config: all 4 fields present and non-empty; tier is exactly short/medium/long
+[ ] characters: non-empty array; exactly 1 protagonist; all roles valid; name/description/appearance non-empty
+[ ] locations: non-empty array; every id is snake_case; name/description non-empty
+[ ] variables: ≤3 total, ≤2 number, ≤1 string; number initial values in [0, 100]; names unique
+[ ] outline: every route target matches a node id; final node routes is empty array []
+[ ] outline: every condition variable is declared in variables
+[ ] No markdown fences; no text outside the JSON object
+[ ] All content in $language
+```
 
 ---
 
@@ -424,12 +619,21 @@ Rough guide: ~lines 001-{REF_PRE} before bridge + ~{REF_SINGLE} after (single pa
 # Story Context
 **Language:** {LANGUAGE}
 **Seg limits:** narration ≤{NARR_LIMIT} characters, dialogue ≤{DIAL_LIMIT} characters
-**Background:** {background}
-**Protagonist:** {protagonist}
-**Tone:** {tone}
-**Conflict:** {conflict}
+{story_context}
+```
+
+`{story_context}` 由 `_format_story_context()` 生成，格式：
+
+```
+**Premise:** {premise}
+
 **Characters:**
-{characters}
+- {name} ({role}) — {description}
+- ...
+
+**Locations:**
+- {name} — {description}
+- ...
 ```
 
 ### 4.3 回合提示词
@@ -527,226 +731,16 @@ The active node may take several rounds to reach. Do not force progress — simp
 
 ### 4.4 完整示例
 
-> Round 1，赛博朋克 medium 故事（zh-CN）。`{MIN_LINES}=150` `{MAX_LINES}=300` `{BRIDGE_PCT}=75`。
-> 以下为 §4.2 首轮前缀 + §4.3 回合提示词拼接后的完整 messages[0]，也就是实际发送给 LLM 的内容。
->
-> 前缀和回合块之间的分隔线（`---`）仅为阅读标注，实际 Prompt 中不存在，两者直接拼接。
+首轮完整 Prompt = §4.2 首轮前缀 + §4.3 回合提示词 + `(This is the start of the whole story.)`。两者直接拼接，无分隔线。回合提示词中 bridge_text 留空、无错误反馈。首轮末尾标记仅首轮出现。
 
-#### 首轮前缀
-
-```
-You are the narrative engine for a text adventure game. Generate the next interactive story segment based on the outline and current state.
-
-# Output Format
-
-Prefix every line with a line number: `001| `, `002| `, `003| ` ... incrementing continuously.
-The program strips these prefixes before parsing — they are NOT part of the XML.
-Start at 001 for this round.
-
-Your output MUST be an XML document. Start with `<story>`, end with `</story>`.
-Do NOT output markdown code fences, XML declarations, or any text outside the XML.
-
-## Structure
-
-001| <story>
-002| <seg>narration text</seg>
-003| <seg>narration text</seg>
-004| ...
-005| <!-- pre-bridge local branch (merges back). opt with no branch stays on main path -->
-006| <choice id="minor">
-007|   <opt key="1" branch="path_a">takes a branch</opt>
-008|   <opt key="2">stays on main</opt>
-009| </choice>
-010| <branch name="path_a">
-011| <seg>local variant — merges back after</seg>
-012| </branch>
-...
-013| <!-- main interaction — not every choice needs consequences -->
-014| <choice id="variable_name">
-015|   <opt key="1">option text</opt>
-016|   <opt key="2">option text</opt>
-017| </choice>
-018| <!-- node still in progress — no <checkpoint> yet -->
-019| <bridge/>
-020| <seg>narration continues on a single path</seg>
-021| ...
-022| </story>
-
-## Elements
-
-**Line numbers** — `NNN| ` prefix on every line, zero-padded to 3 digits. Increment each line. Not part of the XML.
-
-**<seg>** — A narrative segment. The basic unit of the story — a single beat of narration or dialogue. One thing per segment.
-
-**<choice id="variable_name">** — Player choice. Contains 2-4 `<opt>` elements with `key` (number), `branch` (optional, assigned to `current_branch`), and `if` (optional, availability condition).
-
-**<set>** — State change. Modifies a state variable. `var`, `op`, `val` required. `if` (optional): conditional execution.
-
-**<checkpoint>** — Key story node and save point. Appears 0-1 times. Always a direct child of `<story>`. Records outline progress with a `summary`. May contain `<route>` elements for outline branching.
-
-**<bridge/>** — Self-closing. Always a direct child of `<story>`. Exactly ONCE per output. The signal point where the program triggers the next API call. Divides output into interactive zone (before) and narrative zone (after).
-
-**<branch name>** — Branch narrative container. Before bridge: local branches that merge back. After bridge: key branches selected by `current_branch`. `name` is matched against `current_branch`.
-
-## Format Example
-
-Below is a format example (content is a short fictional fantasy story in English):
-
-001| <story>
-002| <seg>Rain hammered the tin roof of the border outpost</seg>
-003| <seg>Kael pushed through the door, dripping onto the threshold</seg>
-004| <seg>Innkeeper: Storm's getting worse. Staying or just drying off?</seg>
-005| <choice id="inn_first">
-006|   <opt key="1">Ask about the patrols on the north road</opt>
-007|   <opt key="2">Order a hot meal and find a corner</opt>
-008|   <opt key="3">Study the room — faces, exits, threats</opt>
-009| </choice>
-010| <seg>The innkeeper grunted and went back to his glass</seg>
-011| <seg>Outside, metal clattered against stone — then a muffled curse</seg>
-012| <seg>Someone was in the stables, and they weren't being quiet about it</seg>
-013| <choice id="investigate">
-014|   <opt key="1" branch="check_stables">Slip out the back and investigate</opt>
-015|   <opt key="2">Stay put — not your problem</opt>
-016| </choice>
-017| <branch name="check_stables">
-018| <seg>Rain lashed Kael's face as he eased the back door open</seg>
-019| <seg>A hooded figure was rifling through his saddlebags</seg>
-020| </branch>
-021| <seg>The hooded figure followed him inside and threw back her hood</seg>
-022| <seg>Stranger: You're the courier. I've tracked you for three days</seg>
-023| <seg>Stranger: That letter in your coat — it's not what they told you</seg>
-024| <choice id="mission">
-025|   <opt key="1" branch="trust">Hear her out</opt>
-026|   <opt key="2" branch="refuse">Walk away — the job comes first</opt>
-027| </choice>
-028| <set var="trust" op="+" val="10" if="mission==1"/>
-029| <set var="trust" op="-" val="10" if="mission==2"/>
-030| <checkpoint node="ch2_revelation" summary="Kael learned the letter's true nature and chose whether to trust the stranger.">
-031|   <route if="mission==1" target="ch3_ally"/>
-032|   <route if="mission==2" target="ch3_alone"/>
-033| </checkpoint>
-034| <bridge/>
-035| <branch name="trust">
-036| <seg>The stranger slid into the booth across from him</seg>
-037| <seg>Stranger: The seal on that letter is a kill order. Your name is on it</seg>
-038| <seg>Stranger: Help me crack it open. We both walk away clean</seg>
-039| </branch>
-040| <branch name="refuse">
-041| <seg>Kael tossed a coin on the counter and stood</seg>
-042| <seg>Stranger: They'll use you and throw you away. Same as they did me</seg>
-043| <seg>Kael stepped into the storm without looking back</seg>
-044| </branch>
-045| </story>
-(This is a format example ONLY. Your output is an entirely new story segment.)
-
-# Core Rules
-
-**Segment Format**
-- Each `<seg>` is EITHER narration OR dialogue.
-- Narration: one scene per segment. Short — a single observation, action, or beat.
-- Dialogue: `Name: text` format, no quotation marks. One line per segment.
-- Put character actions, expressions, and tone in separate narration segments.
-- Use actual character names in dialogue.
-
-**Line Count & Bridge Position**
-- **Output 150-300 total lines.** The format example is deliberately short (35 lines) to show structure only — your output MUST reach 150-300.
-- Place `<bridge/>` roughly 75% through — about 3/4 of lines before, 1/4 after.
-- Each post-bridge `<branch>` must span at least 25 lines.
-- Post-bridge content is selected by `current_branch`: use `<branch>` containers for multiple possible paths, bare `<seg>` for a single path.
-
-**Choice → current_branch**
-- `<opt branch="X">` sets `current_branch = X`. Branch selection is based on `current_branch`: `<branch name="X">` will match.
-- Reference the choice in conditions using its `id` with the `key` number: `variable_name==1`.
-- Conditions support `and` / `or` (max one combinator) and reference variables from "Current State".
-
-**Set — State Changes**
-- `var` MUST use the exact names from "Current State" below. Do NOT invent, translate, or substitute them.
-- number: `op="+"` / `op="-"` / `op="="` with `val` as the number; string: `op="="`.
-- Condition syntax: same as Choice above.
-
-**Checkpoint**
-- Trigger the checkpoint as soon as the active node's goal is achieved — don't delay.
-- If the goal has NOT been reached, omit `<checkpoint>` entirely. The node may take several rounds.
-- Copy the `node` attribute verbatim from the outline — exact character-for-character match.
-  Outline has `ch2_confrontation` → write `node="ch2_confrontation"`.
-- Copy `<route>` `target` attributes verbatim from outline node IDs.
-
-**XML Rules**
-- Match every opening tag with a closing tag. Use `/>` for self-closing elements.
-- Wrap attribute values in double quotes.
-- Escape `<` `>` `&` in text as `&lt;` `&gt;` `&amp;`. Example: "R&D" → "R&amp;D".
-
-**Prohibited**
-- `<bridge/>` count not equal to 1.
-- `<choice>`, `<set>`, or `<checkpoint>` after bridge.
-- More than one `<checkpoint>`.
-- Outputting anything outside the XML document (markdown fences, comments, explanatory text).
-- `<checkpoint>` `node` or `<route>` `target` not matching an outline node ID exactly.
-- `<checkpoint>` when the active node's goal has not been reached.
-- `<set>` `var` referencing a variable not listed in "Current State".
-- Dialogue with quotation marks, pronouns as character names, or inline action descriptions.
-- Addressing the player directly ("You choose...", "What do you do?").
-
-# Quality Requirements
-
-One thing per segment. Alternate dialogue and narration. Make each branch narratively distinct. Create suspense after bridge.
-
-Rough guide: ~lines 001-225 before bridge + ~75 after (single path) or ~38 per branch-tail.
-
-# Story Context
-**Language:** zh-CN
-**Seg limits:** narration ≤40 characters, dialogue ≤50 characters
-**Background:** 赛博朋克冒险 · 2087年新东京地下城
-**Protagonist:** 林焰，前荒坂安全顾问，现自由佣兵。冷静、道德灰色，有过载神经接口
-**Tone:** 黑暗冷峻
-**Conflict:** 一枚从企业R&D部门流出的神秘芯片正在寻找宿主
-**Characters:**
-耗子（地下情报贩子，亦敌亦友）、美智子（荒坂安全主管，前上司）
-```
-
----
-
-#### 回合提示词
-
-```
-**Outline:**
-ch1_bar [completed] — 霓虹深渊：在酒吧获取情报
-  → ch2_confrontation [active]
-ch2_confrontation [active] — 地下交易：与耗子会面
-  ├→ ch3_ally [pending]
-  └→ ch3_betrayal [pending]
-ch3_ally [pending] — 盟友之路：通过地下网络逃离
-ch3_betrayal [pending] — 背叛之路：杀出重围
-ch4_safehouse [pending] — 安全屋：揭开芯片秘密（结局）
-
-**Active Node:** ch2_confrontation — 与耗子完成交易
-
-**Current State:**
-体力: 80 / 100
-理智值: 55 / 100
-信任度: 10 / 100
-芯片完整度: 100 / 100
-线索: （无）
-所属势力: 自由佣兵
-
-Output 150-300 total lines. Exactly one `<bridge/>`. Less is fine — do not pad to hit the upper bound.
-Choices aren't just for branching — place them freely as moments of play and interaction.
-The active node may take several rounds to reach. Do not force progress — simply continue from where the story left off.
-
-```
-
-#### 拼接
-
-首轮完整 Prompt = 首轮前缀 + 回合提示词 + `(This is the start of the whole story.)`
-
-> 实际发送给 LLM 时，前缀和回合块之间没有分隔线，就是一个整体文本。首轮末尾的 `(This is the start of the whole story.)` 仅首轮出现，后续轮次不追加。
+> 具体格式示例见 §4.2 各模板和 §4.3 格式示例。
 
 ## §5 冒险日志 Prompt
 
 ### 5.1 规范
 
 - **调用时机**：结局轮 bridge 处（ending_flag=true）。独立调用，不流式。
-- **输入**：story_config 全文、state_vars 当前值、outline_text（含各节点 status 和 summary）。
+- **输入**：故事数据（premise、characters、locations）、state_vars 当前值、outline_text（含各节点 status 和 summary）。
 - **输出**：Markdown 格式，500-1000 字。面向玩家回顾性口吻。不加区块分隔符。
 - **Prompt 语言**：英文（与所有系统 Prompt 一致）。通过 `{language}` 占位符指示 LLM 以故事语言输出。
 
@@ -758,7 +752,7 @@ You are an adventure log author. Write a player-facing recap for a completed tex
 Use Markdown format. Write in the story's language ({language}).
 
 ## Story Background
-{background_text}
+{story_context}
 
 ## Story Outline
 {outline_text}
@@ -767,7 +761,7 @@ Use Markdown format. Write in the story's language ({language}).
 a ↳ summary of what actually happened — use these as the basis for each chapter recap.
 [active] is the final node. [pending] nodes were skipped due to branching.)
 
-## Adventure Recap: {story_label}
+## Adventure Recap: {title}
 
 Write a chapter-by-chapter recap based on the outline and summaries above.
 
@@ -793,13 +787,16 @@ You are an adventure log author. Write a player-facing recap for a completed tex
 Use Markdown format. Write in the story's language (zh-CN).
 
 ## Story Background
-Genre: 赛博朋克冒险
-Setting: 2087年新东京地下城，霓虹与钢铁的深渊
-Protagonist: 林焰 — 前荒坂安全顾问，现自由佣兵 (冷静、道德灰色)
-Tone: 黑暗冷峻
-Conflict: 一枚从企业R&D部门流出的神秘芯片正在寻找宿主
-Characters:
-耗子（地下情报贩子，亦敌亦友）、美智子（荒坂安全主管，前上司）
+**Premise:** 2087年新东京，数据是唯一货币。林焰，前荒坂安全顾问转自由佣兵，卷入了一场争夺被盗生物芯片的追逐——这枚芯片可能颠覆全球秩序。
+
+**Characters:**
+- 林焰 (protagonist) — 前荒坂安全顾问，自由佣兵。冷静、道德灰色、 fiercely loyal
+- 耗子 (supporting) — 地下情报贩子，有旧债未清。滑头、足智多谋、偏执
+- 美智子 (supporting) — 荒坂安全主管，前导师。忠于职责与旧日情谊之间挣扎
+
+**Locations:**
+- 霓虹深渊酒吧 — 霓虹灯闪烁的午夜街头，全息广告在摩天大楼表面闪烁
+- 废弃滨水仓库 — 工业滨水区的生锈金属结构，雨水从波纹屋顶渗入
 
 ## Story Outline
 ch1_bar [completed] — 霓虹深渊：在酒吧获取情报
@@ -849,6 +846,7 @@ Requirements:
 | 2026-07-04 | v4 模板重构：示例精简(18→11段)、规则结构化、新增6条设计原则 | 6轮30+次测试验证。正确率33%→83%，TTFT 38s→11s。关键改进：(1)独立options节+choice显式规则 (2)checkpoint反例约束 (3)pre-bridge的:main双重覆盖 (4)示例后防续写屏障 (5)bridge/bridge段数上下限+反例 (6)(重要)注意力标签 |
 | 2026-07-04 | 跨题材泛化测试：恋爱/悬疑/古风各3轮 | v4模板在4题材下正确率波动大（1/3~3/3）。发现2个跨题材共性问题：(1) **bridge-before-options** — LLM在options之前插入bridge；(2) **bridge位置偏离** — 慢节奏叙事推迟了交互断点 |
 | 2026-07-04 | **架构迁移：对话式消息数组 + XML 输出格式** | 从每轮 system prompt 迁移到 messages 数组架构。(1) **XML 格式**（`<seg>`/`<choice>`/`<set>`/`<checkpoint>`/`<bridge/>`/`<branch>`）替代 `--- block ---`，frame-v1 测试正确率 100%；(2) **对话式** Round 1 永久锚定 + 滑动窗口（WINDOW_SIZE=3）+ checkpoint 压缩；(3) `context_manager.py`、`prompt_builder.py`、`streaming_parser.py` 替代旧 prompt 组装管线。旧格式 prompt 文件清理归档 |
+| 2026-07-27 | **共创 Prompt 重写：JSON 输出格式** | 数据模型重构（story_config 11→4 字段，新增 characters/locations 结构化数组，variables 移至顶层）。共创生成 Prompt 从三 block INI 格式迁移到单一 JSON 输出：(1) 自定义解析器约 300 行 → `json.loads()`；(2) 5 段式结构（角色定义 → JSON 示例 + 屏障 → 字段规范 → 禁止模式 + 反例 → 自检清单）；(3) §4 Story Context 区域同步精简（Background/Protagonist/Tone/Conflict → Premise + Characters + Locations）；(4) 冒险日志 Story Background 共用 `_format_story_context()` 格式 |
 
 ---
 
