@@ -84,12 +84,13 @@ class GameState:
     NUMBER_MIN = 0
     NUMBER_MAX = 100
 
-    def __init__(self, story_config: dict):
-        """Initialize state from story_config.variables.
+    def __init__(self, variables: list[dict] | None = None):
+        """Initialize state from variable definitions.
 
         Args:
-            story_config: Dict with a 'variables' list.
-                          Each variable has: name, type, initial.
+            variables: List of variable definitions.
+                       Each variable has: name, type, initial.
+                       None or empty list → no state variables.
 
         Raises:
             ValueError: On unsupported variable type.
@@ -97,8 +98,7 @@ class GameState:
         self._state_vars: dict = {}
         self._var_types: dict[str, str] = {}
 
-        variables = story_config.get("variables", [])
-        for v in variables:
+        for v in (variables or []):
             name = v["name"]
             var_type = v["type"]
             initial = v["initial"]
@@ -128,21 +128,21 @@ class GameState:
         }
 
     @classmethod
-    def from_dict(cls, data: dict, story_config: dict) -> "GameState":
+    def from_dict(cls, data: dict, variables: list[dict]) -> "GameState":
         """Restore GameState from save data.
 
-        Uses the original story_config for variable type definitions;
-        actual state values come from data['state_vars'].
+        Uses *variables* for type definitions; actual state values come
+        from ``data['state_vars']``.
 
         Args:
             data: Dict with 'state_vars' key from save file.
-            story_config: Original story_config from save file
-                          (preserves variable definitions with initial values).
+            variables: Variable definitions (name, type, initial)
+                       from the save file's top-level ``variables`` key.
 
         Returns:
             New GameState instance with restored values.
         """
-        gs = cls(story_config)
+        gs = cls(variables)
         gs._state_vars = dict(data.get("state_vars", {}))
         return gs
 
@@ -386,13 +386,17 @@ class GameLoop:
         observers: list[Callable[[RoundRecord], None]] | None = None,
         observer: Callable[[RoundRecord], None] | None = None,
         outline_nodes: list[dict] | None = None,
+        characters: list[dict] | None = None,
+        locations: list[dict] | None = None,
+        variables: list[dict] | None = None,
     ):
         """Initialize game loop with story config and dependencies.
 
         Args:
-            story_config: Story configuration dict.
+            story_config: Story configuration dict (4 fields: tier, title,
+                          language, premise).
             api_client: API client for LLM calls.
-            game_state: Optional GameState (created from story_config if omitted).
+            game_state: Optional GameState (created from *variables* if omitted).
             current_node: Starting node ID (optional).
             goal: Starting node goal description (optional).
             observers: Optional list of observer callbacks invoked after each
@@ -400,11 +404,20 @@ class GameLoop:
             observer: Deprecated. Single observer (use observers=list instead).
             outline_nodes: Structured outline from co-creation (optional).
                 Each node: {id, title, goal, routes, status?, summary?}.
+            characters: Character definitions from co-creation (optional).
+                Each: {name, role, description, appearance}.
+            locations: Location definitions from co-creation (optional).
+                Each: {id, name, description}.
+            variables: Variable definitions from co-creation (optional).
+                Each: {name, type, initial}.
 
         Observer failures are silently ignored (must not break the game loop).
         """
         self.story_config = story_config
         self.api_client = api_client
+        self.characters = characters or []
+        self.locations = locations or []
+        self.variables = variables or []
 
         # Normalize outline nodes and bake in initial status + empty summary
         self._outline_nodes = self._normalize_outline_nodes(outline_nodes or [])
@@ -430,7 +443,7 @@ class GameLoop:
         self._observers: list[Callable[[RoundRecord], None]] = obs_list
 
         # State
-        self.game_state = game_state or GameState(story_config)
+        self.game_state = game_state or GameState(self.variables)
         self.current_node = current_node or (
             self._outline_nodes[0]["id"] if self._outline_nodes else None
         )
@@ -596,6 +609,9 @@ class GameLoop:
             current_node=self.current_node or "",
             goal=self.goal or "",
             state_vars=self.game_state.state_vars,
+            characters=self.characters,
+            locations=self.locations,
+            variables=self.variables,
         )
 
         messages = [{"role": "user", "content": r1_prompt}]
@@ -957,7 +973,7 @@ class GameLoop:
             current_node=self.current_node or "",
             goal=self.goal or "",
             state_vars=self.game_state.state_vars,
-            variables=self.story_config.get("variables", []),
+            variables=self.variables,
             bridge_text=bridge_text,
             rejected_changes=(
                 self._rejected_changes if self._rejected_changes else None
@@ -1095,6 +1111,15 @@ class GameLoop:
         if self._created_at is None:
             self._created_at = now
 
+        # story_config: only persist the 4 canonical fields (plan D4/D9).
+        sc = self.story_config
+        canonical_sc = {
+            "tier": sc.get("tier", ""),
+            "title": sc.get("title", ""),
+            "language": sc.get("language", ""),
+            "premise": sc.get("premise", ""),
+        }
+
         return {
             "version": SAVE_VERSION,
             "metadata": {
@@ -1105,7 +1130,10 @@ class GameLoop:
             "config": {
                 "temperature": getattr(self, "_temperature", None),
             },
-            "story_config": copy.deepcopy(self.story_config),
+            "story_config": canonical_sc,
+            "characters": copy.deepcopy(self.characters),
+            "locations": copy.deepcopy(self.locations),
+            "variables": copy.deepcopy(self.variables),
             "state_vars": self.game_state.state_vars,
             "outline": outline_for_save,
             "progress": {
@@ -1127,6 +1155,9 @@ class GameLoop:
         Supports old save format where nodes may lack summary field.
         """
         story_config = data["story_config"]
+        characters = data.get("characters", [])
+        locations = data.get("locations", [])
+        variables = data.get("variables", [])
         state_vars_data = {"state_vars": data["state_vars"]}
         outline_nodes = data["outline"]
 
@@ -1135,7 +1166,7 @@ class GameLoop:
             node.setdefault("status", "pending")
             node.setdefault("summary", "")
 
-        game_state = GameState.from_dict(state_vars_data, story_config)
+        game_state = GameState.from_dict(state_vars_data, variables)
         progress = data.get("progress", {})
         current_node = progress.get("current_node", "")
 
@@ -1154,6 +1185,9 @@ class GameLoop:
             current_node=current_node or None,
             goal=goal or None,
             outline_nodes=outline_nodes,
+            characters=characters,
+            locations=locations,
+            variables=variables,
         )
 
         gl._checkpoint_snapshots = dict(progress.get("checkpoint_snapshots", {}))
@@ -1554,6 +1588,8 @@ class GameLoop:
             story_config=self.story_config,
             state_vars=self.game_state.state_vars,
             outline_text=self.outline_text,
+            characters=self.characters,
+            locations=self.locations,
         )
         self._adv_retry_prompt = prompt
         self._adv_error = None

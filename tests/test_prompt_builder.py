@@ -5,22 +5,26 @@ from storyloom.core.prompt_builder import PromptBuilder
 
 
 SAMPLE_STORY_CONFIG = {
-    "genre": "赛博朋克冒险",
     "tier": "medium",
     "title": "霓虹深渊",
-    "setting": "2087年新东京地下城",
-    "protagonist_name": "林焰",
-    "protagonist_identity": "前荒坂安全顾问，现自由佣兵",
-    "protagonist_traits": "冷静、道德灰色",
-    "tone": "黑暗冷峻",
-    "conflict": "一枚神秘芯片正在寻找宿主",
-    "characters": "耗子（地下情报贩子）、美智子（荒坂安全主管）",
-    "variables": [
-        {"name": "体力", "type": "number", "initial": 80},
-        {"name": "信任度", "type": "number", "initial": 10},
-        {"name": "所属势力", "type": "string", "initial": "自由佣兵"},
-    ],
+    "language": "zh-CN",
+    "premise": "2087年新东京地下城，前荒坂安全顾问林焰被卷入一场围绕神秘芯片的暗战。",
 }
+
+SAMPLE_CHARACTERS = [
+    {"name": "林焰", "role": "protagonist", "description": "前荒坂安全顾问，冷静、道德灰色", "appearance": "高瘦，短发，眼神锐利"},
+    {"name": "耗子", "role": "supporting", "description": "地下情报贩子", "appearance": "矮小精悍"},
+]
+
+SAMPLE_LOCATIONS = [
+    {"id": "neo_tokyo_streets", "name": "新东京地下城", "description": "霓虹灯闪烁的潮湿巷道"},
+]
+
+SAMPLE_VARIABLES = [
+    {"name": "体力", "type": "number", "initial": 80},
+    {"name": "信任度", "type": "number", "initial": 10},
+    {"name": "所属势力", "type": "string", "initial": "自由佣兵"},
+]
 
 SAMPLE_OUTLINE = """
 ch1_bar [active] — 霓虹深渊
@@ -40,32 +44,33 @@ SAMPLE_STATE_VARS = {"体力": 80, "信任度": 10, "所属势力": "自由佣�
 class TestBuildRound1:
     def test_round1_contains_role_definition(self):
         pb = PromptBuilder()
-        result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS)
+        result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES)
         assert "narrative engine" in result
 
     def test_round1_contains_xml_format_spec(self):
         pb = PromptBuilder()
-        result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS)
+        result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES)
         assert "<story>" in result
         assert "<seg>" in result
         assert "<bridge/>" in result
 
     def test_round1_contains_format_example(self):
         pb = PromptBuilder()
-        result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS)
+        result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES)
         assert "Rain hammered" in result
         assert "Innkeeper" in result
 
     def test_round1_contains_story_context(self):
         pb = PromptBuilder()
-        result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS)
-        assert "赛博朋克冒险" in result
+        result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES)
+        assert "**Premise:**" in result
+        assert "**Characters:**" in result
         assert "林焰" in result
         assert "ch2_confrontation" in result
 
     def test_round1_contains_state_variables(self):
         pb = PromptBuilder()
-        result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS)
+        result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES)
         assert "体力" in result
         assert "信任度" in result
 
@@ -74,6 +79,8 @@ class TestBuildRound1:
         result = pb.build_round1(
             SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation",
             "与耗子完成交易", SAMPLE_STATE_VARS,
+            characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
         )
         assert "(Story begins)" in result
         assert "Continue from" not in result
@@ -84,7 +91,7 @@ class TestBuildRound1:
         pb = PromptBuilder()
         # 体力 initial=80, but state_vars says 75
         modified_vars = {"体力": 75, "信任度": 10, "所属势力": "自由佣兵"}
-        result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", modified_vars)
+        result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", modified_vars, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES)
         assert "体力: 75 / 100" in result
         assert "体力: 80 / 100" not in result
 
@@ -259,7 +266,7 @@ class TestBuildRoundN:
 class TestAdventureLogPrompt:
     def test_build_adventure_log_prompt_contains_label(self):
         pb = PromptBuilder()
-        config = {"title": "霓虹深渊", "genre": "cyberpunk"}
+        config = {"title": "霓虹深渊", "language": "zh-CN", "premise": "A test premise."}
         state_vars = {"体力": 25}
         outline = "ch1_intro [completed] — 序章\n  ↳ 抵达边陲小镇"
 
@@ -269,7 +276,7 @@ class TestAdventureLogPrompt:
 
     def test_build_adventure_log_prompt_shows_outline(self):
         pb = PromptBuilder()
-        config = {"title": "test", "genre": "fantasy"}
+        config = {"title": "test", "language": "en", "premise": "A test premise."}
         state_vars = {"魔力": 50}
         outline = "ch1_start [completed] — 开始\n  ↳ first checkpoint"
 
@@ -281,39 +288,40 @@ class TestAdventureLogPrompt:
 
     def test_build_adventure_log_prompt_empty_outline(self):
         pb = PromptBuilder()
-        config = {"title": "test"}
+        config = {"title": "test", "premise": ""}
         state_vars = {}
         prompt = pb.build_adventure_log_prompt(config, state_vars, "")
         assert "Adventure Recap" in prompt
         assert "Final State" in prompt
 
-    def test_build_adventure_log_prompt_includes_background(self):
+    def test_build_adventure_log_prompt_includes_story_context(self):
         pb = PromptBuilder()
         config = {
             "title": "test",
-            "genre": "赛博朋克冒险",
-            "setting": "2087年新东京",
-            "protagonist_name": "林焰",
-            "protagonist_identity": "前佣兵",
-            "protagonist_traits": "冷静、果断",
-            "tone": "黑暗冷峻",
-            "conflict": "芯片争夺",
-            "characters": "耗子 | 情报贩子 | 亦敌亦友",
+            "language": "zh-CN",
+            "premise": "2087年新东京，芯片争夺战。",
         }
         state_vars = {}
         outline = "ch1 [completed] — 序章\n  ↳ 抵达"
+        chars = [
+            {"name": "林焰", "role": "protagonist", "description": "前佣兵，冷静果断", "appearance": "高瘦"},
+        ]
+        locs = [
+            {"id": "neo_tokyo", "name": "新东京", "description": "霓虹闪烁的都市"},
+        ]
 
-        prompt = pb.build_adventure_log_prompt(config, state_vars, outline)
-        assert "Genre:" in prompt
-        assert "赛博朋克" in prompt
+        prompt = pb.build_adventure_log_prompt(config, state_vars, outline, chars, locs)
+        assert "**Premise:**" in prompt
+        assert "2087年新东京" in prompt
         assert "林焰" in prompt
+        assert "前佣兵" in prompt
         assert "Story Background" in prompt
         assert "Story Outline" in prompt
 
     def test_build_adventure_log_prompt_with_summaries_in_outline(self):
         """Summaries are now embedded in outline_text via ↳ lines."""
         pb = PromptBuilder()
-        config = {"title": "test"}
+        config = {"title": "test", "premise": ""}
         state_vars = {}
         outline = "ch1 [completed] — 序章\n  ↳ 抵达边境小镇"
 

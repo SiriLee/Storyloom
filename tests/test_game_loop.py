@@ -10,22 +10,26 @@ from storyloom.parser import SetOperation
 # ── Fixtures ───────────────────────────────────────────────────────
 
 SAMPLE_STORY_CONFIG = {
-    "genre": "赛博朋克冒险",
     "tier": "medium",
     "title": "霓虹深渊",
-    "setting": "2087年新东京地下城",
-    "protagonist_name": "林焰",
-    "protagonist_identity": "前荒坂安全顾问",
-    "protagonist_traits": "冷静、道德灰色",
-    "tone": "黑暗冷峻",
-    "conflict": "一枚神秘芯片正在寻找宿主",
-    "characters": "耗子（情报贩子）、美智子（安全主管）",
-    "variables": [
-        {"name": "体力", "type": "number", "initial": 80},
-        {"name": "信任度", "type": "number", "initial": 10},
-        {"name": "所属势力", "type": "string", "initial": "自由佣兵"},
-    ],
+    "language": "zh-CN",
+    "premise": "2087年新东京地下城，前荒坂安全顾问林焰被卷入一场围绕神秘芯片的暗战。",
 }
+
+SAMPLE_VARIABLES = [
+    {"name": "体力", "type": "number", "initial": 80},
+    {"name": "信任度", "type": "number", "initial": 10},
+    {"name": "所属势力", "type": "string", "initial": "自由佣兵"},
+]
+
+SAMPLE_CHARACTERS = [
+    {"name": "林焰", "role": "protagonist", "description": "前荒坂安全顾问，冷静、道德灰色", "appearance": "高瘦，短发，眼神锐利"},
+    {"name": "耗子", "role": "supporting", "description": "地下情报贩子", "appearance": "矮小精悍"},
+]
+
+SAMPLE_LOCATIONS = [
+    {"id": "neo_tokyo_streets", "name": "新东京地下城", "description": "霓虹灯闪烁的潮湿巷道"},
+]
 
 SAMPLE_OUTLINE = """ch1_bar [active] — 霓虹深渊
   → ch2_confrontation [pending]
@@ -138,36 +142,31 @@ class MockApiClient:
 class TestGameStateInit:
     def test_initializes_from_story_config(self):
         """GameState should initialize with variables from story_config."""
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         assert gs.state_vars["体力"] == 80
         assert gs.state_vars["信任度"] == 10
         assert gs.state_vars["所属势力"] == "自由佣兵"
 
     def test_raises_on_unknown_variable_type(self):
         """GameState should raise on unsupported variable type."""
-        config = {
-            "variables": [
-                {"name": "foo", "type": "unknown", "initial": 0},
-            ]
-        }
         with pytest.raises(ValueError, match="Unknown variable type"):
-            GameState(config)
+            GameState([{"name": "foo", "type": "unknown", "initial": 0}])
 
     def test_empty_variables_list(self):
         """GameState should handle empty variables list."""
-        gs = GameState({"variables": []})
+        gs = GameState([])
         assert gs.state_vars == {}
 
     def test_missing_variables_key(self):
-        """GameState should handle missing variables key."""
-        gs = GameState({})
+        """GameState should handle None variables (default)."""
+        gs = GameState()
         assert gs.state_vars == {}
 
 
 class TestGameStateApplySet:
     def test_applies_decrement_operation(self):
         """Subtraction from a number variable should work."""
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         op = SetOperation(var="体力", op="-", val="10", condition=None)
         result = gs.apply_set(op, {})
         assert result.accepted
@@ -175,7 +174,7 @@ class TestGameStateApplySet:
 
     def test_applies_increment_operation(self):
         """Addition to a number variable should work."""
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         op = SetOperation(var="信任度", op="+", val="15", condition=None)
         result = gs.apply_set(op, {})
         assert result.accepted
@@ -183,7 +182,7 @@ class TestGameStateApplySet:
 
     def test_applies_assignment_operation(self):
         """Assignment operation for numbers should work."""
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         op = SetOperation(var="体力", op="=", val="50", condition=None)
         result = gs.apply_set(op, {})
         assert result.accepted
@@ -191,7 +190,7 @@ class TestGameStateApplySet:
 
     def test_applies_set_to_zero(self):
         """Assignment with =N should set to N."""
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         op = SetOperation(var="体力", op="=", val="0", condition=None)
         result = gs.apply_set(op, {})
         assert result.accepted
@@ -202,7 +201,7 @@ class TestGameStateApplySet:
 
         Per block-spec.md §5: out-of-range → clamp to boundary, accepted=True.
         """
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         op = SetOperation(var="体力", op="+", val="50", condition=None)
         result = gs.apply_set(op, {})
         assert result.accepted
@@ -211,7 +210,7 @@ class TestGameStateApplySet:
 
     def test_clamps_out_of_range_low(self):
         """Number variables below 0 should be clamped to 0."""
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         op = SetOperation(var="体力", op="-", val="200", condition=None)
         result = gs.apply_set(op, {})
         assert result.accepted
@@ -220,7 +219,7 @@ class TestGameStateApplySet:
 
     def test_evaluates_condition_true(self):
         """Condition should be evaluated against choice_dict."""
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         op = SetOperation(var="信任度", op="+", val="5", condition="approach==1")
         result = gs.apply_set(op, {"approach": 1})
         assert result.accepted
@@ -228,7 +227,7 @@ class TestGameStateApplySet:
 
     def test_evaluates_condition_false(self):
         """Condition returning false should skip the operation."""
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         op = SetOperation(var="信任度", op="+", val="5", condition="approach==1")
         result = gs.apply_set(op, {"approach": 2})
         assert result.accepted
@@ -237,7 +236,7 @@ class TestGameStateApplySet:
 
     def test_rejects_nonexistent_variable(self):
         """Setting a variable that doesn't exist should be silently rejected."""
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         op = SetOperation(var="不存在变量", op="+", val="10", condition=None)
         result = gs.apply_set(op, {})
         assert not result.accepted
@@ -245,7 +244,7 @@ class TestGameStateApplySet:
 
     def test_applies_string_assignment(self):
         """String variable assignment should work."""
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         op = SetOperation(var="所属势力", op="=", val="荒坂重工", condition=None)
         result = gs.apply_set(op, {})
         assert result.accepted
@@ -253,22 +252,19 @@ class TestGameStateApplySet:
 
     def test_rejects_invalid_operation_for_type(self):
         """Invalid operation for a type should raise."""
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         op = SetOperation(var="体力", op="+", val="not_a_number", condition=None)
         result = gs.apply_set(op, {})
         assert not result.accepted
 
     def test_rejects_unknown_variable_type(self):
         """GameState should raise ValueError for unsupported variable types."""
-        config = {
-            "variables": [{"name": "test", "type": "list", "initial": []}]
-        }
         with pytest.raises(ValueError, match="Unknown variable type"):
-            GameState(config)
+            GameState([{"name": "test", "type": "list", "initial": []}])
 
     def test_condition_against_state_variable(self):
         """Condition can reference state variables."""
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         gs._state_vars["体力"] = 30  # Low stamina
         op = SetOperation(var="信任度", op="+", val="10", condition="体力<=50")
         result = gs.apply_set(op, {})
@@ -277,7 +273,7 @@ class TestGameStateApplySet:
 
     def test_condition_against_state_variable_false(self):
         """Condition against state variable returns false."""
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         gs._state_vars["体力"] = 80  # High stamina
         op = SetOperation(var="信任度", op="+", val="10", condition="体力<=50")
         result = gs.apply_set(op, {})
@@ -287,59 +283,59 @@ class TestGameStateApplySet:
 
 class TestGameStateConditionEval:
     def test_eq_operator(self):
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         assert gs.evaluate_condition("approach==1", {"approach": 1})
         assert not gs.evaluate_condition("approach==1", {"approach": 2})
 
     def test_neq_operator(self):
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         assert gs.evaluate_condition("approach!=1", {"approach": 2})
         assert not gs.evaluate_condition("approach!=1", {"approach": 1})
 
     def test_gt_operator(self):
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         assert gs.evaluate_condition("体力>50", {})
         assert not gs.evaluate_condition("体力>90", {})
 
     def test_ge_operator(self):
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         assert gs.evaluate_condition("体力>=80", {})
         assert not gs.evaluate_condition("体力>=90", {})
 
     def test_lt_operator(self):
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         assert gs.evaluate_condition("信任度<50", {})
         assert not gs.evaluate_condition("信任度<5", {})
 
     def test_le_operator(self):
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         assert gs.evaluate_condition("信任度<=10", {})
         assert not gs.evaluate_condition("信任度<=5", {})
 
     def test_unknown_variable_in_condition(self):
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         assert not gs.evaluate_condition("未知变量==1", {})
 
     def test_condition_is_empty_string(self):
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         assert gs.evaluate_condition("", {})
 
     def test_condition_is_none(self):
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         assert gs.evaluate_condition(None, {})
 
     def test_value_is_string(self):
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         assert gs.evaluate_condition("所属势力==自由佣兵", {})
         assert not gs.evaluate_condition("所属势力==荒坂", {})
 
     def test_and_combinator(self):
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         assert gs.evaluate_condition("体力>50 and 信任度>5", {})
         assert not gs.evaluate_condition("体力>50 and 信任度>50", {})
 
     def test_or_combinator(self):
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         assert gs.evaluate_condition("体力>100 or 信任度>5", {})
         assert not gs.evaluate_condition("体力>100 or 信任度>50", {})
 
@@ -375,6 +371,9 @@ class TestGameLoopInit:
         """GameLoop should initialize with minimal arguments."""
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
         )
@@ -391,6 +390,9 @@ class TestGameLoopInit:
 
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
             observers=[obs],
@@ -400,6 +402,9 @@ class TestGameLoopInit:
         # Deprecated single observer also works
         loop2 = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
             observer=obs,
@@ -409,6 +414,9 @@ class TestGameLoopInit:
         # Both merged
         loop3 = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
             observers=[obs],
@@ -420,6 +428,9 @@ class TestGameLoopInit:
         """current_node defaults to the first outline node's id."""
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
         )
@@ -429,6 +440,9 @@ class TestGameLoopInit:
         """completed_nodes should start as empty list."""
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
         )
@@ -442,6 +456,9 @@ class TestGameLoopRound1:
         """Round 1 should set round_count to 1."""
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
         )
@@ -453,6 +470,9 @@ class TestGameLoopRound1:
         """Round 1 should parse the API response into ParsedOutput."""
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
         )
@@ -465,6 +485,9 @@ class TestGameLoopRound1:
         """start_game should raise if called again."""
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
         )
@@ -477,6 +500,9 @@ class TestGameLoopRound1:
         mock = MockApiClient()
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
         )
@@ -490,6 +516,9 @@ class TestGameLoopRound1:
         mock = MockApiClient()
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
             current_node="ch1_bar",
@@ -503,6 +532,9 @@ class TestGameLoopRound1:
         """After round 1, available options should be populated."""
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
         )
@@ -520,6 +552,9 @@ class TestGameLoopContinueRound:
         """Round 2 should increment round count."""
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
         )
@@ -531,9 +566,12 @@ class TestGameLoopContinueRound:
     def test_round2_applies_state_changes(self):
         """Round 2 should apply state changes from parsed XML."""
         mock = MockApiClient()
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
             game_state=gs,
@@ -547,6 +585,9 @@ class TestGameLoopContinueRound:
         """stream_round should raise if start_game wasn't called."""
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
         )
@@ -556,9 +597,12 @@ class TestGameLoopContinueRound:
     def test_round2_picks_different_branch(self):
         """Different choice should apply different state changes."""
         mock = MockApiClient()
-        gs = GameState(SAMPLE_STORY_CONFIG)
+        gs = GameState(SAMPLE_VARIABLES)
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
             game_state=gs,
@@ -573,6 +617,9 @@ class TestGameLoopContinueRound:
         mock = MockApiClient()
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
         )
@@ -588,6 +635,9 @@ class TestGameLoopWithSimpleXml:
         mock = MockApiClient(response=SIMPLE_XML)
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
         )
@@ -601,6 +651,9 @@ class TestGameLoopWithSimpleXml:
         mock = MockApiClient(response=SIMPLE_XML)
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
         )
@@ -614,6 +667,9 @@ class TestGameLoopWithSimpleXml:
         mock = MockApiClient(response=SIMPLE_XML)
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
         )
@@ -628,6 +684,9 @@ class TestGameLoopAdventureLog:
         """Adventure log should work without a game state."""
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
         )
@@ -642,6 +701,9 @@ class TestGameLoopAdventureLog:
         mock = MockApiClient()
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
         )
@@ -657,6 +719,9 @@ class TestGameLoopBranchRoute:
         mock = MockApiClient()
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
         )
@@ -672,6 +737,9 @@ class TestGameLoopLastParsed:
         mock = MockApiClient()
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
         )
@@ -682,36 +750,30 @@ class TestGameLoopLastParsed:
 
 class TestGameStateSerialization:
     def test_to_dict_returns_state_vars(self):
-        story_config = {
-            "variables": [
-                {"name": "体力", "type": "number", "initial": 80},
-                {"name": "信任度", "type": "number", "initial": 10},
-            ]
-        }
-        gs = GameState(story_config)
+        variables = [
+            {"name": "体力", "type": "number", "initial": 80},
+            {"name": "信任度", "type": "number", "initial": 10},
+        ]
+        gs = GameState(variables)
         data = gs.to_dict()
         assert data == {"state_vars": {"体力": 80, "信任度": 10}}
 
     def test_from_dict_preserves_original_initial_values(self):
-        story_config = {
-            "variables": [
-                {"name": "体力", "type": "number", "initial": 80},
-            ]
-        }
+        variables = [
+            {"name": "体力", "type": "number", "initial": 80},
+        ]
         save_state = {"state_vars": {"体力": 30}}
-        gs = GameState.from_dict(save_state, story_config)
+        gs = GameState.from_dict(save_state, variables)
         assert gs.state_vars == {"体力": 30}
 
     def test_from_dict_roundtrip(self):
-        story_config = {
-            "variables": [
-                {"name": "体力", "type": "number", "initial": 100},
-            ]
-        }
-        gs1 = GameState(story_config)
+        variables = [
+            {"name": "体力", "type": "number", "initial": 100},
+        ]
+        gs1 = GameState(variables)
         gs1._state_vars["体力"] = 50
         data = gs1.to_dict()
-        gs2 = GameState.from_dict(data, story_config)
+        gs2 = GameState.from_dict(data, variables)
         assert gs2.state_vars == gs1.state_vars
 
 
@@ -723,6 +785,9 @@ class TestGameLoopAdventureLogRetry:
         mock = MockApiClient()
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
         )
@@ -733,6 +798,9 @@ class TestGameLoopAdventureLogRetry:
         """retry_adventure_log() raises before run_adventure_log() ever called."""
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
         )
@@ -745,6 +813,9 @@ class TestGameLoopAdventureLogRetry:
         mock = MockApiClient()
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
         )
@@ -758,6 +829,9 @@ class TestGameLoopAdventureLogRetry:
         mock = MockApiClient()
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
         )
@@ -771,6 +845,9 @@ class TestGameLoopAdventureLogRetry:
         mock = MockApiClient()
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
         )
@@ -792,6 +869,9 @@ class TestGameLoopAdventureLogRetry:
         mock = MockApiClient()
         loop = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
         )
@@ -812,6 +892,9 @@ class TestCheckpointHistory:
         """checkpoint_history returns [] before any checkpoints occur."""
         gl = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
         )
@@ -822,6 +905,9 @@ class TestCheckpointHistory:
         """checkpoint_history returns a copy, not the internal list."""
         gl = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=MockApiClient(),
         )
@@ -841,6 +927,9 @@ class TestOutlineNodes:
         ]
         gl = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             api_client=MockApiClient(),
             current_node="ch1_intro",
             outline_nodes=outline_nodes,
@@ -862,6 +951,9 @@ class TestOutlineNodes:
         ]
         gl = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             api_client=MockApiClient(),
             outline_nodes=outline_nodes,
         )
@@ -880,6 +972,9 @@ class TestOutlineNodes:
         ]
         gl = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             api_client=MockApiClient(),
             current_node="ch2",
             outline_nodes=outline_nodes,
@@ -901,6 +996,9 @@ class TestOutlineNodes:
         ]
         gl = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             api_client=MockApiClient(),
             current_node="ch2_next",
             outline_nodes=save_format_nodes,
@@ -924,6 +1022,9 @@ class TestCheckpointProcessing:
         mock = MockApiClient()
         gl = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
             current_node="ch1_bar",
@@ -945,6 +1046,9 @@ class TestCheckpointProcessing:
         mock = MockApiClient()
         gl = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
             current_node="ch1_bar",
@@ -972,6 +1076,9 @@ class TestCheckpointProcessing:
         mock = MockApiClient(response=xml)
         gl = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
             current_node="ch1_bar",
@@ -989,6 +1096,9 @@ class TestCheckpointProcessing:
         mock = MockApiClient(response=ENDING_XML)
         gl = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
             current_node="ch3_ally",  # ch3_ally has routes=[] → ending
@@ -1006,6 +1116,9 @@ class TestCheckpointProcessing:
         mock = MockApiClient(response=ENDING_XML)
         gl = GameLoop(
             story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
             outline_nodes=SAMPLE_OUTLINE_NODES,
             api_client=mock,
             current_node="ch3_ally",

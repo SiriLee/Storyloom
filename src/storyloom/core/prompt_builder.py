@@ -189,12 +189,7 @@ Rough guide: ~lines 001-{REF_PRE} before bridge + ~{REF_SINGLE} after (single pa
 # Story Context
 **Language:** {LANGUAGE}
 **Seg limits:** narration ≤{NARR_LIMIT} characters, dialogue ≤{DIAL_LIMIT} characters
-**Background:** {background}
-**Protagonist:** {protagonist}
-**Tone:** {tone}
-**Conflict:** {conflict}
-**Characters:**
-{characters}
+{story_context}
 """
 
 ROUND_TEMPLATE = """**Outline:**
@@ -232,6 +227,9 @@ class PromptBuilder:
         current_node: str,
         goal: str,
         state_vars: dict[str, int | str],
+        characters: list[dict] | None = None,
+        locations: list[dict] | None = None,
+        variables: list[dict] | None = None,
     ) -> str:
         """Build Round 1 prompt (permanent anchor).
 
@@ -243,11 +241,15 @@ class PromptBuilder:
         (no previous round to reject changes from).
 
         Args:
-            story_config: Story configuration dict.
+            story_config: Story configuration dict (tier, title,
+                          language, premise).
             outline_text: Formatted outline tree text.
             current_node: Current outline node ID.
             goal: Current node narrative goal.
             state_vars: Current state variable values (new game or loaded).
+            characters: Character definitions (name, role, description,
+                        appearance).
+            locations: Location definitions (id, name, description).
 
         Returns:
             Full Round 1 prompt string.
@@ -258,23 +260,14 @@ class PromptBuilder:
         dial_limit = limits["dialogue"]
 
         state_vars_text = PromptBuilder._format_current_state(
-            state_vars, story_config.get("variables", [])
+            state_vars, variables or [],
         )
 
-        # Build protagonist line
-        name = story_config.get("protagonist_name", "")
-        identity = story_config.get("protagonist_identity", "")
-        traits = story_config.get("protagonist_traits", "")
-        protagonist = name
-        if identity:
-            protagonist += f"，{identity}"
-        if traits:
-            protagonist += f"。{traits}"
-
-        # Build background line
-        genre = story_config.get("genre", "")
-        setting = story_config.get("setting", "")
-        background = f"{genre} · {setting}" if genre and setting else genre or setting
+        # Build unified story context (plan D9/D15)
+        premise = story_config.get("premise", "")
+        story_context = PromptBuilder._format_story_context(
+            premise, characters or [], locations or [],
+        )
 
         # Reference guides for bridge position
         bridge_pct = BRIDGE_POSITION_RATIO * 100
@@ -293,11 +286,7 @@ class PromptBuilder:
             LANGUAGE=language,
             NARR_LIMIT=narr_limit,
             DIAL_LIMIT=dial_limit,
-            background=background,
-            protagonist=protagonist,
-            tone=story_config.get("tone", ""),
-            conflict=story_config.get("conflict", ""),
-            characters=story_config.get("characters", ""),
+            story_context=story_context,
         )
 
         round_part = ROUND_TEMPLATE.format(
@@ -386,16 +375,22 @@ class PromptBuilder:
         story_config: dict,
         state_vars: dict,
         outline_text: str,
+        characters: list[dict] | None = None,
+        locations: list[dict] | None = None,
     ) -> str:
         """Build adventure log prompt per prompt-design.md §5.
 
         This is an independent LLM call — not part of the narrative loop.
 
         Args:
-            story_config: Story configuration dict.
+            story_config: Story configuration dict (tier, title,
+                          language, premise).
             state_vars: Current state variables.
             outline_text: Formatted outline tree text with status
                 markers and ↳ summary lines under completed nodes.
+            characters: Character definitions (name, role, description,
+                        appearance).
+            locations: Location definitions (id, name, description).
 
         Returns:
             Prompt string for adventure log generation.
@@ -403,35 +398,11 @@ class PromptBuilder:
         title = story_config.get("title", "Untitled Adventure")
         language = story_config.get("language", DEFAULT_LANGUAGE)
 
-        # ── Story Background ──────────────────────────────────────
-        genre = story_config.get("genre", "")
-        setting = story_config.get("setting", "")
-        name = story_config.get("protagonist_name", "")
-        identity = story_config.get("protagonist_identity", "")
-        traits = story_config.get("protagonist_traits", "")
-        tone = story_config.get("tone", "")
-        conflict = story_config.get("conflict", "")
-        characters = story_config.get("characters", "")
-
-        bg_parts = []
-        if genre:
-            bg_parts.append(f"Genre: {genre}")
-        if setting:
-            bg_parts.append(f"Setting: {setting}")
-        if name:
-            protag = name
-            if identity:
-                protag += f" — {identity}"
-            if traits:
-                protag += f" ({traits})"
-            bg_parts.append(f"Protagonist: {protag}")
-        if tone:
-            bg_parts.append(f"Tone: {tone}")
-        if conflict:
-            bg_parts.append(f"Conflict: {conflict}")
-        if characters:
-            bg_parts.append(f"Characters:\n{characters}")
-        background_text = "\n".join(bg_parts) if bg_parts else "(No background)"
+        # ── Story Background (unified via _format_story_context) ──
+        premise = story_config.get("premise", "")
+        background_text = PromptBuilder._format_story_context(
+            premise, characters or [], locations or [],
+        )
 
         # ── State vars ─────────────────────────────────────────────
         state_lines = []
@@ -471,6 +442,60 @@ Requirements:
 - 500-1000 words"""
 
         return prompt
+
+    @staticmethod
+    def _format_story_context(
+        premise: str,
+        characters: list[dict],
+        locations: list[dict],
+    ) -> str:
+        """Format story context as Premise + Characters + Locations.
+
+        Used by both ``build_round1()`` and ``build_adventure_log_prompt()``
+        to produce a consistent story-background block (plan D15).
+
+        Format::
+
+            **Premise:** {premise}
+
+            **Characters:**
+            - {name} ({role}) — {description}
+            - ...
+
+            **Locations:**
+            - {name} — {description}
+            - ...
+        """
+        lines: list[str] = []
+
+        # Premise
+        lines.append(f"**Premise:** {premise}" if premise else "**Premise:** (none)")
+
+        # Characters
+        lines.append("")
+        lines.append("**Characters:**")
+        if characters:
+            for c in characters:
+                name = c.get("name", "?")
+                role = c.get("role", "")
+                desc = c.get("description", "")
+                role_tag = f" ({role})" if role else ""
+                lines.append(f"- {name}{role_tag} — {desc}")
+        else:
+            lines.append("- (none)")
+
+        # Locations
+        lines.append("")
+        lines.append("**Locations:**")
+        if locations:
+            for loc in locations:
+                name = loc.get("name", "?")
+                desc = loc.get("description", "")
+                lines.append(f"- {name} — {desc}")
+        else:
+            lines.append("- (none)")
+
+        return "\n".join(lines)
 
     @staticmethod
     def _format_current_state(

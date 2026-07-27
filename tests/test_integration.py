@@ -5,21 +5,24 @@ from storyloom.core.prompt_builder import PromptBuilder
 
 
 SAMPLE_STORY = {
-    "genre": "赛博朋克冒险",
     "tier": "medium",
     "title": "霓虹深渊",
-    "setting": "2087年新东京地下城",
-    "protagonist_name": "林焰",
-    "protagonist_identity": "前荒坂安全顾问",
-    "protagonist_traits": "冷静、道德灰色",
-    "tone": "黑暗冷峻",
-    "conflict": "一枚神秘芯片正在寻找宿主",
-    "characters": "耗子（情报贩子）、美智子（安全主管）",
-    "variables": [
-        {"name": "体力", "type": "number", "initial": 80},
-        {"name": "信任度", "type": "number", "initial": 10},
-    ],
+    "language": "zh-CN",
+    "premise": "2087年新东京地下城，前荒坂安全顾问林焰被卷入一场围绕神秘芯片的暗战。",
 }
+
+SAMPLE_CHARACTERS = [
+    {"name": "林焰", "role": "protagonist", "description": "前荒坂安全顾问，冷静、道德灰色", "appearance": "高瘦，短发，眼神锐利"},
+]
+
+SAMPLE_LOCATIONS = [
+    {"id": "neo_tokyo_streets", "name": "新东京地下城", "description": "霓虹灯闪烁的潮湿巷道"},
+]
+
+SAMPLE_VARIABLES = [
+    {"name": "体力", "type": "number", "initial": 80},
+    {"name": "信任度", "type": "number", "initial": 10},
+]
 
 SAMPLE_OUTLINE = """ch1_bar [active] — 霓虹深渊
   → ch2_confrontation [pending]
@@ -89,6 +92,8 @@ class TestIntegration:
         r1_prompt = pb.build_round1(
             SAMPLE_STORY, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易",
             {"体力": 80, "信任度": 10},
+            characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
         )
         sp1 = StreamingXmlParser()
         for line in ROUND1_OUTPUT.split("\n"):
@@ -108,7 +113,7 @@ class TestIntegration:
             current_node="ch3_ally",
             goal="与耗子前往安全屋",
             state_vars={"体力": 80, "信任度": 15},
-            variables=SAMPLE_STORY["variables"],
+            variables=SAMPLE_VARIABLES,
             bridge_text=bridge1,
         )
         sp2 = StreamingXmlParser()
@@ -158,6 +163,8 @@ class TestIntegration:
         r1 = pb.build_round1(
             SAMPLE_STORY, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子交易",
             {"体力": 80, "信任度": 10},
+            characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
         )
         cm.set_round1(r1, ROUND1_OUTPUT)
 
@@ -180,7 +187,7 @@ class TestIntegration:
         for line in ROUND1_OUTPUT.split("\n"):
             sp.feed_line(line)
         cm.set_round1(
-            pb.build_round1(SAMPLE_STORY, SAMPLE_OUTLINE, "ch2", "交易", {"体力": 80, "信任度": 10}),
+            pb.build_round1(SAMPLE_STORY, SAMPLE_OUTLINE, "ch2", "交易", {"体力": 80, "信任度": 10}, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES),
             ROUND1_OUTPUT,
             bridge_text=sp.get_bridge_text(),
         )
@@ -191,7 +198,7 @@ class TestIntegration:
             current_node="ch3",
             goal="前往安全屋",
             state_vars={"体力": 80, "信任度": 15},
-            variables=SAMPLE_STORY["variables"],
+            variables=SAMPLE_VARIABLES,
             bridge_text=bridge1,
         )
         assert "信用棒" in r2 or "耗子" in r2
@@ -207,7 +214,7 @@ class TestIntegration:
         for line in ROUND1_OUTPUT.split("\n"):
             sp.feed_line(line)
         cm.set_round1(
-            pb.build_round1(SAMPLE_STORY, SAMPLE_OUTLINE, "ch2", "交易", {"体力": 80, "信任度": 10}),
+            pb.build_round1(SAMPLE_STORY, SAMPLE_OUTLINE, "ch2", "交易", {"体力": 80, "信任度": 10}, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES),
             ROUND1_OUTPUT,
             bridge_text=sp.get_bridge_text(),
         )
