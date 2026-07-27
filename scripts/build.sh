@@ -25,6 +25,10 @@ esac
 
 echo "=== Storyloom Web UI Build v${VERSION} ==="
 
+# 0. Clean previous build artifacts
+echo "[0/5] Cleaning previous builds..."
+rm -rf build/ dist/*.whl dist/*.tar.gz dist/storyloom-web*
+
 # 1. Install project + build tools (PyInstaller needs deps to discover imports)
 echo "[1/5] Installing project + build tools..."
 $PYTHON -m pip install -q -e . build pyinstaller wheel 2>/dev/null || \
@@ -52,7 +56,7 @@ mkdir -p "$OUTPUT_DIR"
 cp "dist/$BIN_NAME" "$OUTPUT_DIR/"
 cp -r locale "$OUTPUT_DIR/"
 cp config.example.json "$OUTPUT_DIR/"
-cp dist/*.whl dist/*.tar.gz "$OUTPUT_DIR/"
+cp "dist/storyloom-${VERSION}-"*.whl "dist/storyloom-${VERSION}.tar.gz" "$OUTPUT_DIR/"
 
 # 5. Create zip for GitHub Release upload
 echo "[5/5] Creating release archive..."
