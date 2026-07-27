@@ -525,7 +525,7 @@
 
                 <div class="gp-content">
                     <h1 class="gp-label">${esc(config.title)}</h1>
-                    <p class="gp-setting">${esc(config.setting || "")}</p>
+                    <p class="gp-setting">${esc(config.premise || "")}</p>
 
                     <button class="gp-start-btn" id="gp-start">
                         ${esc(_("Begin Adventure"))}
@@ -606,7 +606,7 @@
                     <div class="sv-card-main">
                         <span class="sv-card-label">${esc(g.title)}</span>
                         <div class="sv-card-meta">
-                            <span>${esc(g.genre || "?")}</span>
+                            <span>${esc(g.premise || "?")}</span>
                             <span>${g.save_count} ${esc(_("saves"))}</span>
                         </div>
                     </div>
