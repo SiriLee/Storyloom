@@ -11,18 +11,21 @@
 
 ## §1 GameState 初始化
 
-共创阶段生成完成后（`generate()` 返回 `CoCreationResult`），初始化内存中的 GameState：
+共创阶段生成完成后（`generate()` 返回 dict），初始化内存中的 GameState：
 
 ```
 game_state = GameState()
-game_state.story_config   = story_config           // CoCreationResult.story_config（含 variables）
-game_state.state_vars     = init_from_variables(story_config.variables)  // 初始值深拷贝
-game_state.outline        = outline                // CoCreationResult.outline_nodes
-  → 每个节点含 id / title / goal / routes / status / summary
-  → 第一个节点 status = "active"，其余 = "pending"，summary 初始为空
-game_state.current_node   = outline[0].node_id     // 当前活跃节点
-game_state.checkpoint_snapshots = {}               // 节点状态快照（为回档预留）
-game_state.bridge_text    = ""                     // 首轮为空
+game_state.story_config   = {tier, title, language, premise}    ← 4 fields
+game_state.characters     = [{name, role, description, appearance}, ...]
+game_state.locations      = [{id, name, description}, ...]
+game_state.variables      = [{name, type, initial}, ...]        ← 顶层，原嵌于 story_config
+game_state.state_vars     = init_from_variables(variables)      // 初始值深拷贝
+game_state.outline        = [{id, title, goal, routes, +status, +summary}, ...]
+  → 引擎附加 status（首节点 "active"，其余 "pending"）与 summary（初始 null）
+  → LLM 产出 id / title / goal / routes，不输出 status / summary
+game_state.current_node   = outline[0].id           // 当前活跃节点
+game_state.checkpoint_snapshots = {}                 // 节点状态快照（为回档预留）
+game_state.bridge_text    = ""                       // 首轮为空
 game_state.rejected_changes = []
 
 进入叙事循环（见 exec-flow.md §4）
@@ -88,10 +91,10 @@ saves/
     ...
 ```
 
-- **`.last_played.json`**：`saves/` 根下的追踪文件。记录最后加载/存档的 `game_id`、`game_label`、`save_file`、`played_at`。原子写入。文件丢失或过期时 fallback 到扫描目录取最新。
+- **`.last_played.json`**：`saves/` 根下的追踪文件。记录最后加载/存档的 `game_id`、`game_title`、`save_file`、`played_at`。原子写入。文件丢失或过期时 fallback 到扫描目录取最新。
 - **`_init.json`**：元存档。共创阶段完成后立即写入。新游戏和 checkpoint 存档共享完全相同的 JSON 结构，由统一的加载路径读取。
 - **Checkpoint 存档**：每次到达 checkpoint 时追加写入新文件，文件名格式 `{cp_title}_{timestamp}.json`（紧凑 UTC 时间戳），永不覆盖。玩家可回溯到任意历史关键节点。
-- **存档内容结构**：所有存档文件（含 `_init.json`）共享同一 JSON 结构——`version`、`metadata`、`config`、`story_config`（含 `variables`）、`state_vars`、`outline`（含节点状态）、`progress`（含 checkpoint 历史/摘要/快照）。
+- **存档内容结构**：所有存档文件（含 `_init.json`）共享同一 JSON 结构——`version`、`metadata`、`config`、`story_config`（4 字段）、`characters`、`locations`、`variables`（顶层）、`state_vars`、`outline`（含节点状态）、`progress`（含 checkpoint 历史/摘要/快照）。
 
 > **概念区分**：「游戏存档」是游戏目录下的 JSON 文件；「checkpoint 快照」是存档内部的 `checkpoint_snapshots`（为 Phase 2 回档预留，Phase 1 仅存储不读取）。
 
@@ -111,9 +114,9 @@ saves/
 
 ### 3.4 加载与校验
 
-加载时校验：version 匹配 → 顶层必需字段存在 → `story_config` 含 `variables` → `current_node` 在 `outline` 中存在。任一校验失败判定为存档损坏——删除损坏文件并向上报告。
+加载时校验：version 匹配 → 顶层必需字段存在（含 `story_config`、`characters`、`locations`、`variables`、`state_vars`、`outline`、`progress`）→ `current_node` 在 `outline` 中存在。任一校验失败判定为存档损坏——删除损坏文件并向上报告。
 
-存档自包含——变量定义（`story_config.variables`）、大纲结构均以存档文件为准。运行时校验 state 变更的类型合法性时，以存档内的 `story_config.variables` 为类型定义来源。模型配置以当前应用设置为准。
+存档自包含——变量定义（顶层 `variables`）、大纲结构均以存档文件为准。运行时校验 state 变更的类型合法性时，以存档内的顶层 `variables` 为类型定义来源。模型配置以当前应用设置为准。
 
 ### 3.5 存档字段说明
 
@@ -122,6 +125,11 @@ saves/
 | `metadata.title` | 共创结束后首次写入 | 来源于 `story_config.title` |
 | `metadata.created_at` | 首次写入时设定 | 之后不变 |
 | `metadata.updated_at` | 每次 `save()` 写入时更新 | 存档数据最后修改时间。仅反映存档文件内容变化（checkpoint 或 init），不因读档而变 |
+| `story_config` | 共创结束后首次写入 | 4 字段：tier、title、language、premise |
+| `characters` | 共创结束后首次写入 | 角色数组，每项含 name / role / description / appearance |
+| `locations` | 共创结束后首次写入 | 地点数组，每项含 id / name / description |
+| `variables` | 共创结束后首次写入 | 变量定义数组，每项含 name / type / initial。顶层存储，不再嵌套于 story_config |
+| `state_vars` | 共创结束后写入初始值，后续随 `<set>` 变更 | 运行时状态值，以 variables 为类型定义 |
 | `outline` | 每次 checkpoint 时更新 | 每个节点含 id / title / goal / status / summary / routes。status 标记推进状态，summary 在 checkpoint 时写入当前节点 |
 | `progress.checkpoint_snapshots` | 每次 checkpoint 时追加 | 为 Phase 2 回档预留，Phase 1 仅存储不读取 |
 
@@ -142,13 +150,13 @@ saves/
 
 | 常量 | 参考值 | 说明 |
 |------|--------|------|
-| `STORY_LABEL_MIN_CHARS` | 1 | 故事标签最短字符数 |
-| `STORY_LABEL_MAX_CHARS` | 30 | 故事标签最长字符数 |
+| `STORY_TITLE_MIN_CHARS` | 1 | 故事标题最短字符数 |
+| `STORY_TITLE_MAX_CHARS` | 30 | 故事标题最长字符数 |
 | `VARIABLE_CAP` | 3 | 变量总数上限（per 2026-07-05 variable-cap spec） |
 | `VARIABLE_NUMERIC_CAP` | 2 | number 型变量上限 |
 | `VARIABLE_LABEL_CAP` | 1 | string 型变量上限 |
-| `SUPPORTED_LANGUAGES` | `{"zh-CN", "en"}` | 支持的语言集合 |
-| `DEFAULT_LANGUAGE` | `"zh-CN"` | 默认语言（语言未指定或不受支持时的 fallback） |
+| `SUPPORTED_LANGUAGES` | `{"zh-CN", "zh-TW", "en"}` | 支持的语言集合 |
+| `DEFAULT_LANGUAGE` | `"en"` | 默认语言（语言未指定或不受支持时的 fallback） |
 
 ### A.3 故事规模档位
 
@@ -189,7 +197,7 @@ saves/
 |------|--------|------|
 | `DEFAULT_MODEL` | `"deepseek-v4-pro"` | 默认模型标识。可通过 `user_config.json` 的 `api_model` 字段覆盖 |
 | `STREAM_STALL_TIMEOUT_SEC` | 180 | 流式输出停顿超时秒数（如果任何新 token 间隔超过此值则超时）。当前 context ~50K tokens 时 TTFT 通常 10-30s，180s 提供充足 margin |
-| `SAVE_VERSION` | 1 | 存档格式版本号。不匹配则判定存档损坏 |
+| `SAVE_VERSION` | 2 | 存档格式版本号。不匹配则判定存档损坏 |
 
 ### A.7 已废弃常量
 

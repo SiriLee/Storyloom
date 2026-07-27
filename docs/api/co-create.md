@@ -4,8 +4,9 @@
 > **Authoritative spec:** `docs/spec/exec-flow.md` §3
 
 The co-creation phase is a guided Q&A flow between the player and the LLM.
-It produces a `CoCreationResult` containing `story_config` and `outline_text`
-— pass these to `GameSession.start_game()` to begin the narrative.
+It produces a dict containing story configuration, characters, locations,
+variables, and outline — pass it to `GameSession.start_game()` to begin
+the narrative.
 
 ## Entry Point
 
@@ -67,22 +68,24 @@ reply = flow.send("A cyberpunk story set in 2087 Tokyo")
 > (e.g. a "Back" button, `/quit` command). The engine does **not**
 > inspect message content for keywords. Per `exec-flow.md` §3.3.
 
-#### `generate() → CoCreationResult`
+#### `generate() → dict`
 
-Inject the generation prompt, call the LLM, parse and validate the
-three output sections (`story_config`, `variables`, `outline`).
+Inject the generation prompt, call the LLM, parse the JSON response,
+and validate all fields.
 
 ```python
 result = flow.generate()
-# → CoCreationResult(story_config={...}, outline_text="...", outline_nodes=[...])
+# → {"story_config": {...}, "characters": [...], "locations": [...],
+#    "variables": [...], "outline": [...], "outline_text": "..."}
 ```
 
 - Must be in `"awaiting_answer"` phase; raises `RuntimeError` otherwise.
 - On API failure, raises `CoCreateError` (phase="generate_api") — UI can
   call `retry_generate()` to re-attempt.
-- On parse/validation failure, raises `CoCreateError` (phase="generate_parse")
-  with an error description. `retry_generate()` appends a correction prompt
-  and re-calls the LLM.
+- On JSON parse failure, raises `CoCreateError` (phase="generate_parse")
+  with a generic format hint.
+- On field validation failure, raises `CoCreateError` (phase="generate_parse")
+  with a description of which fields failed and why.
 - On success, `phase` → `"complete"` and `result` is set.
 
 #### `abort() → None`
@@ -108,7 +111,7 @@ except CoCreateError as e:
 
 Raises `RuntimeError` if no failed send to retry.
 
-#### `retry_generate() → CoCreationResult`
+#### `retry_generate() → dict`
 
 Re-attempt the last failed `generate()`. For API failures, re-sends the
 same messages. For parse/validation failures, appends a correction
@@ -129,7 +132,7 @@ Raises `RuntimeError` if no failed generation to retry.
 | Property | Type | Description |
 |----------|------|-------------|
 | `phase` | `str` | Current phase: `"init"` \| `"awaiting_idea"` \| `"awaiting_answer"` \| `"complete"` \| `"aborted"` |
-| `result` | `CoCreationResult \| None` | Result when `phase == "complete"`, `None` otherwise |
+| `result` | `dict \| None` | Result when `phase == "complete"`, `None` otherwise |
 | `messages` | `list[dict]` | Full conversation messages (system prompt, Q&A turns, generation prompt + response). For debug / prompt saving. |
 
 ### Error Handling
@@ -187,15 +190,18 @@ if user_wants_to_generate():
 
 ## Output
 
-```python
-@dataclass
-class CoCreationResult:
-    story_config: dict    # genre, tier, title, setting, protagonist, variables, ...
-    outline_text: str     # formatted outline string for PromptBuilder
-    outline_nodes: list   # structured node data for GameLoop / progress display
-```
+`generate()` returns a dict with the following keys:
 
-Pass ``CoCreationResult`` to ``GameSession.start_game()`` — it returns
+| Key | Type | Description |
+|-----|------|-------------|
+| `story_config` | `dict` | `tier`, `title`, `language`, `premise` |
+| `characters` | `list[dict]` | Each: `name`, `role`, `description`, `appearance` |
+| `locations` | `list[dict]` | Each: `id`, `name`, `description` |
+| `variables` | `list[dict]` | Each: `name`, `type`, `initial` |
+| `outline` | `list[dict]` | Each: `id`, `title`, `goal`, `routes` |
+| `outline_text` | `str` | Formatted outline tree for prompt injection |
+
+Pass the dict to ``GameSession.start_game()`` — it returns
 ``(GameLoop, game_id)``, handling ``GameState`` creation, ``GameLoop``
 construction, and auto-save wiring.
 
@@ -203,13 +209,19 @@ construction, and auto-save wiring.
 
 The engine validates all LLM output during generation:
 
-- **story_config:** required fields (genre, tier, title, protagonist_name,
-  protagonist_identity, protagonist_traits, tone, conflict, characters),
-  tier must be short/medium/long, title 1-30 chars.
-- **variables:** count caps (≤3 total, ≤2 numeric, ≤1 string),
-  name uniqueness, numeric range [0, 100], no illegal chars.
-- **outline:** all route targets exist in node IDs, final node has no
-  routes (ending node), at least 1 node present.
+- **JSON format:** must be valid JSON. Parse failures return a generic
+  format hint to the LLM for retry.
+- **story_config:** tier must be `short`/`medium`/`long`, title 1–30
+  chars, language must be a supported code, premise non-empty.
+- **characters:** non-empty array, exactly one `role: "protagonist"`,
+  all required fields non-empty, role must be a valid enum value.
+- **locations:** non-empty array, `id` must be snake_case, `name` and
+  `description` non-empty.
+- **variables:** ≤3 total, ≤2 number, ≤1 string. Number initial values
+  in [0, 100]. Names must be unique. Type must be `"number"` or `"string"`.
+- **outline:** non-empty array. Every route `target` must match an
+  existing node `id`. Final node's `routes` must be empty. Route
+  conditions may only reference declared variables.
 
 Failures raise `CoCreateError` with a specific `phase` and error
 description. The UI presents the error to the user, who can retry

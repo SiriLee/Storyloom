@@ -16,9 +16,9 @@
 
 | 术语 | 含义 | 详见 |
 |------|------|------|
-| **story_config** | 共创阶段产出的故事设定与变量定义，包含题材、档位、世界观、角色、variables 等字段 | §3.4, §3.5 |
+| **story_config** | 共创阶段产出的故事设定（tier、title、language、premise） | §3.4 |
 | **大纲** | 由关键节点组成的有向图，描述故事骨架。节点间可有分支 | §3.6 |
-| **变量定义 (variables)** | 共创阶段 LLM 自定义的游戏变量列表，每项含名称、类型、初始值 | §3.5 |
+| **变量定义 (variables)** | 共创阶段 LLM 自定义的游戏变量列表，顶层存储。每项含名称、类型、初始值 | §3.4 |
 | **冒险日志 (adventure_log)** | 结局时独立 LLM 调用生成，不走正常叙事循环 | §5.4 |
 
 **剧情段与路由**
@@ -91,7 +91,7 @@
 继续   → 选择存档 → 恢复 GameState → 叙事循环（§4）→ 结局（§5）→ 结束
 ```
 
-- **新游戏**：进入共创阶段，产出 `CoCreationResult` → 初始化 `GameState` → 进入叙事循环。每次新游戏创建独立的存档目录。
+- **新游戏**：进入共创阶段，产出故事数据 → 初始化 `GameState` → 进入叙事循环。每次新游戏创建独立的存档目录。
 - **继续**：从存档列表中选择游戏和存档文件 → 校验完整性 → 恢复 `GameState` → 进入叙事循环。损坏的存档自动删除并跳过。
 - **存档管理**：浏览/删除存档文件——由 UI 层实现，引擎通过 `GameSession` 提供 `list_games()`、`delete_game()`、`delete_save()` 等 API。
 
@@ -112,8 +112,8 @@
 └────────┬────────┘
          ↓ 用户决定开始（UI 触发）
 ┌─────────────────┐
-│ Step 3: 生成故事   │ ← 单次 LLM 调用，产出
-│ 设定 + 变量 + 大纲 │   story_config / variables / outline
+│ Step 3: 生成故事      │ ← 单次 LLM 调用，产出
+│ 设定 + 角色 + 大纲等  │   JSON 对象（5 个顶层键）
 └────────┬────────┘
          ↓
 ┌─────────────────┐
@@ -167,9 +167,9 @@
 
 > ⚠️ **追问范围约束**：LLM 可参考以下维度引导对话——世界观、主角设定（姓名、性别、身份、性格、背景）、故事基调、冲突方向、故事长度。但这不是硬性清单，LLM 应根据对话自然流动灵活探索。严格禁止涉及具体情节走向或透露后续内容。
 
-### 3.4 Step 3: 生成故事设定 + 变量 + 大纲
+### 3.4 Step 3: 生成故事数据
 
-UI 调用 `CoCreateFlow.generate()` → 引擎注入 `CO_CREATE_GENERATION_PROMPT`（含 `=== story_config ===` / `=== variables ===` / `=== outline ===` 三段格式规范），单次 LLM 调用产出全部内容。
+UI 触发生成 → 引擎注入生成 Prompt（JSON 输出格式规范），单次 LLM 调用产出完整故事数据的 JSON 对象。
 
 **流程**：
 
@@ -177,44 +177,29 @@ UI 调用 `CoCreateFlow.generate()` → 引擎注入 `CO_CREATE_GENERATION_PROMP
 1. 程序展示等待文案
 
 2. 引擎将生成 Prompt 作为 user 消息追加到对话历史
-   → LLM 返回包含三个 section 的完整响应
+   → LLM 返回一个 JSON 对象
 
-3. 按 === xxx === 分隔符切分为三个 block
+3. JSON 解析：
+   ├── 成功 → 继续校验
+   └── 失败 → 向 LLM 反馈行列号和格式提示，可重试
 
-4. 逐 block 解析 + 校验：
-   story_config：
-   ├── 解析成功？→ 否：抛 CoCreateError（附带缺失字段提示）
-   └── 是 → 继续
+4. 逐部分校验：
+   ├── 字段完整性（必填字段、类型约束、枚举取值）
+   ├── 约束合规性（变量数量上限、角色 protagonist 数量等）
+   ├── 引用有效性（route target 匹配、condition 变量已声明）
+   └── 失败 → 向 LLM 反馈具体字段错误，可重试
 
-   variables：
-   ├── 解析成功？
-   │   └── 否 → 抛 CoCreateError（附带格式提示）
-   ├── 校验：变量名唯一、类型合法、初始值合规、≤3 个变量
-   └── 通过 → 继续
-
-   outline：
-   ├── 解析成功？
-   │   └── 否 → 抛 CoCreateError
-   ├── 静态校验：route 目标存在、变量引用存在、最后节点 routes 为空
-   └── 通过 → 继续
-
-5. 全部通过 → 返回 CoCreationResult
-   API 失败 / 解析失败 → 抛 CoCreateError（含 phase 和错误描述）
-   UI 捕获后向用户展示错误并询问重试 / 退出
-
-   **重试机制**：
-   - `send()` 失败（phase="send"）→ UI 调用 `flow.retry_send()` 用同一 messages 数组重试
-   - `generate()` API 失败（phase="generate_api"）→ UI 调用 `flow.retry_generate()` 重试
-   - `generate()` 解析/校验失败（phase="generate_parse"）→ `retry_generate()` 追加纠错提示后重试
+5. 全部通过 → 返回生成结果
+   API 失败 / 校验失败 → 向 UI 报告，由用户选择重试或退出
 ```
 
-> 三个 section 的格式规范、字段定义和完整示例见 [`prompt-design.md` §3](./prompt-design.md)。API 失败或解析失败通过 `CoCreateError` 异常向 UI 报告，由用户决定重试或退出。共创 API 的详细方法签名和状态机控制见 [`api/co-create.md`](../api/co-create.md)。
+> JSON 各部分的格式规范、字段定义和完整示例见 [`prompt-design.md` §3](./prompt-design.md)。API 调用失败、解析失败、校验失败均向 UI 报告，由用户决策。共创 API 的交互流程见 [`api/co-create.md`](../api/co-create.md)。
 
 ### 3.5 Step 4: 初始化 GameState
 
 > GameState 完整结构定义见 [`data-model.md`](./data-model.md)。
 
-变量校验通过后，从 `story_config.variables` 初始化 `state_vars`（初始值深拷贝）。
+校验通过后，从生成结果中提取各部分数据初始化 GameState：故事设定、角色列表、地点列表、变量定义（从中初始化 state_vars 初始值）、大纲（附引擎运行时字段）。
 
 初始化后进入叙事循环（§4）。
 
