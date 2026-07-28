@@ -38,7 +38,7 @@ ch4_safehouse [pending] — 安全屋
 """
 
 # State vars matching initial values in SAMPLE_STORY_CONFIG.variables
-SAMPLE_STATE_VARS = {"体力": 80, "信任度": 10, "所属势力": "自由佣兵"}
+SAMPLE_STATE_VARS = {"GLOBAL": {"体力": 80, "信任度": 10, "所属势力": "自由佣兵"}}
 
 
 class TestBuildRound1:
@@ -90,7 +90,7 @@ class TestBuildRound1:
         the prompt shows the actual state_vars values."""
         pb = PromptBuilder()
         # 体力 initial=80, but state_vars says 75
-        modified_vars = {"体力": 75, "信任度": 10, "所属势力": "自由佣兵"}
+        modified_vars = {"GLOBAL": {"体力": 75, "信任度": 10, "所属势力": "自由佣兵"}}
         result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", modified_vars, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES)
         assert "体力: 75 / 100" in result
         assert "体力: 80 / 100" not in result
@@ -98,14 +98,14 @@ class TestBuildRound1:
     def test_format_current_state_number_type(self):
         """Number-type variables get / 100 suffix."""
         result = PromptBuilder._format_current_state(
-            {"体力": 45}, [{"name": "体力", "type": "number"}]
+            {"GLOBAL": {"体力": 45}}, [{"name": "体力", "type": "number"}]
         )
         assert "体力: 45 / 100" in result
 
     def test_format_current_state_string_type(self):
         """String-type variables get no suffix."""
         result = PromptBuilder._format_current_state(
-            {"所属势力": "反抗军"}, [{"name": "所属势力", "type": "string"}]
+            {"GLOBAL": {"所属势力": "反抗军"}}, [{"name": "所属势力", "type": "string"}]
         )
         assert "所属势力: 反抗军" in result
         assert "/" not in result
@@ -133,7 +133,7 @@ class TestBuildRoundN:
             outline_text=ROUNDN_OUTLINE,
             current_node="ch3_ally",
             goal="通过地下网络逃离",
-            state_vars={"体力": 60, "信任度": 25, "所属势力": "自由佣兵"},
+            state_vars={"GLOBAL": {"体力": 60, "信任度": 25, "所属势力": "自由佣兵"}},
             variables=ROUNDN_VARS,
             bridge_text="你对耗子点了点头。\n耗子: 跟我来。",
         )
@@ -146,7 +146,7 @@ class TestBuildRoundN:
             outline_text=ROUNDN_OUTLINE,
             current_node="ch3_ally",
             goal="通过地下网络逃离",
-            state_vars={"体力": 60},
+            state_vars={"GLOBAL": {"体力": 60}},
             variables=ROUNDN_VARS,
             bridge_text="tail...",
         )
@@ -162,7 +162,7 @@ class TestBuildRoundN:
             outline_text=ROUNDN_OUTLINE,
             current_node="ch3_ally",
             goal="逃",
-            state_vars={"体力": 60, "信任度": 25},
+            state_vars={"GLOBAL": {"体力": 60, "信任度": 25}},
             variables=ROUNDN_VARS,
             bridge_text="tail...",
         )
@@ -177,7 +177,7 @@ class TestBuildRoundN:
             outline_text=ROUNDN_OUTLINE,
             current_node="ch3_ally",
             goal="逃",
-            state_vars={"体力": 60},
+            state_vars={"GLOBAL": {"体力": 60}},
             variables=ROUNDN_VARS,
             bridge_text="你对耗子点了点头。",
         )
@@ -189,7 +189,7 @@ class TestBuildRoundN:
             outline_text=ROUNDN_OUTLINE,
             current_node="ch4",
             goal="结局",
-            state_vars={"体力": 30},
+            state_vars={"GLOBAL": {"体力": 30}},
             variables=ROUNDN_VARS,
             bridge_text="tail...",
         )
@@ -202,7 +202,7 @@ class TestBuildRoundN:
             outline_text=ROUNDN_OUTLINE,
             current_node="ch3",
             goal="逃",
-            state_vars={"体力": 60},
+            state_vars={"GLOBAL": {"体力": 60}},
             variables=ROUNDN_VARS,
             bridge_text="tail...",
             rejected_changes=["体力变更被拒：超出范围[0,100]"],
@@ -216,7 +216,7 @@ class TestBuildRoundN:
             outline_text=ROUNDN_OUTLINE,
             current_node="ch3",
             goal="逃",
-            state_vars={"体力": 60},
+            state_vars={"GLOBAL": {"体力": 60}},
             variables=ROUNDN_VARS,
             bridge_text="tail...",
             rejected_changes=[],
@@ -229,7 +229,7 @@ class TestBuildRoundN:
             outline_text=ROUNDN_OUTLINE,
             current_node="ch3",
             goal="逃",
-            state_vars={"体力": 60},
+            state_vars={"GLOBAL": {"体力": 60}},
             variables=ROUNDN_VARS,
             bridge_text="tail...",
             format_error="checkpoint 的 node 值与大纲不匹配",
@@ -242,7 +242,7 @@ class TestBuildRoundN:
             outline_text=ROUNDN_OUTLINE,
             current_node="ch3",
             goal="逃",
-            state_vars={"体力": 60},
+            state_vars={"GLOBAL": {"体力": 60}},
             variables=ROUNDN_VARS,
             bridge_text="tail...",
             no_choices_last_round=True,
@@ -256,7 +256,7 @@ class TestBuildRoundN:
             outline_text=ROUNDN_OUTLINE,
             current_node="ch3",
             goal="逃",
-            state_vars={"体力": 60},
+            state_vars={"GLOBAL": {"体力": 60}},
             variables=ROUNDN_VARS,
             bridge_text="tail...",
         )
@@ -267,7 +267,7 @@ class TestAdventureLogPrompt:
     def test_build_adventure_log_prompt_contains_label(self):
         pb = PromptBuilder()
         config = {"title": "霓虹深渊", "language": "zh-CN", "premise": "A test premise."}
-        state_vars = {"体力": 25}
+        state_vars = {"GLOBAL": {"体力": 25}}
         outline = "ch1_intro [completed] — 序章\n  ↳ 抵达边陲小镇"
 
         prompt = pb.build_adventure_log_prompt(config, state_vars, outline)
@@ -277,7 +277,7 @@ class TestAdventureLogPrompt:
     def test_build_adventure_log_prompt_shows_outline(self):
         pb = PromptBuilder()
         config = {"title": "test", "language": "en", "premise": "A test premise."}
-        state_vars = {"魔力": 50}
+        state_vars = {"GLOBAL": {"魔力": 50}}
         outline = "ch1_start [completed] — 开始\n  ↳ first checkpoint"
 
         prompt = pb.build_adventure_log_prompt(config, state_vars, outline)

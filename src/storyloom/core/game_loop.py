@@ -14,7 +14,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Callable
 
-from storyloom.config import SAVE_VERSION, STREAM_STALL_TIMEOUT_SEC
+from storyloom.config import SAVE_VERSION, STREAM_STALL_TIMEOUT_SEC, GLOBAL_SCOPE
 from storyloom.io.api_client import ApiClient
 from storyloom.core.context_manager import ContextManager
 from storyloom.core.prompt_builder import PromptBuilder
@@ -89,42 +89,52 @@ class GameState:
 
         Args:
             variables: List of variable definitions.
-                       Each variable has: name, type, initial.
-                       None or empty list → no state variables.
+                       Each variable has: scope (optional), name, type, initial.
+                       scope omitted = GLOBAL. None or empty list → no state variables.
 
         Raises:
             ValueError: On unsupported variable type.
         """
-        self._state_vars: dict = {}
-        self._var_types: dict[str, str] = {}
+        self._state_vars: dict[str, dict] = {}          # {scope: {name: value}}
+        self._var_types: dict[str, dict[str, str]] = {}  # {scope: {name: type}}
 
         for v in (variables or []):
+            scope = v.get("scope") or GLOBAL_SCOPE
             name = v["name"]
             var_type = v["type"]
             initial = v["initial"]
 
+            if scope not in self._state_vars:
+                self._state_vars[scope] = {}
+                self._var_types[scope] = {}
+
             if var_type == "number":
-                self._state_vars[name] = int(initial)
+                self._state_vars[scope][name] = int(initial)
             elif var_type == "string":
-                self._state_vars[name] = initial
+                self._state_vars[scope][name] = initial
             else:
                 raise ValueError(f"Unknown variable type: {var_type}")
 
-            self._var_types[name] = var_type
+            self._var_types[scope][name] = var_type
 
     @property
     def state_vars(self) -> dict:
-        """Return current state variables as a dict copy."""
-        return dict(self._state_vars)
+        """Return current state variables as a nested dict copy.
+
+        Format: ``{scope: {name: value}}``.
+        """
+        return {s: dict(vars_) for s, vars_ in self._state_vars.items()}
 
     def to_dict(self) -> dict:
         """Serialize state variables to a plain dict.
 
         Returns:
-            Dict with 'state_vars' key containing current values.
+            Dict with 'state_vars' key containing current nested values.
         """
         return {
-            "state_vars": dict(self._state_vars),
+            "state_vars": {
+                s: dict(vars_) for s, vars_ in self._state_vars.items()
+            },
         }
 
     @classmethod
@@ -132,7 +142,7 @@ class GameState:
         """Restore GameState from save data.
 
         Uses *variables* for type definitions; actual state values come
-        from ``data['state_vars']``.
+        from ``data['state_vars']`` (nested: ``{scope: {name: value}}``).
 
         Args:
             data: Dict with 'state_vars' key from save file.
@@ -143,8 +153,21 @@ class GameState:
             New GameState instance with restored values.
         """
         gs = cls(variables)
-        gs._state_vars = dict(data.get("state_vars", {}))
+        gs._state_vars = {
+            s: dict(vars_) for s, vars_ in data.get("state_vars", {}).items()
+        }
         return gs
+
+    @staticmethod
+    def _split_var(var: str) -> tuple[str, str]:
+        """Split a dot-notation variable reference into (scope, name).
+
+        ``Scope.Name`` → ``(Scope, Name)``; bare name → ``(GLOBAL_SCOPE, name)``.
+        """
+        if "." in var:
+            scope, name = var.split(".", 1)
+            return scope, name
+        return GLOBAL_SCOPE, var
 
     def apply_set(self, set_op: SetOperation, choice_dict: dict[str, int]) -> SetResult:
         """Validate and apply a state change from the LLM.
@@ -155,11 +178,12 @@ class GameState:
         does not affect other valid sets in the same round.
 
         Steps:
-        1. Verify variable exists.
-        2. Verify operation is valid for the variable type.
-        3. For numbers: try int conversion, verify range [0, 100].
-        4. Evaluate condition if present.
-        5. Apply the change.
+        1. Resolve ``scope.name`` reference.
+        2. Verify variable exists.
+        3. Verify operation is valid for the variable type.
+        4. For numbers: try int conversion, verify range [0, 100].
+        5. Evaluate condition if present.
+        6. Apply the change.
 
         Args:
             set_op: The SetOperation from parsed XML.
@@ -170,29 +194,31 @@ class GameState:
             Never raises — all failures are communicated via the return
             value so the caller can accumulate rejected_changes.
         """
-        var_name = set_op.var
+        scope, var_name = self._split_var(set_op.var)
 
         # Step 1: Verify variable exists (per block-spec.md §5:
         # unknown variable → silently reject, record in rejected_changes).
-        if var_name not in self._state_vars:
+        scope_vars = self._state_vars.get(scope, {})
+        scope_types = self._var_types.get(scope, {})
+        if var_name not in scope_vars:
             return SetResult(
                 accepted=False,
-                reason=f"unknown variable: {var_name}",
+                reason=f"unknown variable: {set_op.var}",
             )
 
-        var_type = self._var_types[var_name]
+        var_type = scope_types[var_name]
 
         # Step 2: Verify operation is valid for type (per block-spec.md §5:
         # type mismatch → silently reject).
         if var_type == "number" and set_op.op not in self.VALID_NUMBER_OPS:
             return SetResult(
                 accepted=False,
-                reason=f"Invalid number operation: {set_op.op} for {var_name}",
+                reason=f"Invalid number operation: {set_op.op} for {set_op.var}",
             )
         if var_type == "string" and set_op.op not in self.VALID_STRING_OPS:
             return SetResult(
                 accepted=False,
-                reason=f"Invalid string operation: {set_op.op} for {var_name}",
+                reason=f"Invalid string operation: {set_op.op} for {set_op.var}",
             )
 
         # Step 3: Parse/try value
@@ -202,7 +228,7 @@ class GameState:
             except ValueError:
                 return SetResult(
                     accepted=False,
-                    reason=f"Cannot parse '{set_op.val}' as integer for {var_name}",
+                    reason=f"Cannot parse '{set_op.val}' as integer for {set_op.var}",
                 )
         else:
             val = set_op.val
@@ -218,15 +244,16 @@ class GameState:
 
         # Step 5: Apply
         if var_type == "number":
-            return self._apply_number_op(var_name, set_op.op, val)
+            return self._apply_number_op(scope, var_name, set_op.op, val)
         elif var_type == "string":
-            return self._apply_string_op(var_name, val)
+            return self._apply_string_op(scope, var_name, val)
 
         return SetResult(accepted=False, reason="Unknown variable type")
 
-    def _apply_number_op(self, var_name: str, op: str, val: int) -> SetResult:
+    def _apply_number_op(self, scope: str, var_name: str, op: str,
+                         val: int) -> SetResult:
         """Apply a numeric operation with range validation."""
-        current = self._state_vars[var_name]
+        current = self._state_vars[scope][var_name]
 
         if op == "=":
             new_val = val
@@ -246,7 +273,7 @@ class GameState:
             new_val = self.NUMBER_MAX
             clamped = True
 
-        self._state_vars[var_name] = new_val
+        self._state_vars[scope][var_name] = new_val
         if clamped:
             return SetResult(
                 accepted=True,
@@ -254,9 +281,9 @@ class GameState:
             )
         return SetResult(accepted=True)
 
-    def _apply_string_op(self, var_name: str, val: str) -> SetResult:
+    def _apply_string_op(self, scope: str, var_name: str, val: str) -> SetResult:
         """Apply a string assignment."""
-        self._state_vars[var_name] = val
+        self._state_vars[scope][var_name] = val
         return SetResult(accepted=True)
 
     def evaluate_condition(
@@ -267,11 +294,11 @@ class GameState:
         Supports:
         - Comparison: ==, !=, >, >=, <, <=
         - Combinators: and, or
-        - Variables from state_vars (by name)
-        - Choice variables (by name from choice_dict)
+        - Scoped variables: ``Scope.Name`` (has dot) → ``state_vars[scope][name]``
+        - Bare names: ``choice_dict`` first, then ``state_vars[GLOBAL]``
 
         Args:
-            condition: Condition string (e.g., "approach==1", "体力>50").
+            condition: Condition string (e.g., ``"approach==1"``, ``"耗子.信任度>=50"``).
             choice_dict: Player choice mapping.
 
         Returns:
@@ -292,23 +319,33 @@ class GameState:
                 self.evaluate_condition(p.strip(), choice_dict) for p in parts
             )
 
-        # Parse single condition: var_name operator value
+        # Parse single condition: var_ref operator value
+        # var_ref supports dot notation: Scope.Name
         match = re.match(
-            r"^\s*(\w+)\s*(==|!=|>=|<=|>|<)\s*(.+?)\s*$", condition
+            r"^\s*([\w.]+)\s*(==|!=|>=|<=|>|<)\s*(.+?)\s*$", condition
         )
         if not match:
             return False
 
-        var_name = match.group(1)
+        var_ref = match.group(1)
         operator = match.group(2)
         raw_value = match.group(3).strip()
 
-        # Try to get the variable value.
-        # Per block-spec.md §3: choice_dict > state_vars priority.
-        if var_name in choice_dict:
-            var_value = choice_dict[var_name]
-        elif var_name in self._state_vars:
-            var_value = self._state_vars[var_name]
+        # Resolve variable value.
+        # Per block-spec.md §3:
+        #  - Dot notation "Scope.Name" → state_vars[scope][name]
+        #  - Bare name → choice_dict first, then state_vars[GLOBAL]
+        if "." in var_ref:
+            scope, name = var_ref.split(".", 1)
+            scope_vars = self._state_vars.get(scope, {})
+            if name in scope_vars:
+                var_value = scope_vars[name]
+            else:
+                return False
+        elif var_ref in choice_dict:
+            var_value = choice_dict[var_ref]
+        elif var_ref in self._state_vars.get(GLOBAL_SCOPE, {}):
+            var_value = self._state_vars[GLOBAL_SCOPE][var_ref]
         else:
             return False
 

@@ -351,33 +351,31 @@ class TestCoCreateValidatorVariables:
         data = {
             "variables": [
                 {"name": f"var{i}", "type": "number", "initial": 50}
-                for i in range(4)
+                for i in range(7)
             ]
         }
         errors = CoCreateValidator.validate_variables(data)
-        assert any("exceeds maximum 3" in e for e in errors)
+        assert any("exceeds maximum 6" in e for e in errors)
 
-    def test_too_many_numeric(self):
+    def test_duplicate_in_same_scope(self):
         data = {
             "variables": [
-                {"name": "a", "type": "number", "initial": 50},
-                {"name": "b", "type": "number", "initial": 50},
-                {"name": "c", "type": "number", "initial": 50},
+                {"name": "体力", "type": "number", "initial": 80},
+                {"name": "体力", "type": "number", "initial": 50},
             ]
         }
         errors = CoCreateValidator.validate_variables(data)
-        assert any("numeric" in e.lower() for e in errors)
+        assert any("Duplicate" in e for e in errors)
 
-    def test_too_many_strings(self):
+    def test_duplicate_across_scopes_ok(self):
         data = {
             "variables": [
-                {"name": "a", "type": "string", "initial": "x"},
-                {"name": "b", "type": "string", "initial": "y"},
-                {"name": "c", "type": "number", "initial": 50},
+                {"scope": "Alice", "name": "好感度", "type": "number", "initial": 50},
+                {"scope": "Bob", "name": "好感度", "type": "number", "initial": 30},
             ]
         }
         errors = CoCreateValidator.validate_variables(data)
-        assert any("string" in e.lower() for e in errors)
+        assert errors == []
 
     def test_number_out_of_bounds(self):
         data = {

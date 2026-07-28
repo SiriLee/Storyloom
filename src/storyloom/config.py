@@ -1,7 +1,7 @@
 """Configurable constants for Storyloom."""
 
 # ── Save format ──────────────────────────────────────────────────
-SAVE_VERSION = 2           # save file format version; mismatch → load error (user decides)
+SAVE_VERSION = 3           # save file format version; mismatch → load error (user decides)
 
 # ── Sliding window ─────────────────────────────────────────────
 WINDOW_SIZE = 3          # full rounds to keep in window
@@ -29,10 +29,9 @@ MAX_CONTEXT_TOKENS = 50_000   # target ceiling
 
 # ── Co-creation ──────────────────────────────────────────────────
 
-# Variable caps (per 2026-07-05 variable-cap spec)
-VARIABLE_CAP = 3            # max total variables
-VARIABLE_NUMERIC_CAP = 2    # max numeric (number) variables
-VARIABLE_STRING_CAP = 1     # max string variables
+# Scoped variable caps (per 2026-07-21 scoped-variables spec)
+VARIABLE_CAP = 6            # max total variables across all scopes
+GLOBAL_SCOPE = "GLOBAL"     # default scope identifier (omit = GLOBAL)
 
 # Story config title constraints
 STORY_TITLE_MIN_CHARS = 1

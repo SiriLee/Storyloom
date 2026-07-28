@@ -196,7 +196,7 @@ saves/
 |------|--------|------|
 | `DEFAULT_MODEL` | `"deepseek-v4-pro"` | 默认模型标识。可通过 `user_config.json` 的 `api_model` 字段覆盖 |
 | `STREAM_STALL_TIMEOUT_SEC` | 180 | 流式输出停顿超时秒数（如果任何新 token 间隔超过此值则超时）。当前 context ~50K tokens 时 TTFT 通常 10-30s，180s 提供充足 margin |
-| `SAVE_VERSION` | 2 | 存档格式版本号。不匹配则判定存档损坏 |
+| `SAVE_VERSION` | 3 | 存档格式版本号。不匹配则判定存档损坏 |
 
 ### A.7 已废弃常量
 

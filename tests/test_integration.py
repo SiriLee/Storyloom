@@ -91,7 +91,7 @@ class TestIntegration:
         # Round 1
         r1_prompt = pb.build_round1(
             SAMPLE_STORY, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易",
-            {"体力": 80, "信任度": 10},
+            {"GLOBAL": {"体力": 80, "信任度": 10}},
             characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS,
             variables=SAMPLE_VARIABLES,
         )
@@ -112,7 +112,7 @@ class TestIntegration:
             outline_text=SAMPLE_OUTLINE,
             current_node="ch3_ally",
             goal="与耗子前往安全屋",
-            state_vars={"体力": 80, "信任度": 15},
+            state_vars={"GLOBAL": {"体力": 80, "信任度": 15}},
             variables=SAMPLE_VARIABLES,
             bridge_text=bridge1,
         )
@@ -162,7 +162,7 @@ class TestIntegration:
 
         r1 = pb.build_round1(
             SAMPLE_STORY, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子交易",
-            {"体力": 80, "信任度": 10},
+            {"GLOBAL": {"体力": 80, "信任度": 10}},
             characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS,
             variables=SAMPLE_VARIABLES,
         )
@@ -187,7 +187,7 @@ class TestIntegration:
         for line in ROUND1_OUTPUT.split("\n"):
             sp.feed_line(line)
         cm.set_round1(
-            pb.build_round1(SAMPLE_STORY, SAMPLE_OUTLINE, "ch2", "交易", {"体力": 80, "信任度": 10}, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES),
+            pb.build_round1(SAMPLE_STORY, SAMPLE_OUTLINE, "ch2", "交易", {"GLOBAL": {"体力": 80, "信任度": 10}}, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES),
             ROUND1_OUTPUT,
             bridge_text=sp.get_bridge_text(),
         )
@@ -197,7 +197,7 @@ class TestIntegration:
             outline_text=SAMPLE_OUTLINE,
             current_node="ch3",
             goal="前往安全屋",
-            state_vars={"体力": 80, "信任度": 15},
+            state_vars={"GLOBAL": {"体力": 80, "信任度": 15}},
             variables=SAMPLE_VARIABLES,
             bridge_text=bridge1,
         )
@@ -214,7 +214,7 @@ class TestIntegration:
         for line in ROUND1_OUTPUT.split("\n"):
             sp.feed_line(line)
         cm.set_round1(
-            pb.build_round1(SAMPLE_STORY, SAMPLE_OUTLINE, "ch2", "交易", {"体力": 80, "信任度": 10}, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES),
+            pb.build_round1(SAMPLE_STORY, SAMPLE_OUTLINE, "ch2", "交易", {"GLOBAL": {"体力": 80, "信任度": 10}}, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES),
             ROUND1_OUTPUT,
             bridge_text=sp.get_bridge_text(),
         )

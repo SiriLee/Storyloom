@@ -143,9 +143,9 @@ class TestGameStateInit:
     def test_initializes_from_story_config(self):
         """GameState should initialize with variables from story_config."""
         gs = GameState(SAMPLE_VARIABLES)
-        assert gs.state_vars["体力"] == 80
-        assert gs.state_vars["信任度"] == 10
-        assert gs.state_vars["所属势力"] == "自由佣兵"
+        assert gs.state_vars["GLOBAL"]["体力"] == 80
+        assert gs.state_vars["GLOBAL"]["信任度"] == 10
+        assert gs.state_vars["GLOBAL"]["所属势力"] == "自由佣兵"
 
     def test_raises_on_unknown_variable_type(self):
         """GameState should raise on unsupported variable type."""
@@ -170,7 +170,7 @@ class TestGameStateApplySet:
         op = SetOperation(var="体力", op="-", val="10", condition=None)
         result = gs.apply_set(op, {})
         assert result.accepted
-        assert gs.state_vars["体力"] == 70
+        assert gs.state_vars["GLOBAL"]["体力"] == 70
 
     def test_applies_increment_operation(self):
         """Addition to a number variable should work."""
@@ -178,7 +178,7 @@ class TestGameStateApplySet:
         op = SetOperation(var="信任度", op="+", val="15", condition=None)
         result = gs.apply_set(op, {})
         assert result.accepted
-        assert gs.state_vars["信任度"] == 25
+        assert gs.state_vars["GLOBAL"]["信任度"] == 25
 
     def test_applies_assignment_operation(self):
         """Assignment operation for numbers should work."""
@@ -186,7 +186,7 @@ class TestGameStateApplySet:
         op = SetOperation(var="体力", op="=", val="50", condition=None)
         result = gs.apply_set(op, {})
         assert result.accepted
-        assert gs.state_vars["体力"] == 50
+        assert gs.state_vars["GLOBAL"]["体力"] == 50
 
     def test_applies_set_to_zero(self):
         """Assignment with =N should set to N."""
@@ -194,7 +194,7 @@ class TestGameStateApplySet:
         op = SetOperation(var="体力", op="=", val="0", condition=None)
         result = gs.apply_set(op, {})
         assert result.accepted
-        assert gs.state_vars["体力"] == 0
+        assert gs.state_vars["GLOBAL"]["体力"] == 0
 
     def test_clamps_out_of_range_high(self):
         """Number variables out of range [0,100] should be clamped silently.
@@ -206,7 +206,7 @@ class TestGameStateApplySet:
         result = gs.apply_set(op, {})
         assert result.accepted
         assert "clamped" in (result.reason or "")
-        assert gs.state_vars["体力"] == 100
+        assert gs.state_vars["GLOBAL"]["体力"] == 100
 
     def test_clamps_out_of_range_low(self):
         """Number variables below 0 should be clamped to 0."""
@@ -215,7 +215,7 @@ class TestGameStateApplySet:
         result = gs.apply_set(op, {})
         assert result.accepted
         assert "clamped" in (result.reason or "")
-        assert gs.state_vars["体力"] == 0
+        assert gs.state_vars["GLOBAL"]["体力"] == 0
 
     def test_evaluates_condition_true(self):
         """Condition should be evaluated against choice_dict."""
@@ -223,7 +223,7 @@ class TestGameStateApplySet:
         op = SetOperation(var="信任度", op="+", val="5", condition="approach==1")
         result = gs.apply_set(op, {"approach": 1})
         assert result.accepted
-        assert gs.state_vars["信任度"] == 15
+        assert gs.state_vars["GLOBAL"]["信任度"] == 15
 
     def test_evaluates_condition_false(self):
         """Condition returning false should skip the operation."""
@@ -232,7 +232,7 @@ class TestGameStateApplySet:
         result = gs.apply_set(op, {"approach": 2})
         assert result.accepted
         assert result.reason == "skipped: condition not met"
-        assert gs.state_vars["信任度"] == 10  # Unchanged
+        assert gs.state_vars["GLOBAL"]["信任度"] == 10  # Unchanged
 
     def test_rejects_nonexistent_variable(self):
         """Setting a variable that doesn't exist should be silently rejected."""
@@ -248,7 +248,7 @@ class TestGameStateApplySet:
         op = SetOperation(var="所属势力", op="=", val="荒坂重工", condition=None)
         result = gs.apply_set(op, {})
         assert result.accepted
-        assert gs.state_vars["所属势力"] == "荒坂重工"
+        assert gs.state_vars["GLOBAL"]["所属势力"] == "荒坂重工"
 
     def test_rejects_invalid_operation_for_type(self):
         """Invalid operation for a type should raise."""
@@ -265,20 +265,20 @@ class TestGameStateApplySet:
     def test_condition_against_state_variable(self):
         """Condition can reference state variables."""
         gs = GameState(SAMPLE_VARIABLES)
-        gs._state_vars["体力"] = 30  # Low stamina
+        gs._state_vars["GLOBAL"]["体力"] = 30  # Low stamina
         op = SetOperation(var="信任度", op="+", val="10", condition="体力<=50")
         result = gs.apply_set(op, {})
         assert result.accepted
-        assert gs.state_vars["信任度"] == 20
+        assert gs.state_vars["GLOBAL"]["信任度"] == 20
 
     def test_condition_against_state_variable_false(self):
         """Condition against state variable returns false."""
         gs = GameState(SAMPLE_VARIABLES)
-        gs._state_vars["体力"] = 80  # High stamina
+        gs._state_vars["GLOBAL"]["体力"] = 80  # High stamina
         op = SetOperation(var="信任度", op="+", val="10", condition="体力<=50")
         result = gs.apply_set(op, {})
         assert result.accepted
-        assert gs.state_vars["信任度"] == 10  # Unchanged
+        assert gs.state_vars["GLOBAL"]["信任度"] == 10  # Unchanged
 
 
 class TestGameStateConditionEval:
@@ -579,7 +579,7 @@ class TestGameLoopContinueRound:
         loop.start_game()
         _run_round(loop)
         _run_round(loop, choice_key="1")
-        assert gs.state_vars["体力"] == 70  # 80 - 10
+        assert gs.state_vars["GLOBAL"]["体力"] == 70  # 80 - 10
 
     def test_stream_round_without_start_game_raises(self):
         """stream_round should raise if start_game wasn't called."""
@@ -610,7 +610,7 @@ class TestGameLoopContinueRound:
         loop.start_game()
         _run_round(loop)
         _run_round(loop, choice_key="2")
-        assert gs.state_vars["信任度"] == 15  # 10 + 5
+        assert gs.state_vars["GLOBAL"]["信任度"] == 15  # 10 + 5
 
     def test_round2_sends_context_to_api(self):
         """Round 2 should send context messages to API."""
@@ -756,22 +756,22 @@ class TestGameStateSerialization:
         ]
         gs = GameState(variables)
         data = gs.to_dict()
-        assert data == {"state_vars": {"体力": 80, "信任度": 10}}
+        assert data == {"state_vars": {"GLOBAL": {"体力": 80, "信任度": 10}}}
 
     def test_from_dict_preserves_original_initial_values(self):
         variables = [
             {"name": "体力", "type": "number", "initial": 80},
         ]
-        save_state = {"state_vars": {"体力": 30}}
+        save_state = {"state_vars": {"GLOBAL": {"体力": 30}}}
         gs = GameState.from_dict(save_state, variables)
-        assert gs.state_vars == {"体力": 30}
+        assert gs.state_vars == {"GLOBAL": {"体力": 30}}
 
     def test_from_dict_roundtrip(self):
         variables = [
             {"name": "体力", "type": "number", "initial": 100},
         ]
         gs1 = GameState(variables)
-        gs1._state_vars["体力"] = 50
+        gs1._state_vars["GLOBAL"]["体力"] = 50
         data = gs1.to_dict()
         gs2 = GameState.from_dict(data, variables)
         assert gs2.state_vars == gs1.state_vars

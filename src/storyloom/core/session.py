@@ -15,7 +15,7 @@ import copy
 import os
 import time
 
-from storyloom.config import SAVE_VERSION
+from storyloom.config import SAVE_VERSION, GLOBAL_SCOPE
 from storyloom.io.api_client import ApiClient
 from storyloom.core.save_manager import SaveManager
 from storyloom.core.co_create import CoCreateFlow
@@ -184,10 +184,11 @@ class GameSession:
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         title = sc.get("title", "untitled")
 
-        # Initialize state_vars from top-level variable definitions
-        state_vars: dict[str, int | str] = {}
+        # Initialize nested state_vars from variable definitions
+        state_vars: dict[str, dict[str, int | str]] = {}
         for v in data.get("variables", []):
-            state_vars[v["name"]] = v["initial"]
+            scope = v.get("scope") or GLOBAL_SCOPE
+            state_vars.setdefault(scope, {})[v["name"]] = v["initial"]
 
         # Convert outline nodes to save format
         first_node_id = ""

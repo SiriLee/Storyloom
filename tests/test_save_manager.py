@@ -21,7 +21,7 @@ class TestSaveManagerInstance:
     @pytest.fixture
     def save_data(self):
         return {
-            "version": 2,
+            "version": 3,
             "metadata": {
                 "title": "test-story",
                 "created_at": "2026-01-01T00:00:00Z",
@@ -134,7 +134,7 @@ class TestSaveManagerInstance:
 
     def test_load_missing_fields_raises(self, game_dir):
         sm = SaveManager(game_dir)
-        save_data = {"version": 2, "metadata": {"title": "bad"}}
+        save_data = {"version": 3, "metadata": {"title": "bad"}}
         filename = sm.save(save_data, cp_title="test")
         with pytest.raises(ValueError, match="Missing required"):
             sm.load(filename)
@@ -181,7 +181,7 @@ class TestSaveManagerStatic:
         _, game_id, _ = SaveManager.create_game(root, "my_story")
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
-            "version": 2,
+            "version": 3,
             "metadata": {"title": "my_story", "created_at": "2026-01-01T00:00:00Z", "updated_at": ""},
             "config": {"temperature": None},
             "story_config": {"tier": "short", "title": "my_story", "language": "zh-CN", "premise": "A fantasy story."},
@@ -203,7 +203,7 @@ class TestSaveManagerStatic:
         _, game_id, _ = SaveManager.create_game(root, "test")
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
-            "version": 2,
+            "version": 3,
             "metadata": {"title": "test", "created_at": "2026-01-01T00:00:00Z", "updated_at": ""},
             "config": {"temperature": None},
             "story_config": {"tier": "short", "title": "test", "language": "en", "premise": "A test."},
@@ -305,7 +305,7 @@ class TestLastPlayedTracking:
         _, game_id, _ = SaveManager.create_game(root, "test")
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
-            "version": 2,
+            "version": 3,
             "metadata": {"title": "test"},
             "config": {},
             "story_config": {"tier": "short", "title": "test", "language": "en", "premise": "A test."},
@@ -327,7 +327,7 @@ class TestLastPlayedTracking:
         _, game_id, _ = SaveManager.create_game(root, "test")
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
-            "version": 2,
+            "version": 3,
             "metadata": {"title": "test"},
             "config": {},
             "story_config": {"tier": "short", "title": "test", "language": "en", "premise": "A test."},
@@ -348,7 +348,7 @@ class TestLastPlayedTracking:
         _, game_id, _ = SaveManager.create_game(root, "test")
         sm = SaveManager(os.path.join(root, game_id))
         sm.save({
-            "version": 2,
+            "version": 3,
             "metadata": {"title": "test"},
             "config": {},
             "story_config": {"tier": "short", "title": "test", "language": "en", "premise": "A test."},

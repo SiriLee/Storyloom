@@ -11,8 +11,7 @@ from storyloom.config import (
     STORY_TITLE_MIN_CHARS,
     STORY_TITLE_MAX_CHARS,
     VARIABLE_CAP,
-    VARIABLE_NUMERIC_CAP,
-    VARIABLE_STRING_CAP,
+    GLOBAL_SCOPE,
     OUTLINE_NODE_RANGES,
     DEFAULT_LANGUAGE,
     SUPPORTED_LANGUAGES,
@@ -244,62 +243,50 @@ class CoCreateValidator:
         """Validate the ``variables`` section.
 
         Rules:
-        * ≤3 total, ≤2 number, ≤1 string.
+        * ≤VARIABLE_CAP total (global count across all scopes).
         * ``type`` must be ``"number"`` or ``"string"``.
+        * ``scope`` (optional): non-empty string if present.
         * Number initial: integer in [0, 100] (bool rejected — isinstance
           guard per plan §A.5).
         * String initial: non-empty.
-        * Names must be unique.
+        * Names must be unique within the same scope.
         """
         errors: list[str] = []
         variables = data.get("variables")
         if not isinstance(variables, list):
             return ["variables must be a JSON array"]
 
-        # Count caps
+        # Total cap
         if len(variables) > VARIABLE_CAP:
             errors.append(
                 f"Variable count {len(variables)} exceeds maximum {VARIABLE_CAP}"
             )
 
-        num_count = sum(
-            1 for v in variables
-            if isinstance(v, dict) and v.get("type") == "number"
-        )
-        string_count = sum(
-            1 for v in variables
-            if isinstance(v, dict) and v.get("type") == "string"
-        )
-
-        if num_count > VARIABLE_NUMERIC_CAP:
-            errors.append(
-                f"Numeric variables ({num_count}) exceed maximum "
-                f"{VARIABLE_NUMERIC_CAP}"
-            )
-        if string_count > VARIABLE_STRING_CAP:
-            errors.append(
-                f"String variables ({string_count}) exceed maximum "
-                f"{VARIABLE_STRING_CAP}"
-            )
-
         # Per-variable validation
-        seen_names: set[str] = set()
+        seen: set[tuple[str, str]] = set()  # (scope, name)
         for i, v in enumerate(variables):
             if not isinstance(v, dict):
                 errors.append(f"variables[{i}] must be a JSON object")
                 continue
 
+            scope = v.get("scope") or GLOBAL_SCOPE
             name = v.get("name", "")
             var_type = v.get("type")
             initial = v.get("initial")
+
+            # scope (optional, but must be non-empty string if present)
+            raw_scope = v.get("scope")
+            if raw_scope is not None and (not isinstance(raw_scope, str) or not raw_scope.strip()):
+                errors.append(f"variables[{i}].scope must be a non-empty string if present")
 
             if not isinstance(name, str) or not name.strip():
                 errors.append(f"variables[{i}].name must be a non-empty string")
                 continue
 
-            if name in seen_names:
-                errors.append(f"Duplicate variable name: '{name}'")
-            seen_names.add(name)
+            key = (scope, name)
+            if key in seen:
+                errors.append(f"Duplicate variable '{name}' in scope '{scope}'")
+            seen.add(key)
 
             if var_type not in CoCreateValidator.VALID_VAR_TYPES:
                 errors.append(
@@ -567,7 +554,7 @@ Below is a complete format example (a short cyberpunk story in English):
   ],
   "variables": [
     {"name": "Stamina", "type": "number", "initial": 80},
-    {"name": "Trust", "type": "number", "initial": 10},
+    {"scope": "Mouse", "name": "Trust", "type": "number", "initial": 10},
     {"name": "Faction", "type": "string", "initial": "Freelancer"}
   ],
   "outline": [
@@ -637,8 +624,9 @@ Below is a complete format example (a short cyberpunk story in English):
 - **description** — 2-3 sentences: environment, lighting, atmosphere, key visual features.
 
 ## variables
-- Array of variable definitions. ≤3 total, ≤2 of type `number`, ≤1 of type `string`.
-- **name** — Variable name in the story language. Must be unique within the array.
+- Array of variable definitions. ≤$variable_cap total.
+- **scope** — (optional) Character name this variable belongs to. Omit for global variables.
+- **name** — Variable name in the story language. Must be unique within the same scope.
 - **type** — `number` or `string`. Number values are integers in [0, 100].
 - **initial** — Starting value. Must match the declared type.
 - Only create variables that drive branching or gate choices. Fewer is better.
@@ -670,7 +658,7 @@ Below is a complete format example (a short cyberpunk story in English):
 
 - Route `condition` referencing a variable not declared in `variables`.
 - Character `role` value outside the allowed set (`protagonist`, `supporting`, `antagonist`).
-- More than 2 `number` variables or more than 1 `string` variable.
+- More than $variable_cap variables total.
 
 # Before You Write — Plan Silently
 
@@ -761,6 +749,7 @@ class CoCreateFlow:
             language=lang,
             title_hint=meta["title_hint"],
             node_count_hint=node_count_hint,
+            variable_cap=str(VARIABLE_CAP),
         )
 
     @staticmethod

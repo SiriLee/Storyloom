@@ -7,6 +7,7 @@ from storyloom.config import (
     MIN_TAIL_LINES,
     LANGUAGE_SEG_LIMITS,
     DEFAULT_LANGUAGE,
+    GLOBAL_SCOPE,
 )
 
 
@@ -112,8 +113,8 @@ Below is a format example (content is a short fictional fantasy story in English
 025|   <opt key="1" branch="trust">Hear her out</opt>
 026|   <opt key="2" branch="refuse">Walk away — the job comes first</opt>
 027| </choice>
-028| <set var="trust" op="+" val="10" if="mission==1"/>
-029| <set var="trust" op="-" val="10" if="mission==2"/>
+028| <set var="Elena.trust" op="+" val="10" if="mission==1"/>
+029| <set var="Elena.trust" op="-" val="10" if="mission==2"/>
 030| <checkpoint node="ch2_revelation" summary="Kael learned the letter's true nature and chose whether to trust the stranger.">
 031|   <route if="mission==1" target="ch3_ally"/>
 032|   <route if="mission==2" target="ch3_alone"/>
@@ -153,7 +154,7 @@ Below is a format example (content is a short fictional fantasy story in English
 - Conditions support `and` / `or` (max one combinator) and reference variables from "Current State".
 
 **Set — State Changes**
-- `var` MUST use the exact names from "Current State" below. Do NOT invent, translate, or substitute them.
+- `var` MUST use the exact names from "Current State" below (character-scoped as `Scope.Name`). Do NOT invent, translate, or substitute them.
 - number: `op="+"` / `op="-"` / `op="="` with `val` as the number; string: `op="="`.
 - Condition syntax: same as Choice above.
 
@@ -226,7 +227,7 @@ class PromptBuilder:
         outline_text: str,
         current_node: str,
         goal: str,
-        state_vars: dict[str, int | str],
+        state_vars: dict[str, dict[str, int | str]],
         characters: list[dict] | None = None,
         locations: list[dict] | None = None,
         variables: list[dict] | None = None,
@@ -307,7 +308,7 @@ class PromptBuilder:
         outline_text: str,
         current_node: str,
         goal: str,
-        state_vars: dict[str, int | str],
+        state_vars: dict[str, dict[str, int | str]],
         variables: list[dict],
         bridge_text: str,
         rejected_changes: list[str] | None = None,
@@ -373,7 +374,7 @@ class PromptBuilder:
     @staticmethod
     def build_adventure_log_prompt(
         story_config: dict,
-        state_vars: dict,
+        state_vars: dict[str, dict[str, int | str]],
         outline_text: str,
         characters: list[dict] | None = None,
         locations: list[dict] | None = None,
@@ -405,9 +406,13 @@ class PromptBuilder:
         )
 
         # ── State vars ─────────────────────────────────────────────
-        state_lines = []
-        for name, value in state_vars.items():
-            state_lines.append(f"- {name}: {value}")
+        state_lines: list[str] = []
+        for scope, vars_dict in state_vars.items():
+            if scope != GLOBAL_SCOPE:
+                state_lines.append(f"[{scope}]")
+            for name, value in vars_dict.items():
+                prefix = "  " if scope != GLOBAL_SCOPE else ""
+                state_lines.append(f"- {prefix}{name}: {value}")
         state_text = "\n".join(state_lines) if state_lines else "(No state variables)"
 
         prompt = f"""You are an adventure log author. Write a player-facing recap for a completed text adventure game.
@@ -499,19 +504,38 @@ Requirements:
 
     @staticmethod
     def _format_current_state(
-        state_vars: dict[str, int | str],
+        state_vars: dict[str, dict[str, int | str]],
         variables: list[dict],
     ) -> str:
-        """Format current state values for prompt display.
+        """Format current state values grouped by scope.
 
-        Uses *variables* only for type lookup (number → ``/ 100`` suffix).
-        Values come from *state_vars* — always the actual runtime values.
+        GLOBAL vars are unindented with no heading; character-scoped vars
+        are displayed under ``[name]`` headers with 2-space indent.
+        Uses *variables* for type lookup (number → ``/ 100`` suffix).
         """
-        var_types = {v["name"]: v.get("type", "") for v in variables}
-        lines = []
-        for name, value in state_vars.items():
-            if var_types.get(name) == "number":
-                lines.append(f"{name}: {value} / 100")
-            else:
-                lines.append(f"{name}: {value}")
+        # Build scope-aware type lookup: (scope, name) → type
+        var_types: dict[tuple[str, str], str] = {}
+        for v in variables:
+            scope = v.get("scope") or GLOBAL_SCOPE
+            var_types[(scope, v["name"])] = v.get("type", "")
+
+        lines: list[str] = []
+        # GLOBAL first, then characters in insertion order
+        scopes = list(state_vars.keys())
+        if GLOBAL_SCOPE in scopes:
+            scopes.remove(GLOBAL_SCOPE)
+            scopes.insert(0, GLOBAL_SCOPE)
+
+        for scope in scopes:
+            vars_dict = state_vars.get(scope, {})
+            if not vars_dict:
+                continue
+            if scope != GLOBAL_SCOPE:
+                lines.append(f"[{scope}]")
+            for name, value in vars_dict.items():
+                prefix = "  " if scope != GLOBAL_SCOPE else ""
+                if var_types.get((scope, name)) == "number":
+                    lines.append(f"{prefix}{name}: {value} / 100")
+                else:
+                    lines.append(f"{prefix}{name}: {value}")
         return "\n".join(lines)
