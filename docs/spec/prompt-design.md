@@ -115,7 +115,7 @@
 | 完整 JSON 示例 + 屏障 | 英文示例展示 5 键完整结构与引用关系；显式声明示例仅供格式参考 | 示例先行、示例-规则屏障 |
 | 逐键字段规范 | 每个键的字段含义、约束、必填/可选；route target 引用规则 | 关键处不吝笔墨、具体优于抽象 |
 | 禁止模式 | 逐条列出 JSON 场景下的已知错误模式（含反例片段） | 显式禁止优于隐式模式、正反双重覆盖、反例约束 |
-| 自检清单 | 输出前逐项自查——引导 LLM 生成末尾做结构化验证 | 注意力标签 |
+| 无声规划 | 输出前引导 LLM 先想清故事全貌再落笔，不做逐项核查 | 注意力标签 |
 
 格式示例使用英文（与 §4 叙事 Prompt 的 Kael 示例策略一致），输出语言通过 `$language` 占位符控制。语言相关的轻量提示（`title_hint`）通过 `lang_meta/{lang}.json` 注入。
 
@@ -183,7 +183,7 @@ routes 元素：
 
 #### Prompt
 
-```
+````
 You are a story setup generator. Based on the conversation above, produce a complete, structured story configuration for a text adventure game.
 
 Write ALL content — title, premise, character names, node titles, goals, and variable names — in this language: $language.
@@ -283,7 +283,7 @@ Below is a complete format example (a short cyberpunk story in English):
   ]
 }
 
-**(The above is a format example ONLY. Generate an entirely new story setup based on the conversation, written in $language. Do NOT copy the example's characters, setting, or variable names.)**
+**(The above is a format example ONLY. Generate an entirely new story setup based on the conversation.)**
 
 # Field Specifications
 
@@ -318,14 +318,12 @@ Below is a complete format example (a short cyberpunk story in English):
 - **id** — `ch{number}_{english_abbreviation}`. e.g. `"ch1_intro"`, `"ch2_confrontation"`.
 - **title** — Chapter title in the story language.
 - **goal** — Chapter arc, not a single scene. Unfolds over several rounds. 2-3 sentences.
-- **routes** — Array of `{condition, target}` objects. **(IMPORTANT)** Every `target` must match word-for-word an `id` of some node in this outline. References to non-existent node IDs will cause the entire generation to be rejected.
+- **routes** — Array of `{condition, target}` objects. Every `target` must match word-for-word an `id` of some node in this outline.
 - Route `condition` may only reference variables declared in `variables`. Use `null` for unconditional / fallback routes.
-- **(IMPORTANT)** The **final node** must have `"routes": []` (empty array). The system detects endings by empty routes — no arrows, no placeholder text, no annotations.
+- The **final node** must have `"routes": []` (empty array). The system detects endings by empty routes — no arrows, no placeholder text, no annotations.
 
 # Prohibited
 
-- Wrapping the JSON in markdown code fences (```json ... ```).
-- Root value is not a JSON object — must be `{...}`, not `[...]` or a literal.
 - Route `target` not matching any node `id`. Example of what WILL be rejected:
 
   ```json
@@ -344,17 +342,17 @@ Below is a complete format example (a short cyberpunk story in English):
 - Character `role` value outside the allowed set (`protagonist`, `supporting`, `antagonist`).
 - More than 2 `number` variables or more than 1 `string` variable.
 
-# Verification Checklist
+# Before You Write — Plan Silently
 
-Before outputting, mentally verify:
+Decide on these silently, then output the JSON. Do not write your planning.
 
-[ ] characters: exactly 1 protagonist; all roles valid
-[ ] locations: non-empty array; every id is snake_case
-[ ] variables: ≤3 total, ≤2 number, ≤1 string;
-[ ] outline: every route target matches a node id; final node routes is empty array []
-[ ] No markdown fences; no text outside the JSON object
-[ ] All content in $language
-```
+1. **The story** — tier, premise, tone, language.
+2. **Who & where** — protagonist, supporting cast, key locations.
+3. **What changes** — the 1-3 variables that drive branches.
+4. **How it flows** — the outline as a directed graph. Every route target must
+   hit a real node; the final node must have `"routes": []`.
+5. **Self-check** — verify compliance with the format and field specifications above.
+````
 
 ---
 

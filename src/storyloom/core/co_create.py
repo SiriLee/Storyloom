@@ -508,7 +508,7 @@ Show genuine curiosity about the user's choices. Acknowledge their previous answ
 #   2. Complete JSON format example + barrier statement
 #   3. Per-key field specifications
 #   4. Prohibited patterns (with counter-examples)
-#   5. Verification checklist
+#   5. Silent planning — guide LLM to decide story shape before writing
 #
 # Design principles (§1.2): example-first, positive+negative dual coverage,
 # attention labels for error-prone rules, example-rule barrier, concrete
@@ -613,7 +613,7 @@ Below is a complete format example (a short cyberpunk story in English):
   ]
 }
 
-**(The above is a format example ONLY. Generate an entirely new story setup based on the conversation, written in $language. Do NOT copy the example's characters, setting, or variable names.)**
+**(The above is a format example ONLY. Generate an entirely new story setup based on the conversation.)**
 
 # Field Specifications
 
@@ -624,11 +624,11 @@ Below is a complete format example (a short cyberpunk story in English):
 - **premise** — Story premise. 2-4 sentences: world, protagonist situation, core conflict. This is the foundation the narrative engine uses to maintain consistency.
 
 ## characters
-- Array of character objects. At least 1 element. **(IMPORTANT)** Exactly 1 protagonist.
+- Array of character objects. At least 1 element.
 - **name** — Character name in the story language.
 - **role** — `protagonist`, `supporting`, or `antagonist`.
 - **description** — Identity background + personality traits. For protagonist: who they are, what drives them. For others: who they are, their relationship to the protagonist.
-- **appearance** — 2-3 sentences: physique, facial features, clothing style. Used for image generation.
+- **appearance** — 2-3 sentences: physique, facial features, clothing style.
 
 ## locations
 - Array of location objects. At least 1 element.
@@ -648,15 +648,12 @@ Below is a complete format example (a short cyberpunk story in English):
 - **id** — `ch{number}_{english_abbreviation}`. e.g. `"ch1_intro"`, `"ch2_confrontation"`.
 - **title** — Chapter title in the story language.
 - **goal** — Chapter arc, not a single scene. Unfolds over several rounds. 2-3 sentences.
-- **routes** — Array of `{condition, target}` objects. **(IMPORTANT)** Every `target` must match word-for-word an `id` of some node in this outline. References to non-existent node IDs will cause the entire generation to be rejected.
+- **routes** — Array of `{condition, target}` objects. Every `target` must match word-for-word an `id` of some node in this outline.
 - Route `condition` may only reference variables declared in `variables`. Use `null` for unconditional / fallback routes.
-- **(IMPORTANT)** The **final node** must have `"routes": []` (empty array). The system detects endings by empty routes — no arrows, no placeholder text, no annotations.
+- The **final node** must have `"routes": []` (empty array). The system detects endings by empty routes — no arrows, no placeholder text, no annotations.
 
 # Prohibited
 
-- Wrapping the JSON in markdown code fences (```json ... ```).
-- Root value is not a JSON object — must be `{...}`, not `[...]` or a literal.
-- Missing or extra top-level keys. The object must have exactly 5 keys: `story_config`, `characters`, `locations`, `variables`, `outline`.
 - Route `target` not matching any node `id`. Example of what WILL be rejected:
 
   ```json
@@ -674,20 +671,17 @@ Below is a complete format example (a short cyberpunk story in English):
 - Route `condition` referencing a variable not declared in `variables`.
 - Character `role` value outside the allowed set (`protagonist`, `supporting`, `antagonist`).
 - More than 2 `number` variables or more than 1 `string` variable.
-- More or fewer than exactly 1 `role: "protagonist"` character.
 
-# Verification Checklist
+# Before You Write — Plan Silently
 
-Before outputting, mentally verify:
+Decide on these silently, then output the JSON. Do not write your planning.
 
-[ ] story_config: tier is exactly short/medium/long; title 1-30 chars; premise non-empty
-[ ] characters: non-empty array; exactly 1 protagonist; all roles valid; name/description/appearance non-empty
-[ ] locations: non-empty array; every id is snake_case; name/description non-empty
-[ ] variables: ≤3 total, ≤2 number, ≤1 string; number values in [0, 100]; names unique
-[ ] outline: every route target matches a node id; final node routes is empty array []
-[ ] outline: every condition variable declared in variables
-[ ] No markdown fences; no text outside the JSON object
-[ ] All content in $language
+1. **The story** — tier, premise, tone, language.
+2. **Who & where** — protagonist, supporting cast, key locations.
+3. **What changes** — the 1-3 variables that drive branches.
+4. **How it flows** — the outline as a directed graph. Every route target must
+   hit a real node; the final node must have `"routes": []`.
+5. **Self-check** — verify compliance with the format and field specifications above.
 """)
 
 
