@@ -50,6 +50,7 @@ Full documentation index with reading order and authority hierarchy: [`docs/READ
 
 | Document | Role |
 |----------|------|
+| `docs/theory/` | Design philosophy — timing model, bridge mechanism, core problems |
 | `docs/spec/exec-flow.md` | Execution pipeline — **authoritative** |
 | `docs/spec/block-spec.md` | XML element syntax — **authoritative** |
 | `docs/spec/prompt-design.md` | Prompt templates — **authoritative** |
