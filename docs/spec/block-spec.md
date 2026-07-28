@@ -24,7 +24,7 @@ LLM 输出使用 XML 格式，根元素为 `<story>`。程序通过 `StreamingXm
 |------|------|---------|---------|------|
 | 叙事段 | `<seg>` | 任意 | 0-N | 每个叙事段。text node 为内容。行号通过 `NNN\| ` 行前缀标注（非 XML 属性） |
 | 分支容器 | `<branch>` | 任意 | 0-N | 分支叙事容器。name 属性标识分支名。内含 `<seg>` 子元素 |
-| 选项 | `<choice>` | 仅 bridge 前 | 0-1 | 玩家选项列表。id 属性为变量名。内含 `<opt>` 子元素 |
+| 选项 | `<choice>` | 仅 bridge 前 | 0-N | 玩家选项列表。id 属性为变量名。内含 `<opt>` 子元素 |
 | 选项项 | `<opt>` | 含在 `<choice>` 内 | 2-4 | 单个选项。key 为数字键（1/2/3/4），branch 为分支名 |
 | 状态变更 | `<set>` | 仅 bridge 前 | 0-N | 状态变量变更。var/op/val 属性为必填，if 属性可选 |
 | 检查点 | `<checkpoint>` | 仅 bridge 前 | 0-1 | 大纲路由。node/summary 属性。内含 `<route>` 子元素 |
@@ -176,7 +176,6 @@ LLM 输出使用 XML 格式，根元素为 `<story>`。程序通过 `StreamingXm
 - bridge 之前的 `<branch>` 用于预路由（多选项的局部小叙事）
 - bridge 之后的 `<branch>` 用于选项后果分支
 - `name` 必须与 `<opt>` 的 `branch` 属性精确对应
-- `<branch>` 内只能有 `<seg>`，不能嵌套其他元素
 
 ### `<choice>`
 
@@ -198,8 +197,6 @@ LLM 输出使用 XML 格式，根元素为 `<story>`。程序通过 `StreamingXm
 | `if` | 否 | 条件表达式，满足才可选。格式 `变量名 运算符 值` |
 
 处理逻辑：展示选项 → 玩家选择 → `choice_dict["chip_choice"] = N` → 设置 `current_branch = opt.branch`。
-
-> **约束**：同一个 `<story>` 内最多一个 `<choice>`。
 
 ### `<set>`
 
@@ -256,7 +253,7 @@ LLM 输出使用 XML 格式，根元素为 `<story>`。程序通过 `StreamingXm
 | 属性 | 必填 | 说明 |
 |------|------|------|
 | `node` | 是 | 节点 ID。必须原样复制大纲 ID，禁止拼接后缀。无 `<route>` 子元素时表示结局节点 |
-| `summary` | 是 | 1-2 句中文摘要 |
+| `summary` | 是 | 2-4 句摘要，概括已完成章节的关键事件 |
 
 **`<route>` 属性**：
 
