@@ -45,7 +45,7 @@ class TestBuildRound1:
     def test_round1_contains_role_definition(self):
         pb = PromptBuilder()
         result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES)
-        assert "narrative engine" in result
+        assert "text adventure game" in result
 
     def test_round1_contains_xml_format_spec(self):
         pb = PromptBuilder()
@@ -57,8 +57,8 @@ class TestBuildRound1:
     def test_round1_contains_format_example(self):
         pb = PromptBuilder()
         result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES)
-        assert "Rain hammered" in result
-        assert "Innkeeper" in result
+        assert "Sleeping Fox" in result
+        assert "Greta" in result
 
     def test_round1_contains_story_context(self):
         pb = PromptBuilder()

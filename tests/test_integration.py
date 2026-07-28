@@ -173,7 +173,7 @@ class TestIntegration:
 
         msgs = cm.get_messages()
         assert msgs[0]["content"] == r1
-        assert "narrative engine" in msgs[0]["content"]
+        assert "text adventure game" in msgs[0]["content"]
         assert "<story>" in msgs[0]["content"]
 
     def test_bridge_text_flows_between_rounds(self):
