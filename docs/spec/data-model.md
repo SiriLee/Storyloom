@@ -18,8 +18,8 @@ game_state = GameState()
 game_state.story_config   = {tier, title, language, premise}
 game_state.characters     = [{name, role, description, appearance}, ...]
 game_state.locations      = [{id, name, description}, ...]
-game_state.variables      = [{name, type, initial}, ...]
-game_state.state_vars     = init_from_variables(variables)      // 初始值深拷贝
+game_state.variables      = [{scope?, name, type, initial}, ...]  // scope 第一个字段，省略 = GLOBAL
+game_state.state_vars     = {scope: {name: value}}               // 初始值按 scope 分组
 game_state.outline        = [{id, title, goal, routes, +status, +summary}, ...]
   // 引擎附加 status（首节点 "active"，其余 "pending"）与 summary（初始 null）
   // LLM 产出 id / title / goal / routes，不输出 status / summary
@@ -128,8 +128,8 @@ saves/
 | `story_config` | 共创结束后首次写入 | 4 字段：tier、title、language、premise |
 | `characters` | 共创结束后首次写入 | 角色数组，每项含 name / role / description / appearance |
 | `locations` | 共创结束后首次写入 | 地点数组，每项含 id / name / description |
-| `variables` | 共创结束后首次写入 | 变量定义数组，每项含 name / type / initial。顶层存储，不再嵌套于 story_config |
-| `state_vars` | 共创结束后写入初始值，后续随 `<set>` 变更 | 运行时状态值，以 variables 为类型定义 |
+| `variables` | 共创结束后首次写入 | 变量定义数组，每项含 scope（可选）、name、type、initial。顶层存储 |
+| `state_vars` | 共创结束后写入初始值，后续随 `<set>` 变更 | 运行时状态值，嵌套：`{scope: {name: value}}`。以 variables 为类型定义 |
 | `outline` | 每次 checkpoint 时更新 | 每个节点含 id / title / goal / status / summary / routes。status 标记推进状态，summary 在 checkpoint 时写入当前节点 |
 | `progress.checkpoint_snapshots` | 每次 checkpoint 时追加 | 为 Phase 2 回档预留，Phase 1 仅存储不读取 |
 
@@ -152,9 +152,8 @@ saves/
 |------|--------|------|
 | `STORY_TITLE_MIN_CHARS` | 1 | 故事标题最短字符数 |
 | `STORY_TITLE_MAX_CHARS` | 30 | 故事标题最长字符数 |
-| `VARIABLE_CAP` | 3 | 变量总数上限（per 2026-07-05 variable-cap spec） |
-| `VARIABLE_NUMERIC_CAP` | 2 | number 型变量上限 |
-| `VARIABLE_STRING_CAP` | 1 | string 型变量上限 |
+| `VARIABLE_CAP` | 6 | 变量全局总数上限（不管 scope 或类型） |
+| `GLOBAL_SCOPE` | `"GLOBAL"` | 默认作用域标识（变量无 scope 时归属此 scope） |
 | `SUPPORTED_LANGUAGES` | `{"zh-CN", "zh-TW", "en"}` | 支持的语言集合 |
 | `DEFAULT_LANGUAGE` | `"en"` | 默认语言（语言未指定或不受支持时的 fallback） |
 
@@ -210,6 +209,8 @@ saves/
 | `BRIDGE_SEGMENT_RATIO` | 0.4 | 重命名为 `BRIDGE_POSITION_RATIO`，值更新为 0.75，已弃用 |
 | `MIN_NARRATION_CHARS` | 200 | 行号格式下每行即一段，字数由 Prompt 端 `LANGUAGE_SEG_LIMITS` 约束，已弃用 |
 | `AUTO_ADVANCE_DELAY_MS` | 500 | 仅 CLI 测试工具使用（控制自动推进间隔），Web UI 自行管理展示节奏，已弃用 |
+| `VARIABLE_NUMERIC_CAP` | 2 | scoped variables 取消类型数量限制，已弃用 |
+| `VARIABLE_STRING_CAP` | 1 | scoped variables 取消类型数量限制，已弃用 |
 
 ---
 

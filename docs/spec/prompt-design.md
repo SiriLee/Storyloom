@@ -151,11 +151,12 @@
 
 #### 3.2.5 variables
 
-数组，≤3 总量，≤2 number，≤1 string。
+数组，≤VARIABLE_CAP 总量。
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `name` | string | 是 | 变量名（故事语言），不可重复 |
+| `scope` | string | 否 | 作用域（角色名 或 `"GLOBAL"`）。省略 = `"GLOBAL"`。必须是第一个字段 |
+| `name` | string | 是 | 变量名（故事语言），同 scope 内不可重复 |
 | `type` | `"number"` \| `"string"` | 是 | number 初始值须在 [0, 100] |
 | `initial` | number \| string | 是 | 初始值 |
 
@@ -237,7 +238,7 @@ Below is a complete format example (a short cyberpunk story in English):
   ],
   "variables": [
     {"name": "Stamina", "type": "number", "initial": 80},
-    {"name": "Trust", "type": "number", "initial": 10},
+    {"scope": "Mouse", "name": "Trust", "type": "number", "initial": 10},
     {"name": "Faction", "type": "string", "initial": "Freelancer"}
   ],
   "outline": [
@@ -307,8 +308,9 @@ Below is a complete format example (a short cyberpunk story in English):
 - **description** — 2-3 sentences: environment, lighting, atmosphere, key visual features.
 
 ## variables
-- Array of variable definitions. ≤3 total, ≤2 of type `number`, ≤1 of type `string`.
-- **name** — Variable name in the story language. Must be unique within the array.
+- Array of variable definitions. ≤$variable_cap total.
+- **scope** — Optional: a character name. Omit for global variables.
+- **name** — Variable name in the story language. Unique within its scope.
 - **type** — `number` or `string`. Number values are integers in [0, 100].
 - **initial** — Starting value. Must match the declared type.
 - Only create variables that drive branching or gate choices. Fewer is better.
@@ -340,7 +342,7 @@ Below is a complete format example (a short cyberpunk story in English):
 
 - Route `condition` referencing a variable not declared in `variables`.
 - Character `role` value outside the allowed set (`protagonist`, `supporting`, `antagonist`).
-- More than 2 `number` variables or more than 1 `string` variable.
+- More than $variable_cap variables total.
 
 # Before You Write — Plan Silently
 
@@ -348,7 +350,7 @@ Decide on these silently, then output the JSON. Do not write your planning.
 
 1. **The story** — tier, premise, tone, language.
 2. **Who & where** — protagonist, supporting cast, key locations.
-3. **What changes** — the 1-3 variables that drive branches.
+3. **What changes** — the key variables that drive branches.
 4. **How it flows** — the outline as a directed graph. Every route target must
    hit a real node; the final node must have `"routes": []`.
 5. **Self-check** — verify compliance with the format and field specifications above.
@@ -536,8 +538,8 @@ Below is a format example (content is a short fictional fantasy story in English
 025|   <opt key="1" branch="trust">Hear her out</opt>
 026|   <opt key="2" branch="refuse">Walk away — the job comes first</opt>
 027| </choice>
-028| <set var="trust" op="+" val="10" if="mission==1"/>
-029| <set var="trust" op="-" val="10" if="mission==2"/>
+028| <set var="Elena.trust" op="+" val="10" if="mission==1"/>
+029| <set var="Elena.trust" op="-" val="10" if="mission==2"/>
 030| <checkpoint node="ch2_revelation" summary="Kael learned the letter's true nature and chose whether to trust the stranger.">
 031|   <route if="mission==1" target="ch3_ally"/>
 032|   <route if="mission==2" target="ch3_alone"/>
@@ -577,7 +579,7 @@ Below is a format example (content is a short fictional fantasy story in English
 - Conditions support `and` / `or` (max one combinator) and reference variables from "Current State".
 
 **Set — State Changes**
-- `var` MUST use the exact names from "Current State" below. Do NOT invent, translate, or substitute them.
+- `var` MUST use the exact names from "Current State" below (character-scoped as `Scope.Name`). Do NOT invent, translate, or substitute them.
 - number: `op="+"` / `op="-"` / `op="="` with `val` as the number; string: `op="="`.
 - Condition syntax: same as Choice above.
 
@@ -658,7 +660,7 @@ The active node may take several rounds to reach. Do not force progress — simp
 |------|------|
 | `outline_text` | 完整大纲树，含 `[completed]`/`[active]`/`[pending]` 状态标记和路由关系 |
 | `active_node` / `node_goal` | 当前节点 ID 及其叙事目标 |
-| `state_vars_text` | 所有变量的当前值。number 类型带 `/ 100` 上限后缀，string 类型不带 |
+| `state_vars_text` | 变量当前值，按 `[scope]` 分组。number 类型带 `/ 100` 后缀 |
 | `error_feedback` | 可选。上轮被拒的变量变更 + 格式错误提醒。首轮留空 |
 | `bridge_text` | 上轮 `<bridge/>` 之后过滤出的纯文本。首轮填入起始占位符 |
 | `MIN_LINES` / `MAX_LINES` | 输出行数范围，与首轮前缀中的约束一致 |
@@ -682,8 +684,9 @@ ch4_safehouse [pending] — 安全屋：揭开芯片秘密（结局）
 
 **Current State:**
 体力: 80 / 100
-信任度: 10 / 100
 所属势力: 自由佣兵
+[耗子]
+  信任度: 10 / 100
 
 Output 150-300 total lines. Exactly one `<bridge/>`. Less is fine — do not pad to hit the upper bound.
 Choices aren't just for branching — place them freely as moments of play and interaction.
@@ -708,8 +711,9 @@ ch4_safehouse [pending] — 安全屋：揭开芯片秘密（结局）
 
 **Current State:**
 体力: 60 / 100
-信任度: 25 / 100
 所属势力: 自由佣兵
+[耗子]
+  信任度: 25 / 100
 
 Rejected state changes from last round:
   - 体力变更被拒：超出范围[0,100]
@@ -818,10 +822,11 @@ Write a chapter-by-chapter recap based on the outline and summaries above.
 above — do not fabricate.)
 
 ## Final State
-- 体力: 25
-- 理智值: 50
-- 信任度: 20
-- 所属势力: 抵抗组织
+体力: 25
+理智值: 50
+所属势力: 抵抗组织
+[耗子]
+  信任度: 20
 (For each variable, write a brief one-sentence reflection.)
 
 Requirements:

@@ -141,7 +141,7 @@ LLM 输出使用 XML 格式，根元素为 `<story>`。程序通过 `StreamingXm
 
 **`choice_dict` 修改来源**：`<choice>` 的 `id` 属性声明 choice 名，玩家选择后 `choice_dict[id] = 选项数字键序号`。
 
-> **条件变量解析优先级**（适用于所有条件求值场景）：`choice_dict > state_vars`。
+> **条件变量解析优先级**（适用于所有条件求值场景）：含 `.` 的变量名拆为 `scope.var`，从对应 scope 取值；裸名称先查 `choice_dict`，再查 `state_vars["GLOBAL"]`。
 
 ---
 
@@ -207,7 +207,7 @@ LLM 输出使用 XML 格式，根元素为 `<story>`。程序通过 `StreamingXm
 
 ```xml
 <set var="体力" op="-" val="10"/>
-<set var="信任度" op="+" val="5" if="approach==1"/>
+<set var="耗子.信任度" op="+" val="5" if="approach==1"/>
 <set var="线索" op="+" val="神秘芯片"/>
 <set var="所属势力" op="=" val="叛军"/>
 <set var="背包" op="-" val="旧钥匙"/>
@@ -217,7 +217,7 @@ LLM 输出使用 XML 格式，根元素为 `<story>`。程序通过 `StreamingXm
 
 | 属性 | 必填 | 说明 |
 |------|------|------|
-| `var` | 是 | 变量名（中文） |
+| `var` | 是 | 变量名。`scope.name` 指定作用域，裸名称 = GLOBAL |
 | `op` | 是 | 操作符：`+`（number 加减），`-`（number 减），`=`（赋值） |
 | `val` | 是 | 操作值 |
 | `if` | 否 | 条件表达式。满足才执行。格式 `变量名 运算符 值`，用 `and`/`or` 组合（最多一个） |
@@ -322,7 +322,8 @@ for each <set> element:
     if condition and not evaluate(condition):
         continue    # 条件不满足，跳过
 
-    var_def = find_var_in_story_config(var)
+    scope, var_name = split_scope(var)   # dot → (scope, name); 裸名称 → (GLOBAL, name)
+    var_def = find_var_in_variables(scope, var_name)
     if not var_def:
         rejected_changes.append({set_element, reason: "变量不存在"})
         continue
