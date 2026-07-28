@@ -6,6 +6,203 @@
 
 ---
 
+## 2026-07-28（周二）
+
+> **概述**：10 次提交，两大核心功能落地——作用域变量（Scoped Variables）和叙事首轮 Prompt 前缀重设计，配套设计理论体系完善、共创 Prompt 无声规划模式、文档清理。版本号 1.1.0 → 1.1.1。315 测试全绿。
+
+### 设计理论基础建设——三项范式框架 + 核心问题定义
+
+**背景**：Storyloom 已有一套成熟的设计哲学（桥接、时序模型、双队列缓冲、本地数据优先），但这些理念散落在 spec 文档、工程日志、代码注释中——缺乏一个系统化的"为什么这样做"的理论陈述。需要一份不可撼动的设计基石文档，与 spec（"怎么做"）形成互补。
+
+**决策**（commits `e75946e`, `70f968a`）：建立 `docs/theory/` 三个理论文件：
+
+1. **`theory/README.md`**（07-27 晚，`e75946e`）：三项范式框架——
+   - **范式一（批量生成）**：AI 一次性产出全部内容，交互与生成分离。自由度高、延迟为零，但内容预设
+   - **范式二（完全实时）**：每次输入实时响应。自由度极高，但延迟直接暴露
+   - **Storyloom（第三方向）**：以实时生成为基础，在用户消费期间完成生成（而非等待期间），通过结构化输出创造生成与展示的重叠窗口
+   - 四个维度对比表（自由度/延迟/质量保证/状态）
+   - 三个核心问题：① 内容质量保证（无人介入下的格式+逻辑把关）→ ② 消解生成延迟（让等待发生在体验期间，而非等待期间）→ ③ 自由度与延迟的矛盾（桥接以预期范围为前提，自由度与隐藏延迟方向相反）
+
+2. **`theory/timing-model.md`**（07-28 早，`70f968a`）：延迟结构分析——
+   - 指标重定义：TTFT（首字时间）vs 总生成时间——是两回事
+   - 三因素模型：API 延迟 → Token 生成速率 → 内容消费速率
+   - 三层流式模型（引擎→解析→展示）+ 双队列缓冲架构
+   - 流式必然性论证：如果 LLM 生成比人阅读慢，唯一出路是让生成与展示重叠——流式解析是实现这一点的必要（但不充分）条件
+
+3. **`theory/bridge-mechanism.md`**（07-28 早，`70f968a`）：桥接机制理论——
+   - 核心思想：在玩家阅读当前内容时预获取下一轮内容
+   - 三个可行性条件：结构化输出（有明确的"触发点"） + 可预测的输入空间（有限选项） + 生成与展示的重叠窗口
+   - 设计约束：桥接位置不能太早（生成内容可能浪费）也不能太晚（窗口不够用）
+   - 作为合成点：桥接机制是全部设计维度（Prompt 工程、流式解析、时序模型、状态管理）的交汇点
+
+**更新规则**（`theory/README.md`）：theory 仅在重大理念转变时修改（与 spec 随实现频繁更新形成对比）。新增文件（如图像生成理论）可追加。
+
+**依据**：commits `e75946e`, `70f968a`；`docs/theory/README.md`、`timing-model.md`、`bridge-mechanism.md`。
+
+### 文档体系收尾——删除 course/，theory 引用贯通，obsolete 脚本清理
+
+**背景**：理论文档到位后，三个清理动作：
+1. `docs/course/`（课程评估报告 + 项目提案，共 1209 行）的理论性内容已提取到 `docs/theory/`，剩余课程特定内容无持续价值
+2. `docs/README.md` 和 `CLAUDE.md` 的文档索引未包含 `theory/`
+3. `scripts/rename_label_to_title.py`（label→title 批量重命名工具脚本，331 行）在重命名完成后属一次性工具
+
+**决策**（commits `280ae6c`, `34abd78`, `6b96ae0`）：
+- 删除 `docs/course/` 全部内容（`course-project-proposal.md` + `report.md`）
+- `docs/README.md` 新增 `theory/` 到文档地图、阅读顺序、权威层级；`CLAUDE.md` 文档表新增 `theory/` 条目
+- 删除 `scripts/rename_label_to_title.py`
+
+**依据**：commits `280ae6c`, `34abd78`, `6b96ae0`。
+
+### 共创 Prompt：Verification Checklist → Plan Silently（无声规划模式）
+
+**背景**：共创生成 Prompt 的 "Verification Checklist"（8 项自检清单）与前面的 Field Specifications 和 Prohibited 内容高度重复——只是换了一种罗列方式。更根本的问题是：它以"输出后逐项对标"为逻辑，但 LLM 是自回归模型——token 产出后不可撤销，输出后对标已无意义。正确的方式是引导 LLM 在输出前做好无声规划。
+
+**决策**（commit `330741c`）：删除完整的 Checklist 段，替换为 "Before You Write — Plan Silently" 指南：
+
+```
+1. The story — tier, premise, tone, language.
+2. Who & where — protagonist, supporting cast, key locations.
+3. What changes — the 1-3 variables that drive branches.
+4. How it flows — the outline as a directed graph.
+5. Self-check — verify compliance with the format and field specifications above.
+```
+
+5 步规划按因果依赖排序（故事→角色→变量→大纲→自检），引导 LLM 在生成 JSON 前先完成创意决策。同时修剪 Prohibited 段中与 Field Specs 重复的条目（markdown fences、root type、missing keys、protagonist count 等约束已在别处覆盖），移除过度 注标签（`(IMPORTANT)`），barrier statement 简化。
+
+**关键理念转变**：从"输出后逐一核对"（verification mindset）到"写之前想清楚"（planning mindset）——对齐 LLM 的自回归生成本质。
+
+**依据**：commit `330741c`；`src/storyloom/core/co_create.py`（+28/-36 行）；`docs/spec/prompt-design.md` §3.2。
+
+### 作用域变量（Scoped Variables）——`Scope.Name` 点号表示法
+
+**背景**：v2 数据模型引入 characters/locations/variables 后，变量系统的局限性暴露：所有变量是全局的（`state_vars` 为 `{name: value}` 扁平字典），角色专属变量（如"好感度"）无法跨角色共存——如果两个角色都有"信任度"，无法区分。且上限 3 个变量（`VARIABLE_CAP=3`）过于严格。类型数量限制（≤2 number、≤1 string）在无字符作用域场景下有意义（防止变量泛滥），但在有作用域后反而是不必要的约束。
+
+**决策**（spec `1f8ebd8` + impl `ff78838`）：引入作用域（Scope）概念，使用 `Scope.Name` 点号表示法。
+
+**核心变更**：
+
+| 维度 | 旧 | 新 |
+|------|-----|-----|
+| `state_vars` 结构 | `{name: value}` 扁平字典 | `{scope: {name: value}}` 嵌套字典 |
+| 变量引用 | `体力`（裸名称） | `耗子.信任度`（点号分隔）或 `体力`（GLOBAL） |
+| `VARIABLE_CAP` | 3 | 6（全 scope 总量） |
+| 类型上限 | ≤2 number, ≤1 string | 无类型数量限制 |
+| `GLOBAL_SCOPE` | 无 | `"GLOBAL"`（默认 scope） |
+| `SAVE_VERSION` | 2 | 3（breaking change） |
+
+**引擎变更**（`game_loop.py`）：
+- `GameState.__init__`：初始化时从 `scope` 字段（缺省=GLOBAL）分组存储 `_state_vars` 和 `_var_types`
+- `GameState._split_var(var)`：新增静态方法——含 `.` 的变量名拆为 `(scope, name)`，裸名称返回 `(GLOBAL_SCOPE, name)`
+- `GameState.apply_set()`：解析 scope → 在当前 scope 的字典中查找/操作变量。拒绝原因中显示原始变量引用（含 scope 前缀）便于调试
+- `GameState._apply_number_op()` / `_apply_string_op()`：接受 `scope` 参数，操作 `_state_vars[scope][name]`
+- `GameState.from_dict()` / `to_dict()`：嵌套序列化
+- 条件求值（`block-spec.md`）：含 `.` 的变量名从对应 scope 取值；裸名称先查 `choice_dict` 再查 `state_vars["GLOBAL"]`
+
+**共创验证器变更**（`co_create.py`）：
+- `validate_variables()`：删除 numeric/string 类型上限检查，新增同 scope 内重复检测（跨 scope 同名合法）
+- `validate_outline_cross_ref()`：scope 感知的变量引用验证
+- `CO_CREATE_GENERATION_PROMPT`：变量数量约束从 "≤3 total, ≤2 number, ≤1 string" 改为 "≤$variable_cap total"，新增 scope 字段说明，格式示例含 `{"scope": "Mouse", "name": "Trust", ...}`
+
+**Prompt 变更**（`prompt_builder.py`）：
+- `_format_current_state()`：按 scope 分组——GLOBAL 变量无缩进无标题，角色 scope 显示 `[角色名]` 标题 + 2 空格缩进
+- `_format_story_context()` / `build_adventure_log_prompt()`：`state_vars` 类型签名从 `dict[str, int | str]` 改为 `dict[str, dict[str, int | str]]`
+- `ROUND1_PREFIX`：格式示例中 `<set var="trust"...` 改为 `<set var="Elena.trust"...`
+- 状态展示格式：
+  ```
+  体力: 80 / 100
+  所属势力: 自由佣兵
+  [耗子]
+    信任度: 10 / 100
+  ```
+
+**Session 适配**（`session.py`）：`_build_init_dict()` 构建嵌套 `state_vars`（`state_vars.setdefault(scope, {})[name] = initial`）。
+
+**config.py**：`VARIABLE_CAP 3→6`，删除 `VARIABLE_NUMERIC_CAP`/`VARIABLE_STRING_CAP`，新增 `GLOBAL_SCOPE = "GLOBAL"`，`SAVE_VERSION 2→3`。
+
+**存储层**：`save_manager.py` 无需修改——`SAVE_VERSION` 升级自动拒绝旧存档（用户决定）。`state_vars` 序列化格式自然跟随嵌套结构。
+
+**测试**：315 passed，fixtures 和断言全面适配嵌套格式。关键新增：同 scope 重复检测、跨 scope 同名合法、`_split_var` 解析验证。
+
+**设计考量**：
+- `GLOBAL_SCOPE` 常量而非硬编码字符串——引擎内部统一引用，未来可改（如 `"global"` 或 `"_GLOBAL_"`）
+- 裸变量名隐式归属 GLOBAL——向后兼容纯全局变量的旧存档（虽然 SAVE_VERSION bump 会拒绝它们，但迁移逻辑只需加 `scope: "GLOBAL"` 字段）
+- 跨 scope 同名变量合法——不同角色的"好感度"独立，在共创验证器中通过
+
+**依据**：commits `1f8ebd8`, `ff78838`；`docs/spec/data-model.md` §A.2；`docs/spec/block-spec.md` §5；`docs/spec/prompt-design.md` §3.2.5, §4.2-4.3。
+
+### 叙事首轮 Prompt 前缀重设计——从"规则罗列"到"示例驱动 + 统一需求模板"
+
+**背景**：`ROUND1_PREFIX`（~200 行 Python 字符串）是叙事引擎最重要的 Prompt——Round 1 作为永久锚定消息，其质量直接影响 LLM 在所有后续轮次的行为基线。但旧版存在两个结构性问题：
+
+1. **伪代码示例无约束力**：旧版 "Structure" 示例全部是占位符（`narration text`、`option text`、`outcome narration`），只有结构骨架无叙事内容——LLM 看到的模板是骨架性的，无法传达"好的输出长什么样"
+2. **规则与元素定义混杂**：Elements 描述、Core Rules、Quality Requirements 三个段落之间存在大量交叉引用和重复——同一约束（如 `<choice>` 的 `id` 引用规则、`<set>` 的 `var` 命名规则）在多处出现，修改时容易遗漏不一致
+3. **禁止清单过于庞杂**：旧版 Prohibited 列出 9 项禁止（含对话引号、代词角色名等），其中大部分是元素规范的自然推论——既重复又削弱了核心禁止项的注意力权重
+4. **缺少创作引导**：旧版纯粹是"格式规范 + 约束清单"——告知 LLM 不能做什么、必须包含什么，但未引导它如何将大纲中的故事目标转化为具体叙事
+
+**决策**（spec `229facf` + impl `65031d3`）：全面重设计 `ROUND1_PREFIX`，对齐 §1.2 的设计原则（示例先行、正反双重覆盖、统一模板、无声规划）。
+
+**新设计结构**：
+
+```
+# Output Format — 简化：仅行号 + XML-only 约束
+# Examples — 两个完整故事示例（各 ~50 行）
+# Requirements — 4 个元素 × 统一模板
+# Prohibited — 3 项高频顽固错误
+# Before You Write — 5 步无声规划
+```
+
+**两个完整示例**（替代旧版单骨架示例）：
+- **Example 1**（Kael 酒馆线）：展示"多选择无 checkpoint"场景——纯粹的角色互动和氛围建立，不触发节点推进。元素覆盖：多角色对话、`<set>`、`<branch>` 交织、post-bridge 连贯叙事
+- **Example 2**（Elena 古墓线）：展示"选择+checkpoint+双路线"场景——结局节点触发、scope 变量（`Silan.loyalty`）、`<route>` 条件路由、post-bridge 分化叙事
+
+两个示例互补覆盖全部功能维度——LLM 看到的不再是骨架，而是完整的输出形态。
+
+**统一需求模板**（每个元素规范化描述）：
+```
+## <element> — 标题
+**Purpose**: 一句话定义
+**Attributes**: (如适用) 属性表（Required/Description）
+**Requirements**: 编号列表——具体规则
+**Snippet**: (如适用) 代码片段
+```
+
+四个元素：`<seg>`、`<branch>`、`<choice>+<opt>`、`<set>`。新增元素按相同模板插入即可——模板化设计便于增量扩展。
+
+**Prohibited 瘦身**：从 9 项缩减为 3 项高频顽固错误——
+1. `<bridge/>` 数量不为 1
+2. `<choice>`/`<set>`/`<checkpoint>` 在 bridge 之后（post-bridge 区域违规）
+3. `<checkpoint>` `node` 或 `<route>` `target` 与大纲 node ID 不匹配
+
+削减理由：其余 6 项（对话引号、代词角色名、`<set>` var 不存在、未到 checkpoint 节点提前触发、markdown fences、文本在 XML 外）或为元素规范的直接推论（对话格式已在 `<seg>` Requirements 中约束），或极少被触发——从 Prohibited 移除不会增加违规率，但可让保留的三项的注意力权重更集中。
+
+**Before You Write（无声规划）**：借鉴共创 Prompt 的 Plan Silently 模式——5 步按因果依赖排序：
+1. **节点大意**——本轮要达成的叙事目标
+2. **场景与人物**——出场的角色和地点
+3. **铺垫 → 交互**——构建到选择点的叙事推进
+4. **分支后果**——每个选项的即时叙事后果
+5. **Post-bridge 展开**——桥后的叙事发展
+
+**block-spec 同步**：放宽两项约束——
+- `at most one <choice>` → 0-N（可容纳无选择纯叙事轮次）
+- `<branch>` can only contain `<seg>` 删除——允许更灵活的分支内容结构
+- checkpoint summary 从 "1 sentence" 放宽为 "2-4 sentences"
+
+**代码清理**（`prompt_builder.py`）：移除 4 个未使用的格式参数（`MIN_TAIL`、`REF_PRE`、`REF_SINGLE`、`REF_HALF`）及对应的 bridge 位置计算逻辑；`MIN_TAIL_LINES` 导入移除（常量保留于 config.py）。
+
+**测试**：2 个断言更新（匹配新 Prompt 文本和示例内容）。315 tests green。
+
+**依据**：commits `229facf`, `65031d3`；`docs/spec/prompt-design.md` §4.2；`docs/spec/block-spec.md`。
+
+### 版本 1.1.1 + 清理
+
+**背景**：累计变更——作用域变量（breaking SAVE_VERSION 2→3）+ 首轮 Prompt 重设计 + 共创无声规划模式 + 理论文档体系——达到 patch 版本级别。
+
+**决策**（commit `2cc67b7`）：版本号 1.1.0 → 1.1.1。同步更新 `pyproject.toml` 和 `src/storyloom/__init__.py`。
+
+**依据**：commit `2cc67b7`。
+
+---
+
 ## 2026-07-27（周一）
 
 > **概述**：12 次提交，完成共创数据模型 v2 的全面落地——JSON 输出格式、引擎适配、Web 层同步、多项缺陷修复。版本号 1.0.2 → 1.1.0。315 测试全绿。
@@ -201,6 +398,16 @@
 2. Release 目录只复制当前版本专属的 wheel 和 sdist（`storyloom_web-{VERSION}-*.whl` / `storyloom_web-{VERSION}.tar.gz`）
 
 **依据**：commit `3bc4e22`。
+
+### 设计理论奠基（07-27 晚间补录）
+
+**背景**：Storyloom 的时序模型、桥接机制、双队列缓冲等核心设计理念散落在 spec 文档和代码注释中——缺乏系统化的"为什么"层面陈述。
+
+**决策**（commit `e75946e`）：新增 `docs/theory/README.md`——三项范式框架（批量生成 vs 完全实时 vs Storyloom 探索方向）+ 三个核心问题（内容质量 → 消解延迟 → 自由度与延迟矛盾）+ 四个维度对比表。定义 theory 的定位（不可撼动的设计理念，仅在重大理念转变时修改）和与 spec 的关系（theory 描述"为什么"，spec 描述"怎么做"）。
+
+此文件为 07-28 的 `timing-model.md` / `bridge-mechanism.md` 的理论扩展奠定基础。
+
+**依据**：commit `e75946e`；`docs/theory/README.md`。
 
 ---
 
