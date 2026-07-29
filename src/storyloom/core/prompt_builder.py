@@ -414,7 +414,7 @@ class PromptBuilder:
 
         error_parts = []
         if rejected_changes:
-            error_parts.append("\nRejected state changes from last round:")
+            error_parts.append("Rejected state changes from last round:")
             for rc in rejected_changes:
                 error_parts.append(f"  - {rc}")
 
@@ -433,8 +433,6 @@ class PromptBuilder:
             )
 
         error_feedback = "\n".join(error_parts) if error_parts else "(No issues)"
-        if error_parts:
-            error_feedback += "\n"
 
         return ROUND_TEMPLATE.format(
             outline_text=outline_text,
