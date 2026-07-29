@@ -666,7 +666,7 @@ Decide on these silently, then output the JSON. Do not write your planning.
 
 1. **The story** — tier, premise, tone, language.
 2. **Who & where** — protagonist, supporting cast, key locations.
-3. **What changes** — the 1-3 variables that drive branches.
+3. **What changes** — the key variables that drive branches.
 4. **How it flows** — the outline as a directed graph. Every route target must
    hit a real node; the final node must have `"routes": []`.
 5. **Self-check** — verify compliance with the format and field specifications above.
