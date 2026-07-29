@@ -708,10 +708,17 @@ Decide these in order mentally. Do not write your planning.
 # Story Context
 **Language:** {LANGUAGE}
 **Seg limits:** narration ≤{NARR_LIMIT} characters, dialogue ≤{DIAL_LIMIT} characters
-{story_context}
+
+**Premise:** {premise}
+
+**Characters:**
+{characters}
+
+**Locations:**
+{locations}
 ````
 
-`{story_context}` 由 `_format_story_context()` 生成，格式：
+`{premise}` 为故事前提字符串，空时为 `(none)`。`{characters}` 和 `{locations}` 分别由 `_format_characters()` 和 `_format_locations()` 生成，格式：
 
 ```
 **Premise:** {premise}
@@ -754,13 +761,13 @@ The active node may take several rounds to reach. Do not force progress — simp
 | `outline_text` | 完整大纲树，含 `[completed]`/`[active]`/`[pending]` 状态标记和路由关系 |
 | `active_node` / `node_goal` | 当前节点 ID 及其叙事目标 |
 | `state_vars_text` | 变量当前值，按 `[scope]` 分组。number 类型带 `/ 100` 后缀 |
-| `error_feedback` | 可选。上轮被拒的变量变更 + 格式错误提醒。首轮留空 |
+| `error_feedback` | 上轮被拒的变量变更 + 格式错误提醒。无错误时为 `(No issues)` |
 | `bridge_text` | 上轮 `<bridge/>` 之后过滤出的纯文本。首轮填入起始占位符 |
 | `MIN_LINES` / `MAX_LINES` | 输出行数范围，与首轮前缀中的约束一致 |
 
 #### 格式示例
 
-首轮（无 bridge_text、无错误反馈）：
+首轮（bridge_text 为起始占位符，error_feedback 为 `(No issues)`）：
 
 ```
 **Outline:**
@@ -780,10 +787,11 @@ ch4_safehouse [pending] — 安全屋：揭开芯片秘密（结局）
 所属势力: 自由佣兵
 [耗子]
   信任度: 10 / 100
-
+(No issues)
 Output 150-300 total lines. Exactly one `<bridge/>`. Less is fine — do not pad to hit the upper bound.
 Choices aren't just for branching — place them freely as moments of play and interaction.
 The active node may take several rounds to reach. Do not force progress — simply continue from where the story left off.
+(Story begins)
 
 ```
 

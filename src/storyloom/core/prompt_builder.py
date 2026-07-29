@@ -262,7 +262,14 @@ Decide these in order mentally. Do not write your planning.
 # Story Context
 **Language:** {LANGUAGE}
 **Seg limits:** narration ≤{NARR_LIMIT} characters, dialogue ≤{DIAL_LIMIT} characters
-{story_context}
+
+**Premise:** {premise}
+
+**Characters:**
+{characters}
+
+**Locations:**
+{locations}
 """
 
 ROUND_TEMPLATE = """**Outline:**
@@ -338,9 +345,9 @@ class PromptBuilder:
 
         # Build unified story context (plan D9/D15)
         premise = story_config.get("premise", "")
-        story_context = PromptBuilder._format_story_context(
-            premise, characters or [], locations or [],
-        )
+        premise_text = premise if premise else "(none)"
+        characters_text = PromptBuilder._format_characters(characters or [])
+        locations_text = PromptBuilder._format_locations(locations or [])
 
         # Bridge position reference
         bridge_pct = BRIDGE_POSITION_RATIO * 100
@@ -352,7 +359,9 @@ class PromptBuilder:
             LANGUAGE=language,
             NARR_LIMIT=narr_limit,
             DIAL_LIMIT=dial_limit,
-            story_context=story_context,
+            premise=premise_text,
+            characters=characters_text,
+            locations=locations_text,
         )
 
         round_part = ROUND_TEMPLATE.format(
@@ -466,10 +475,13 @@ class PromptBuilder:
         title = story_config.get("title", "Untitled Adventure")
         language = story_config.get("language", DEFAULT_LANGUAGE)
 
-        # ── Story Background (unified via _format_story_context) ──
+        # ── Story Background ──
         premise = story_config.get("premise", "")
-        background_text = PromptBuilder._format_story_context(
-            premise, characters or [], locations or [],
+        premise_text = premise if premise else "(none)"
+        background_text = (
+            f"**Premise:** {premise_text}\n\n"
+            f"**Characters:**\n{PromptBuilder._format_characters(characters or [])}\n\n"
+            f"**Locations:**\n{PromptBuilder._format_locations(locations or [])}"
         )
 
         # ── State vars ─────────────────────────────────────────────
@@ -516,59 +528,37 @@ Requirements:
         return prompt
 
     @staticmethod
-    def _format_story_context(
-        premise: str,
-        characters: list[dict],
-        locations: list[dict],
-    ) -> str:
-        """Format story context as Premise + Characters + Locations.
+    def _format_characters(characters: list[dict]) -> str:
+        """Format character list as bullet points.
 
-        Used by both ``build_round1()`` and ``build_adventure_log_prompt()``
-        to produce a consistent story-background block (plan D15).
-
-        Format::
-
-            **Premise:** {premise}
-
-            **Characters:**
-            - {name} ({role}) — {description} ({appearance})
-            - ...
-
-            **Locations:**
-            - {name} — {description}
-            - ...
+        Returns ``(none)`` if the list is empty.
         """
+        if not characters:
+            return "(none)"
         lines: list[str] = []
+        for c in characters:
+            name = c.get("name", "?")
+            role = c.get("role", "")
+            desc = c.get("description", "")
+            appearance = c.get("appearance", "")
+            role_tag = f" ({role})" if role else ""
+            appearance_str = f" ({appearance})" if appearance else ""
+            lines.append(f"- {name}{role_tag} — {desc}{appearance_str}")
+        return "\n".join(lines)
 
-        # Premise
-        lines.append(f"**Premise:** {premise}" if premise else "**Premise:** (none)")
+    @staticmethod
+    def _format_locations(locations: list[dict]) -> str:
+        """Format location list as bullet points.
 
-        # Characters
-        lines.append("")
-        lines.append("**Characters:**")
-        if characters:
-            for c in characters:
-                name = c.get("name", "?")
-                role = c.get("role", "")
-                desc = c.get("description", "")
-                appearance = c.get("appearance", "")
-                role_tag = f" ({role})" if role else ""
-                appearance_str = f" ({appearance})" if appearance else ""
-                lines.append(f"- {name}{role_tag} — {desc}{appearance_str}")
-        else:
-            lines.append("- (none)")
-
-        # Locations
-        lines.append("")
-        lines.append("**Locations:**")
-        if locations:
-            for loc in locations:
-                name = loc.get("name", "?")
-                desc = loc.get("description", "")
-                lines.append(f"- {name} — {desc}")
-        else:
-            lines.append("- (none)")
-
+        Returns ``(none)`` if the list is empty.
+        """
+        if not locations:
+            return "(none)"
+        lines: list[str] = []
+        for loc in locations:
+            name = loc.get("name", "?")
+            desc = loc.get("description", "")
+            lines.append(f"- {name} — {desc}")
         return "\n".join(lines)
 
     @staticmethod
