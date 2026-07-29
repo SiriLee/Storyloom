@@ -391,11 +391,11 @@ messages = [
 
 #### 各部分职责
 
-Round 1 的 user 消息由两部分组成：一个**前缀块**（角色、格式规范、示例、规则、故事背景）和一个**回合块**（大纲进度、当前状态、量化约束、续写锚点）。前缀块只发送一次，永久锚定；回合块每轮都发，首轮和后继轮内容结构一致。
+Round 1 的 user 消息由两部分组成：一个**前缀块**（角色、格式规范、示例、规则、故事设定）和一个**回合块**（大纲进度、当前状态、续写锚点）。前缀块只发送一次，永久锚定；回合块每轮都发，首轮和后继轮内容结构一致。
 
 | 部分 | 说明 |
 |------|------|
-| Round 1 user | 前缀块 + 回合块（首轮：bridge_text 为空，无错误反馈） |
+| Round 1 user | 前缀块 + 回合块（首轮：bridge_text 为起始占位符，error_feedback 为 `(No issues)`） |
 | Round 1 assistant | LLM 输出，永久保留的 few-shot 范例 |
 | 压缩摘要 | 滑出窗口轮次的 checkpoint 摘要，作为独立的 user/assistant 消息对注入 |
 | 窗口轮次 | 最近 WINDOW_SIZE=3 轮的完整 user/assistant 消息对 |
@@ -450,8 +450,8 @@ Format reminder: last round had format issues — {format_error}. Please strictl
 
 ### 4.2 首轮前缀
 
-> 首轮 user 消息的前半段——角色定义、格式规范、示例、元素要求、禁止项、构思引导、故事背景。只发送一次，永久锚定。
-> 后半段（大纲进度、当前状态、量化约束、续写锚点）见 §4.3 回合提示词——首轮和后继轮共享同一模板。
+> 首轮 user 消息的前半段——角色定义、格式规范、示例、元素要求、禁止项、构思引导、故事设定。只发送一次，永久锚定。
+> 后半段（大纲进度、当前状态、续写锚点）见 §4.3 回合提示词——首轮和后继轮共享同一模板。
 >
 > 各元素采用统一描述模板（Purpose → Attributes → Requirements → Snippet），新增元素按相同格式插入即可。Prohibited 仅保留三项高频顽固错误。Before You Write 借鉴共创阶段的无声规划模式。
 
@@ -705,53 +705,57 @@ Decide these in order mentally. Do not write your planning.
 
 5. **What state changes occur?** — Which variables to adjust, and how.
 
-# Story Context
-**Language:** {LANGUAGE}
-**Seg limits:** narration ≤{NARR_LIMIT} characters, dialogue ≤{DIAL_LIMIT} characters
+# Story Setting
 
-**Premise:** {premise}
+## Language
+{LANGUAGE}
 
-**Characters:**
+## Premise
+{premise}
+
+## Characters
 {characters}
 
-**Locations:**
+## Locations
 {locations}
 ````
 
-`{premise}` 为故事前提字符串，空时为 `(none)`。`{characters}` 和 `{locations}` 分别由 `_format_characters()` 和 `_format_locations()` 生成，格式：
+`{premise}` 为故事前提字符串，空时为 `(none)`。`{characters}` 和 `{locations}` 分别由 `_format_characters()` 和 `_format_locations()` 生成，`##` 标题由模板提供，方法仅输出内容体：
 
 ```
-**Premise:** {premise}
-
-**Characters:**
 - {name} ({role}) — {description} ({appearance})
 - ...
 
-**Locations:**
 - {name} — {description}
 - ...
 ```
 
 ### 4.3 回合提示词
 
-> 每轮都发送的 user 消息内容。首轮和后继轮共享同一结构：首轮时 bridge_text 填入起始占位符（如 `(Story begins)`）、无错误反馈；后继轮按实际情况填充。
+> 每轮都发送的 user 消息内容。首轮和后继轮共享同一结构：首轮时 bridge_text 填入起始占位符 `(Story begins)`、error_feedback 为 `(No issues)`；后继轮按实际情况填充。
 >
-> 包含：大纲进度（完整树 + 状态标记）、当前节点与目标、状态快照、可选的错误反馈、输出量化约束、续写锚点。
+> 包含：大纲进度（完整树 + 状态标记 + 当前节点）、变量快照、可选的错误反馈、续写锚点。末尾引导回顾相关章节。
 
 #### 模板
 
 ```
-**Outline:**
+# Current Status
+
+## Outline
 {outline_text}
 
-**Active Node:** {active_node} — {node_goal}
+**Active:** {active_node} — {node_goal}
 
-**Current State:**
-{state_vars_text}{error_feedback}
-Output {MIN_LINES}-{MAX_LINES} total lines. Exactly one `<bridge/>`. Less is fine — do not pad to hit the upper bound.
-Choices aren't just for branching — place them freely as moments of play and interaction.
-The active node may take several rounds to reach. Do not force progress — simply continue from where the story left off.
+## Variables
+{state_vars_text}
+
+## Feedback
+{error_feedback}
+
+## Continue From
 {bridge_text}
+
+Plan silently using "Before You Write". Satisfy every rule in "Requirements". Follow "Story Setting" and "Current Status".
 ```
 
 #### 各字段说明
@@ -759,18 +763,19 @@ The active node may take several rounds to reach. Do not force progress — simp
 | 字段 | 说明 |
 |------|------|
 | `outline_text` | 完整大纲树，含 `[completed]`/`[active]`/`[pending]` 状态标记和路由关系 |
-| `active_node` / `node_goal` | 当前节点 ID 及其叙事目标 |
+| `active_node` / `node_goal` | 当前节点 ID 及其叙事目标，置于 Outline 子部分内 |
 | `state_vars_text` | 变量当前值，按 `[scope]` 分组。number 类型带 `/ 100` 后缀 |
 | `error_feedback` | 上轮被拒的变量变更 + 格式错误提醒。无错误时为 `(No issues)` |
-| `bridge_text` | 上轮 `<bridge/>` 之后过滤出的纯文本。首轮填入起始占位符 |
-| `MIN_LINES` / `MAX_LINES` | 输出行数范围，与首轮前缀中的约束一致 |
+| `bridge_text` | 上轮 `<bridge/>` 之后过滤出的纯文本。首轮填入 `(Story begins)` |
 
 #### 格式示例
 
 首轮（bridge_text 为起始占位符，error_feedback 为 `(No issues)`）：
 
 ```
-**Outline:**
+# Current Status
+
+## Outline
 ch1_bar [active] — 霓虹深渊：在酒吧获取情报
   → ch2_confrontation [pending]
 ch2_confrontation [pending] — 地下交易：与耗子会面
@@ -780,25 +785,29 @@ ch3_ally [pending] — 盟友之路：通过地下网络逃离
 ch3_betrayal [pending] — 背叛之路：杀出重围
 ch4_safehouse [pending] — 安全屋：揭开芯片秘密（结局）
 
-**Active Node:** ch1_bar — 霓虹深渊：在酒吧获取情报
+**Active:** ch1_bar — 霓虹深渊：在酒吧获取情报
 
-**Current State:**
+## Variables
 体力: 80 / 100
 所属势力: 自由佣兵
 [耗子]
   信任度: 10 / 100
+
+## Feedback
 (No issues)
-Output 150-300 total lines. Exactly one `<bridge/>`. Less is fine — do not pad to hit the upper bound.
-Choices aren't just for branching — place them freely as moments of play and interaction.
-The active node may take several rounds to reach. Do not force progress — simply continue from where the story left off.
+
+## Continue From
 (Story begins)
 
+Plan silently using "Before You Write". Satisfy every rule in "Requirements". Follow "Story Setting" and "Current Status".
 ```
 
 中盘轮次（有 bridge_text、有错误反馈）：
 
 ```
-**Outline:**
+# Current Status
+
+## Outline
 ch1_bar [completed] — 霓虹深渊：在酒吧获取情报
   → ch2_confrontation [active]
 ch2_confrontation [active] — 地下交易：与耗子会面
@@ -808,29 +817,29 @@ ch3_ally [pending] — 盟友之路：通过地下网络逃离
 ch3_betrayal [pending] — 背叛之路：杀出重围
 ch4_safehouse [pending] — 安全屋：揭开芯片秘密（结局）
 
-**Active Node:** ch2_confrontation — 地下交易：与耗子会面完成芯片交易
+**Active:** ch2_confrontation — 与耗子完成芯片交易
 
-**Current State:**
+## Variables
 体力: 60 / 100
 所属势力: 自由佣兵
 [耗子]
   信任度: 25 / 100
 
+## Feedback
 Rejected state changes from last round:
   - 体力变更被拒：超出范围[0,100]
 
-Output 150-300 total lines. Exactly one `<bridge/>`. Less is fine — do not pad to hit the upper bound.
-Choices aren't just for branching — place them freely as moments of play and interaction.
-The active node may take several rounds to reach. Do not force progress — simply continue from where the story left off.
-
+## Continue From
 你对耗子点了点头。
 耗子: 跟我来。
 他转身推开一扇锈迹斑斑的铁门。
+
+Plan silently using "Before You Write". Satisfy every rule in "Requirements". Follow "Story Setting" and "Current Status".
 ```
 
 ### 4.4 完整示例
 
-首轮完整 Prompt = §4.2 首轮前缀 + §4.3 回合提示词 + `(This is the start of the whole story.)`。两者直接拼接，无分隔线。回合提示词中 bridge_text 留空、无错误反馈。首轮末尾标记仅首轮出现。
+首轮完整 Prompt = §4.2 首轮前缀 + §4.3 回合提示词。两者直接拼接，无分隔线。回合提示词中 bridge_text 为起始占位符、error_feedback 为 `(No issues)`。
 
 > 具体格式示例见 §4.2 各模板和 §4.3 格式示例。
 
