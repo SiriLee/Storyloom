@@ -264,15 +264,15 @@ class TestBuildRoundN:
 
 
 class TestAdventureLogPrompt:
-    def test_build_adventure_log_prompt_contains_label(self):
+    def test_build_adventure_log_prompt_contains_structure(self):
         pb = PromptBuilder()
         config = {"title": "霓虹深渊", "language": "zh-CN", "premise": "A test premise."}
         state_vars = {"GLOBAL": {"体力": 25}}
         outline = "ch1_intro [completed] — 序章\n  ↳ 抵达边陲小镇"
 
-        prompt = pb.build_adventure_log_prompt(config, state_vars, outline)
-        assert "霓虹深渊" in prompt
-        assert "Adventure Recap" in prompt
+        prompt = pb.build_adventure_log_prompt(config, state_vars, outline, variables=[])
+        assert "Final Status" in prompt
+        assert "Output Format" in prompt
 
     def test_build_adventure_log_prompt_shows_outline(self):
         pb = PromptBuilder()
@@ -280,7 +280,7 @@ class TestAdventureLogPrompt:
         state_vars = {"GLOBAL": {"魔力": 50}}
         outline = "ch1_start [completed] — 开始\n  ↳ first checkpoint"
 
-        prompt = pb.build_adventure_log_prompt(config, state_vars, outline)
+        prompt = pb.build_adventure_log_prompt(config, state_vars, outline, variables=[])
         assert "开始" in prompt
         assert "Final State" in prompt
         assert "魔力" in prompt
@@ -290,8 +290,8 @@ class TestAdventureLogPrompt:
         pb = PromptBuilder()
         config = {"title": "test", "premise": ""}
         state_vars = {}
-        prompt = pb.build_adventure_log_prompt(config, state_vars, "")
-        assert "Adventure Recap" in prompt
+        prompt = pb.build_adventure_log_prompt(config, state_vars, "", variables=[])
+        assert "Final Status" in prompt
         assert "Final State" in prompt
 
     def test_build_adventure_log_prompt_includes_story_context(self):
@@ -310,13 +310,13 @@ class TestAdventureLogPrompt:
             {"id": "neo_tokyo", "name": "新东京", "description": "霓虹闪烁的都市"},
         ]
 
-        prompt = pb.build_adventure_log_prompt(config, state_vars, outline, chars, locs)
-        assert "**Premise:**" in prompt
+        prompt = pb.build_adventure_log_prompt(config, state_vars, outline, variables=[], characters=chars, locations=locs)
+        assert "## Premise" in prompt
         assert "2087年新东京" in prompt
         assert "林焰" in prompt
         assert "前佣兵" in prompt
-        assert "Story Background" in prompt
-        assert "Story Outline" in prompt
+        assert "Story Setting" in prompt
+        assert "## Outline" in prompt
 
     def test_build_adventure_log_prompt_with_summaries_in_outline(self):
         """Summaries are now embedded in outline_text via ↳ lines."""
@@ -325,7 +325,7 @@ class TestAdventureLogPrompt:
         state_vars = {}
         outline = "ch1 [completed] — 序章\n  ↳ 抵达边境小镇"
 
-        prompt = pb.build_adventure_log_prompt(config, state_vars, outline)
-        assert "Adventure Recap" in prompt
+        prompt = pb.build_adventure_log_prompt(config, state_vars, outline, variables=[])
+        assert "Final Status" in prompt
         assert "序章" in prompt
         assert "抵达边境小镇" in prompt

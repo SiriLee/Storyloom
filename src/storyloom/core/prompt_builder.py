@@ -292,6 +292,78 @@ ROUND_TEMPLATE = """# Current Status
 Plan silently using "Before You Write". Satisfy every rule in "Requirements". Follow "Story Setting" and "Current Status".
 """
 
+ADVENTURE_LOG_PROMPT = """You are an adventure log author for an interactive text adventure game. Write a player-facing recap for the completed adventure.
+
+# Output Format
+
+Use Markdown. Address the player directly. Structure your output in three sections:
+
+## Chapter Recaps
+One section per chapter. Use chapter titles as headings.
+
+## Ending
+A warm, satisfying conclusion. Reference specific events from the summaries.
+
+## Final State
+For each variable, write a brief one-sentence reflection connecting the final value to the narrative.
+
+# Format Example
+
+## Chapter Recaps
+
+### The Scrap Heap
+You found the ship buried in a Kepler-9 salvage yard — decommissioned courier vessel, cracked hull, a nav computer that still remembered the war. The yard boss wanted fifty thousand credits. You talked him down to twelve and a favor. He laughed. Six months later, that favor saved his operation from a Syndicate audit. He doesn't laugh anymore when you call.
+
+### The Vega Corridor
+Tess was supposed to be a passenger — an old mechanic paying her way off-world with her hands. But when the Syndicate patrols locked down the Vega corridor, she was the one who rerouted power to the shields while you flew. Three fighters on your tail, sub-light only, and she never flinched — even when the life-support relays started sparking. You made the jump with six percent hull integrity and a navigator who had just become a crewmate.
+
+### The Dead Station
+The cargo was never cargo. It was a military-grade data core, and the buyer was waiting at a station orbiting nothing. When the deal went bad — three armed guards, a double-cross, a sealed bulkhead — it was Tess who talked them down while you cut through the encryption. You walked out with clean credentials, enough credits to vanish, and the strangest thing of all: someone who chose to stay.
+
+## Ending
+
+You started with a scrap heap and a stranger. You ended with a ship that held together and a crewmate who stayed — not for the money, but because you gave her something the Syndicate never could: a reason. The outer rim is big enough for two people with nothing left to prove. Somewhere past the Vega corridor, a nav computer that remembers the war is charting a course to uncharted space.
+
+## Final State
+
+- **Stamina: 20 / 100** — The Vega run pushed you past every limit. Your body kept the tab.
+- **Faction: Unaffiliated** — You never picked a side in a galaxy that demands one. That costs more than allegiance ever would.
+- **Tess.Trust: 85 / 100** — She stopped counting favors somewhere around the third time you saved her life.
+
+(This is a format example only. Your recap is based on the story data below.)
+
+# Requirements
+
+- Write entirely in the story's language — all headings, recaps, and reflections
+- Only recap experienced chapters — use their ↳ summary lines, do NOT invent beyond them
+- Final State reflections must connect the final value to the narrative
+- 500-1000 words
+
+# Story Setting
+
+## Language
+{LANGUAGE}
+
+## Premise
+{premise}
+
+## Characters
+{characters}
+
+## Locations
+{locations}
+
+# Final Status
+
+## Outline
+{outline_text}
+
+## Variables
+{state_vars_text}
+
+Plan silently before writing. Satisfy every rule in "Requirements". Follow "Story Setting" and "Final Status".
+"""
+
 
 class PromptBuilder:
     """Build prompt content for conversation-based architecture.
@@ -447,6 +519,7 @@ class PromptBuilder:
         story_config: dict,
         state_vars: dict[str, dict[str, int | str]],
         outline_text: str,
+        variables: list[dict],
         characters: list[dict] | None = None,
         locations: list[dict] | None = None,
     ) -> str:
@@ -460,6 +533,8 @@ class PromptBuilder:
             state_vars: Current state variables.
             outline_text: Formatted outline tree text with status
                 markers and ↳ summary lines under completed nodes.
+            variables: Variable definitions for type lookup
+                (number → / 100 suffix).
             characters: Character definitions (name, role, description,
                         appearance).
             locations: Location definitions (id, name, description).
@@ -467,60 +542,20 @@ class PromptBuilder:
         Returns:
             Prompt string for adventure log generation.
         """
-        title = story_config.get("title", "Untitled Adventure")
         language = story_config.get("language", DEFAULT_LANGUAGE)
-
-        # ── Story Background ──
         premise = story_config.get("premise", "")
         premise_text = premise if premise else "(none)"
-        background_text = (
-            f"**Premise:** {premise_text}\n\n"
-            f"**Characters:**\n{PromptBuilder._format_characters(characters or [])}\n\n"
-            f"**Locations:**\n{PromptBuilder._format_locations(locations or [])}"
+
+        return ADVENTURE_LOG_PROMPT.format(
+            LANGUAGE=language,
+            premise=premise_text,
+            characters=PromptBuilder._format_characters(characters or []),
+            locations=PromptBuilder._format_locations(locations or []),
+            outline_text=outline_text,
+            state_vars_text=PromptBuilder._format_current_state(
+                state_vars, variables,
+            ),
         )
-
-        # ── State vars ─────────────────────────────────────────────
-        state_lines: list[str] = []
-        for scope, vars_dict in state_vars.items():
-            if scope != GLOBAL_SCOPE:
-                state_lines.append(f"[{scope}]")
-            for name, value in vars_dict.items():
-                prefix = "  " if scope != GLOBAL_SCOPE else ""
-                state_lines.append(f"- {prefix}{name}: {value}")
-        state_text = "\n".join(state_lines) if state_lines else "(No state variables)"
-
-        prompt = f"""You are an adventure log author. Write a player-facing recap for a completed text adventure game.
-
-Use Markdown format. Write in the story's language ({language}).
-
-## Story Background
-{background_text}
-
-## Story Outline
-{outline_text}
-
-(The outline shows the story structure with status markers. [completed] nodes include
-a ↳ summary of what actually happened — use these as the basis for each chapter recap.
-[active] is the final node. [pending] nodes were skipped due to branching.)
-
-## Adventure Recap: {title}
-
-Write a chapter-by-chapter recap based on the outline and summaries above.
-
-## Ending
-(Write a warm, satisfying conclusion. Reference specific events from the summaries
-above — do not fabricate.)
-
-## Final State
-{state_text}
-(For each variable, write a brief one-sentence reflection.)
-
-Requirements:
-- Address the player directly ("You chose...", "In the end you...")
-- Plain text only, no XML or block separators
-- 500-1000 words"""
-
-        return prompt
 
     @staticmethod
     def _format_characters(characters: list[dict]) -> str:

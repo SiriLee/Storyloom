@@ -1625,6 +1625,7 @@ class GameLoop:
             story_config=self.story_config,
             state_vars=self.game_state.state_vars,
             outline_text=self.outline_text,
+            variables=self.variables,
             characters=self.characters,
             locations=self.locations,
         )
