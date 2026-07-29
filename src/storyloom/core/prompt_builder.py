@@ -360,7 +360,7 @@ class PromptBuilder:
             active_node=current_node or "(start)",
             node_goal=goal or "Begin the story from the active node.",
             state_vars_text=state_vars_text,
-            error_feedback="",
+            error_feedback="(No issues)",
             MIN_LINES=LINES_PER_ROUND_MIN,
             MAX_LINES=LINES_PER_ROUND_MAX,
             bridge_text="(Story begins)",
@@ -423,7 +423,9 @@ class PromptBuilder:
                 "can interact with the story."
             )
 
-        error_feedback = "\n".join(error_parts) + ("\n" if error_parts else "")
+        error_feedback = "\n".join(error_parts) if error_parts else "(No issues)"
+        if error_parts:
+            error_feedback += "\n"
 
         return ROUND_TEMPLATE.format(
             outline_text=outline_text,
