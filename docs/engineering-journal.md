@@ -6,6 +6,89 @@
 
 ---
 
+## 2026-07-29（周三）
+
+> **概述**：11 次提交，Story Context 架构拆分、冒险日志 Prompt 重设计、四个阶段 Prompt 全面审查与措辞修复。315 测试全绿。
+
+### Story Context 架构拆分——ROUND1_PREFIX 与 ROUND_TEMPLATE 解耦
+
+**背景**：07-28 的首轮 Prompt 重设计留下两个遗留问题：（1）`_format_story_context` 方法将 characters/locations 拼成一个 `{story_context}` 占位符，同时出现在 ROUND1_PREFIX 和冒险日志 Prompt 中——复用方式模糊，两端需求不完全相同；（2）`error_feedback` 为空时使用空字符串 `"\n"`，换行控制逻辑分散在代码和模板之间；（3）`appearance` 字段被 `_format_story_context` 静默丢弃——共创输出中的 required 字段从未进入 Prompt。
+
+**决策**（commits `27f3445` → `2d04973`，6 次迭代）：
+
+1. **`_format_story_context` 拆分为 `_format_characters` + `_format_locations`**（`faf1ecf`）：
+   - 删除聚合方法，两个调用点各自控制 `##` 标题和顺序
+   - 模板中 `{story_context}` 占位符拆为 `{premise}`、`{characters}`、`{locations}`——每个对应一个明确的 `_format_*` 返回值
+
+2. **`appearance` 字段修复**（`27f3445`）：字符行格式从 `{name} ({role}) — {desc}` 扩展为 `{name} ({role}) — {desc} ({appearance})`——共创阶段的必填字段不再被丢弃。
+
+3. **`error_feedback` 占位符化**（`9bf731a` + `0314e6e`）：
+   - 空反馈从 `"\n"` 改为 `"(No issues)"`——统一占位符语义
+   - 模板中 `\n{error_feedback}` 尾随换行由 build 方法拼接，模板不再控制间距
+
+4. **命名体系统一**（`c45966c` + `2d04973`）：
+   - `ROUND1_PREFIX`：`# Story Context` → `# Story Setting`（与 spec §4.2 一致）
+   - `ROUND_TEMPLATE`：flat `**Bold:**` → `# Current Status` + `##` 子章节（`## Outline`/`## Variables`/`## Feedback`/`## Continue From`）
+   - 移除 ROUND_TEMPLATE 中冗余的 `MIN_LINES`/`MAX_LINES`（已在 ROUND1_PREFIX 约束）
+   - 删除未使用的 `NARR_LIMIT`/`DIAL_LIMIT` 占位符和 `LANGUAGE_SEG_LIMITS` 导入
+   - 尾部指令：`Plan silently using "Before You Write". Satisfy every rule in "Requirements". Follow "Story Setting" and "Current Status".`
+
+**架构意义**：ROUND1_PREFIX 持有 Story Setting（一次发送，永久锚定），ROUND_TEMPLATE 持有 Current Status（每轮更新）——职责清晰，独立修改。
+
+**依据**：commits `27f3445`, `9bf731a`, `faf1ecf`, `0314e6e`, `c45966c`, `2d04973`；`docs/spec/prompt-design.md` §4.2-4.3；`src/storyloom/core/prompt_builder.py`。
+
+### 冒险日志 Prompt 重设计——结构化架构对齐叙事 Prompt
+
+**背景**：冒险日志 Prompt 是独立于叙事循环的单次 LLM 调用（结局时触发），优先级低于叙事 Prompt，但同样需要规范设计。旧版结构松散，缺少设计原则指导。
+
+**决策**（spec `df20b6d` + impl `2020ba2`）：采用六段式架构——系统指令 → 格式说明 → 格式示例 → 要求说明 → 具体状态 → 尾部信息：
+
+```
+You are an adventure log author...
+
+# Output Format — Markdown 三节（Chapter Recaps / Ending / Final State）
+# Format Example — 英文 sci-fi 三章示例（含 Tess.Trust scoped variable）
+# Requirements — 4 条
+# Story Setting — Language / Premise / Characters / Locations
+# Final Status — Outline（含 ↳ summary）+ Variables
+尾部指令
+```
+
+**关键设计决策**：
+- **示例先行**：格式示例在 Requirements 之前。英文 sci-fi 故事（The Scrap Heap / The Vega Corridor / The Dead Station）展示 `Tess.Trust: 85 / 100` 点号表示法
+- **`_format_current_state()` 复用**：`## Variables` 节直接调用与叙事 Prompt 相同方法——number 带 `/ 100`、scoped 按 `[scope]` 分组——格式一致性确保 LLM 无歧义
+- **`# Final Status`**：区别于叙事的 `# Current Status`——结局视角用 "final" 更准确
+- **单一常量**：`ADVENTURE_LOG_PROMPT` 不拆 PREFIX/TEMPLATE——独立单消息调用无需分离
+- **无 Prohibited 节**：输出格式简单（Markdown），失败模式不同于叙事 XML——不设独立禁止节以保持紧凑、生成更快
+
+**API 变更**：`build_adventure_log_prompt()` 新增 `variables` 参数（供类型查找）。两个调用点（`game_loop.py`、`dev_cli/game_driver.py`）同步更新。
+
+**依据**：commits `df20b6d`, `2020ba2`；`docs/spec/prompt-design.md` §5；`src/storyloom/core/prompt_builder.py`。
+
+### 四个阶段 Prompt 全面审查与措辞修复
+
+**背景**：冒险日志重设计完成后，对四个阶段 Prompt（共创追问、共创生成、叙事循环、冒险日志）做全面交叉审查。
+
+**发现与修复**（commits `209a722`, `9150da2`, `18e3c41`）：
+
+1. **叙事 Before You Write 措辞**（`209a722`）：
+   - "Has the active node's goal been reached?" → "Can the active node's goal be reached?"
+   - Before You Write 是创作前的无声规划——"can be" 准确反映规划思维，"has been" 回顾性视角不当
+
+2. **共创生成 Before You Write 措辞**（`9150da2`）：
+   - "the 1-3 variables that drive branches" → "the key variables that drive branches"
+   - 代码与规范文档不一致。字段规范中变量上限可能 >3，规划阶段不应给更窄的数字
+
+3. **共创生成 Before You Write 换行**（`18e3c41`）：
+   - "Every route target must\n   hit a real node" → 合并为单行
+   - 代码和规范文档均存在不必要的句中断行，一并修复
+
+**审查结论**：四个阶段 Prompt 整体质量很高，结构一致、原则到位。
+
+**依据**：commits `209a722`, `9150da2`, `18e3c41`；`docs/spec/prompt-design.md` §3.2, §4.2；`src/storyloom/core/co_create.py`, `prompt_builder.py`。
+
+---
+
 ## 2026-07-28（周二）
 
 > **概述**：10 次提交，两大核心功能落地——作用域变量（Scoped Variables）和叙事首轮 Prompt 前缀重设计，配套设计理论体系完善、共创 Prompt 无声规划模式、文档清理。版本号 1.1.0 → 1.1.1。315 测试全绿。
