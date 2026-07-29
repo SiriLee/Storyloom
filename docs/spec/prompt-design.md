@@ -848,65 +848,157 @@ Plan silently using "Before You Write". Satisfy every rule in "Requirements". Fo
 ### 5.1 规范
 
 - **调用时机**：结局轮 bridge 处（ending_flag=true）。独立调用，不流式。
-- **输入**：故事数据（premise、characters、locations）、state_vars 当前值、outline_text（含各节点 status 和 summary）。
+- **输入**：故事数据（premise、characters、locations）、state_vars 当前值、outline_text（含各节点 status 和 ↳ summary）。
 - **输出**：Markdown 格式，500-1000 字。面向玩家回顾性口吻。不加区块分隔符。
-- **Prompt 语言**：英文（与所有系统 Prompt 一致）。通过 `{language}` 占位符指示 LLM 以故事语言输出。
+- **结构**：系统指令 → 格式说明 → 格式示例 → 要求说明 → 具体状态（Story Setting + Final Status）→ 尾部信息。与叙事 Prompt 同源设计。
+- **Prompt 语言**：英文（与所有系统 Prompt 一致）。输出语言由 Requirements 中的语言规则和 Story Setting 中的 `{LANGUAGE}` 字段共同指示。
 
 ### 5.2 Prompt 模板
 
 ```
-You are an adventure log author. Write a player-facing recap for a completed text adventure game.
+You are an adventure log author for an interactive text adventure game. Write a player-facing recap for the completed adventure.
 
-Use Markdown format. Write in the story's language ({language}).
+# Output Format
 
-## Story Background
-{story_context}
+Use Markdown. Address the player directly. Structure your output in three sections:
 
-## Story Outline
-{outline_text}
-
-(The outline shows the story structure with status markers. [completed] nodes include
-a ↳ summary of what actually happened — use these as the basis for each chapter recap.
-[active] is the final node. [pending] nodes were skipped due to branching.)
-
-## Adventure Recap: {title}
-
-Write a chapter-by-chapter recap based on the outline and summaries above.
+## Chapter Recaps
+One section per chapter. Use chapter titles as headings.
 
 ## Ending
-(Write a warm, satisfying conclusion. Reference specific events from the summaries
-above — do not fabricate.)
+A warm, satisfying conclusion. Reference specific events from the summaries.
 
 ## Final State
-{state_text}
-(For each variable, write a brief one-sentence reflection.)
+For each variable, write a brief one-sentence reflection connecting the final value to the narrative.
 
-Requirements:
-- Address the player directly ("You chose...", "In the end you...")
-- Plain text only, no XML or block separators
+# Format Example
+
+## Chapter Recaps
+
+### The Scrap Heap
+You found the ship buried in a Kepler-9 salvage yard — decommissioned courier vessel, cracked hull, a nav computer that still remembered the war. The yard boss wanted fifty thousand credits. You talked him down to twelve and a favor. He laughed. Six months later, that favor saved his operation from a Syndicate audit. He doesn't laugh anymore when you call.
+
+### The Vega Corridor
+Tess was supposed to be a passenger — an old mechanic paying her way off-world with her hands. But when the Syndicate patrols locked down the Vega corridor, she was the one who rerouted power to the shields while you flew. Three fighters on your tail, sub-light only, and she never flinched — even when the life-support relays started sparking. You made the jump with six percent hull integrity and a navigator who had just become a crewmate.
+
+### The Dead Station
+The cargo was never cargo. It was a military-grade data core, and the buyer was waiting at a station orbiting nothing. When the deal went bad — three armed guards, a double-cross, a sealed bulkhead — it was Tess who talked them down while you cut through the encryption. You walked out with clean credentials, enough credits to vanish, and the strangest thing of all: someone who chose to stay.
+
+## Ending
+
+You started with a scrap heap and a stranger. You ended with a ship that held together and a crewmate who stayed — not for the money, but because you gave her something the Syndicate never could: a reason. The outer rim is big enough for two people with nothing left to prove. Somewhere past the Vega corridor, a nav computer that remembers the war is charting a course to uncharted space.
+
+## Final State
+
+- **Stamina: 20 / 100** — The Vega run pushed you past every limit. Your body kept the tab.
+- **Faction: Unaffiliated** — You never picked a side in a galaxy that demands one. That costs more than allegiance ever would.
+- **Tess.Trust: 85 / 100** — She stopped counting favors somewhere around the third time you saved her life.
+
+(This is a format example only. Your recap is based on the story data below.)
+
+# Requirements
+
+- Write entirely in the story's language — all headings, recaps, and reflections
+- Only recap experienced chapters — use their ↳ summary lines, do NOT invent beyond them
+- Final State reflections must connect the final value to the narrative
 - 500-1000 words
+
+# Story Setting
+
+## Language
+{LANGUAGE}
+
+## Premise
+{premise}
+
+## Characters
+{characters}
+
+## Locations
+{locations}
+
+# Final Status
+
+## Outline
+{outline_text}
+
+## Variables
+{state_vars_text}
+
+Plan silently before writing. Satisfy every rule in "Requirements". Follow "Story Setting" and "Final Status".
 ```
 
 ### 5.3 Prompt 示例
 
+> 以下为填充后的完整 Prompt（故事：霓虹深渊，语言：zh-CN）。格式示例节使用英文（与 Prompt 语言一致），具体数据使用故事语言。
+
 ```
-You are an adventure log author. Write a player-facing recap for a completed text adventure game.
+You are an adventure log author for an interactive text adventure game. Write a player-facing recap for the completed adventure.
 
-Use Markdown format. Write in the story's language (zh-CN).
+# Output Format
 
-## Story Background
-**Premise:** 2087年新东京，数据是唯一货币。林焰，前荒坂安全顾问转自由佣兵，卷入了一场争夺被盗生物芯片的追逐——这枚芯片可能颠覆全球秩序。
+Use Markdown. Address the player directly. Structure your output in three sections:
 
-**Characters:**
-- 林焰 (protagonist) — 前荒坂安全顾问，自由佣兵。冷静、道德灰色、 fiercely loyal（高瘦，短发，眼神锐利，下颌有一道淡淡的疤痕。穿着磨损的合成皮外套）
+## Chapter Recaps
+One section per chapter. Use chapter titles as headings.
+
+## Ending
+A warm, satisfying conclusion. Reference specific events from the summaries.
+
+## Final State
+For each variable, write a brief one-sentence reflection connecting the final value to the narrative.
+
+# Format Example
+
+## Chapter Recaps
+
+### The Scrap Heap
+You found the ship buried in a Kepler-9 salvage yard — decommissioned courier vessel, cracked hull, a nav computer that still remembered the war. The yard boss wanted fifty thousand credits. You talked him down to twelve and a favor. He laughed. Six months later, that favor saved his operation from a Syndicate audit. He doesn't laugh anymore when you call.
+
+### The Vega Corridor
+Tess was supposed to be a passenger — an old mechanic paying her way off-world with her hands. But when the Syndicate patrols locked down the Vega corridor, she was the one who rerouted power to the shields while you flew. Three fighters on your tail, sub-light only, and she never flinched — even when the life-support relays started sparking. You made the jump with six percent hull integrity and a navigator who had just become a crewmate.
+
+### The Dead Station
+The cargo was never cargo. It was a military-grade data core, and the buyer was waiting at a station orbiting nothing. When the deal went bad — three armed guards, a double-cross, a sealed bulkhead — it was Tess who talked them down while you cut through the encryption. You walked out with clean credentials, enough credits to vanish, and the strangest thing of all: someone who chose to stay.
+
+## Ending
+
+You started with a scrap heap and a stranger. You ended with a ship that held together and a crewmate who stayed — not for the money, but because you gave her something the Syndicate never could: a reason. The outer rim is big enough for two people with nothing left to prove. Somewhere past the Vega corridor, a nav computer that remembers the war is charting a course to uncharted space.
+
+## Final State
+
+- **Stamina: 20 / 100** — The Vega run pushed you past every limit. Your body kept the tab.
+- **Faction: Unaffiliated** — You never picked a side in a galaxy that demands one. That costs more than allegiance ever would.
+- **Tess.Trust: 85 / 100** — She stopped counting favors somewhere around the third time you saved her life.
+
+(This is a format example only. Your recap is based on the story data below.)
+
+# Requirements
+
+- Write entirely in the story's language — all headings, recaps, and reflections
+- Only recap experienced chapters — use their ↳ summary lines, do NOT invent beyond them
+- Final State reflections must connect the final value to the narrative
+- 500-1000 words
+
+# Story Setting
+
+## Language
+zh-CN
+
+## Premise
+2087年新东京，数据是唯一货币。林焰，前荒坂安全顾问转自由佣兵，卷入了一场争夺被盗生物芯片的追逐——这枚芯片可能颠覆全球秩序。
+
+## Characters
+- 林焰 (protagonist) — 前荒坂安全顾问，自由佣兵。冷静、道德灰色（高瘦，短发，眼神锐利）
 - 耗子 (supporting) — 地下情报贩子，有旧债未清。滑头、足智多谋、偏执（矮小精瘦，增强眼睛扫描数据流时闪烁蓝光）
-- 美智子 (supporting) — 荒坂安全主管，前导师。忠于职责与旧日情谊之间挣扎（穿着无可挑剔的黑色西装，银发紧束。冷笑中带着洞察一切的眼神）
 
-**Locations:**
+## Locations
 - 霓虹深渊酒吧 — 霓虹灯闪烁的午夜街头，全息广告在摩天大楼表面闪烁
 - 废弃滨水仓库 — 工业滨水区的生锈金属结构，雨水从波纹屋顶渗入
 
-## Story Outline
+# Final Status
+
+## Outline
 ch1_bar [completed] — 霓虹深渊：在酒吧获取情报
   ↳ 在霓虹深渊酒吧与耗子接头，选择了直截了当的接触方式
   → ch2_confrontation [completed]
@@ -916,33 +1008,15 @@ ch2_confrontation [completed] — 地下交易：与耗子会面
   └→ ch3_betrayal [pending]
 ch3_ally [completed] — 盟友之路：通过地下网络逃离
   ↳ 通过地下网络逃离追捕，加入抵抗组织
-ch4_safehouse [completed] — 安全屋：揭开芯片秘密（结局）
-  ↳ 揭开芯片秘密，决定摧毁企业服务器
+ch4_safehouse [active] — 安全屋：揭开芯片秘密（结局）
 
-(The outline shows the story structure with status markers. [completed] nodes include
-a ↳ summary of what actually happened — use these as the basis for each chapter recap.
-[active] is the final node. [pending] nodes were skipped due to branching.)
-
-## Adventure Recap: 霓虹深渊
-
-Write a chapter-by-chapter recap based on the outline and summaries above.
-
-## Ending
-(Write a warm, satisfying conclusion. Reference specific events from the summaries
-above — do not fabricate.)
-
-## Final State
-体力: 25
-理智值: 50
+## Variables
+体力: 25 / 100
 所属势力: 抵抗组织
 [耗子]
-  信任度: 20
-(For each variable, write a brief one-sentence reflection.)
+  信任度: 20 / 100
 
-Requirements:
-- Address the player directly ("You chose...", "In the end you...")
-- Plain text only, no XML or block separators
-- 500-1000 words
+Plan silently before writing. Satisfy every rule in "Requirements". Follow "Story Setting" and "Final Status".
 ```
 
 ---
