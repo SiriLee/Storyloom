@@ -697,7 +697,7 @@ Decide these in order mentally. Do not write your planning.
 
 1. **What happens in this round?** — The scenes and events that fill this round, especially where it ends.
 
-2. **Has the active node's goal been reached?** — If yes → include a `<checkpoint>` with the node ID and summary. If no → no checkpoint this round.
+2. **Can the active node's goal be reached?** — If yes → include a `<checkpoint>` with the node ID and summary. If no → no checkpoint this round.
 
 3. **Where to place the bridge?** — Find the point that cleanly divides the interactive zone from the narrative zone. Earlier is fine.
 
