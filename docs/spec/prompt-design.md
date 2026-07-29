@@ -717,7 +717,7 @@ Decide these in order mentally. Do not write your planning.
 **Premise:** {premise}
 
 **Characters:**
-- {name} ({role}) — {description}
+- {name} ({role}) — {description} ({appearance})
 - ...
 
 **Locations:**
@@ -881,9 +881,9 @@ Use Markdown format. Write in the story's language (zh-CN).
 **Premise:** 2087年新东京，数据是唯一货币。林焰，前荒坂安全顾问转自由佣兵，卷入了一场争夺被盗生物芯片的追逐——这枚芯片可能颠覆全球秩序。
 
 **Characters:**
-- 林焰 (protagonist) — 前荒坂安全顾问，自由佣兵。冷静、道德灰色、 fiercely loyal
-- 耗子 (supporting) — 地下情报贩子，有旧债未清。滑头、足智多谋、偏执
-- 美智子 (supporting) — 荒坂安全主管，前导师。忠于职责与旧日情谊之间挣扎
+- 林焰 (protagonist) — 前荒坂安全顾问，自由佣兵。冷静、道德灰色、 fiercely loyal（高瘦，短发，眼神锐利，下颌有一道淡淡的疤痕。穿着磨损的合成皮外套）
+- 耗子 (supporting) — 地下情报贩子，有旧债未清。滑头、足智多谋、偏执（矮小精瘦，增强眼睛扫描数据流时闪烁蓝光）
+- 美智子 (supporting) — 荒坂安全主管，前导师。忠于职责与旧日情谊之间挣扎（穿着无可挑剔的黑色西装，银发紧束。冷笑中带着洞察一切的眼神）
 
 **Locations:**
 - 霓虹深渊酒吧 — 霓虹灯闪烁的午夜街头，全息广告在摩天大楼表面闪烁

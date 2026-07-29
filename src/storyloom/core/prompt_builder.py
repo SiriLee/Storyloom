@@ -529,7 +529,7 @@ Requirements:
             **Premise:** {premise}
 
             **Characters:**
-            - {name} ({role}) — {description}
+            - {name} ({role}) — {description} ({appearance})
             - ...
 
             **Locations:**
@@ -549,8 +549,10 @@ Requirements:
                 name = c.get("name", "?")
                 role = c.get("role", "")
                 desc = c.get("description", "")
+                appearance = c.get("appearance", "")
                 role_tag = f" ({role})" if role else ""
-                lines.append(f"- {name}{role_tag} — {desc}")
+                appearance_str = f" ({appearance})" if appearance else ""
+                lines.append(f"- {name}{role_tag} — {desc}{appearance_str}")
         else:
             lines.append("- (none)")
 
