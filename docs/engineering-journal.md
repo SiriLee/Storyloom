@@ -8,7 +8,29 @@
 
 ## 2026-07-29（周三）
 
-> **概述**：11 次提交，Story Context 架构拆分、冒险日志 Prompt 重设计、四个阶段 Prompt 全面审查与措辞修复。315 测试全绿。
+> **概述**：12 次提交，Story Context 架构拆分、冒险日志 Prompt 重设计、四个阶段 Prompt 全面审查与措辞修复、Phase 2 图像生成模式设计草稿。315 测试全绿。
+
+### Phase 2 图像生成模式——设计草稿
+
+**背景**：Phase 1 核心引擎已稳定（v1.2.0），下一阶段自然方向是为纯文本互动小说添加视觉表现层——传统 Galgame/视觉小说式的角色立绘 + 背景图像。这项功能涉及 LLM Prompt 扩展、解析器架构重构、新媒体数据库、图像 API 集成、UI 新界面等多个子系统，需要先有完整设计草稿再进入实现。
+
+**决策**（`docs/spec/graph-mode-design-draft.md`）：
+
+1. **媒体数据库分层**：全局库（Storyloom 级，跨存档复用）+ 游戏库（单局作用域，存档时持久化）。使用计数 + 总量阈值自动清理低频素材。角色立绘与背景图像为不同数据类，均可按命名空间分类（支持未来 "小明.微笑" 形式）。
+
+2. **"选择"优先于"生成"**：每次需要媒体数据时，先按名称/描述在库中匹配（"选择"，零 API 调用）；匹配不到才调用图像生成 API。未配置图像 API 时强制走选择模式。
+
+3. **AI 角色六分法**：A. 共创聊天 LLM / B. 大纲生成 LLM / C. 素材预构建 AI（新增——基于设定中的地点角色预生成初始素材库，支持 1-3 个变体方向）/ D. 叙事导演 LLM（修改——仍输出纯文本 XML，新增 `<scene>` 和 `<character>`/`<seg character>` 标签进行视觉编排）/ E. 媒体实时制作 AI（新增——无"思考"快速匹配 + 图像生成 API）/ F. 冒险日志 LLM。
+
+4. **解析器两段式重构**：Line Generator（预处理：截行、分行号、判标签类型，几乎零延迟）+ Event Generator（Line → Event，含 SET/CHECKPOINT/BRIDGE 应用），中间用线程安全 Line Buffer 连接。Line Generator 检测到媒体标签时立即向 Task Generator 发送 Requirement 启动后台制作任务。
+
+5. **异步时序模型**：`LLM 生成 ≥ 程序流式解析/媒体数据制作 ≥ UI 展示`。Tasks Buffer 独立于 Lines Buffer 运行——图像制作与叙事解析并行，Event Generator 消费到 SCENE/CHARACTER 事件时从 Tasks Buffer 取结果，未完成则等待。
+
+6. **实现分 8 个阶段**：解析器重构（验证 Phase 1 无回归）→ 图像 API 模块 → scene/character 标签（纯文本模式兼容） → 媒体数据库 → 共创预构建流程 → 叙事实时制作流程 → Task Buffer 集成 → 图像模式新 UI。
+
+**架构意义**：延续 Phase 1 核心哲学——LLM 只是建议者/编排者，程序做最终裁决和资源管理；异步预取隐藏延迟（bridge pre-fetch 思路的泛化）；关注点分离（导演只管编排，制作 AI 只管执行）。文本模式作为独立路径保留，不与图像模式耦合。
+
+**依据**：`docs/spec/graph-mode-design-draft.md`。
 
 ### Story Context 架构拆分——ROUND1_PREFIX 与 ROUND_TEMPLATE 解耦
 
