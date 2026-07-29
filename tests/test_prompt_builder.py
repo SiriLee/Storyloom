@@ -63,8 +63,8 @@ class TestBuildRound1:
     def test_round1_contains_story_context(self):
         pb = PromptBuilder()
         result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES)
-        assert "**Premise:**" in result
-        assert "**Characters:**" in result
+        assert "## Premise" in result
+        assert "## Characters" in result
         assert "林焰" in result
         assert "ch2_confrontation" in result
 
@@ -153,8 +153,8 @@ class TestBuildRoundN:
         assert "ch3_ally" in result
         assert "通过地下网络逃离" in result
         assert "ch1_bar" in result
-        assert "**Outline:**" in result
-        assert "**Active Node:**" in result
+        assert "## Outline" in result
+        assert "**Active:**" in result
 
     def test_round_n_contains_state_snapshot(self):
         pb = PromptBuilder()
@@ -169,7 +169,7 @@ class TestBuildRoundN:
         assert "体力" in result
         assert "60" in result
         assert "信任度" in result
-        assert "**Current State:**" in result
+        assert "## Variables" in result
 
     def test_round_n_contains_bridge_text(self):
         pb = PromptBuilder()
@@ -183,7 +183,7 @@ class TestBuildRoundN:
         )
         assert "你对耗子点了点头" in result
 
-    def test_round_n_contains_line_count_constraint(self):
+    def test_round_n_contains_ending_reminder(self):
         pb = PromptBuilder()
         result = pb.build_round_n(
             outline_text=ROUNDN_OUTLINE,
@@ -193,8 +193,8 @@ class TestBuildRoundN:
             variables=ROUNDN_VARS,
             bridge_text="tail...",
         )
-        assert "total lines" in result
-        assert "Exactly one" in result
+        assert "Before You Write" in result
+        assert "Requirements" in result
 
     def test_round_n_contains_rejected_feedback_when_present(self):
         pb = PromptBuilder()

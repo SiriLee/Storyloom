@@ -4,7 +4,6 @@ from storyloom.config import (
     LINES_PER_ROUND_MIN,
     LINES_PER_ROUND_MAX,
     BRIDGE_POSITION_RATIO,
-    LANGUAGE_SEG_LIMITS,
     DEFAULT_LANGUAGE,
     GLOBAL_SCOPE,
 )
@@ -259,30 +258,39 @@ Decide these in order mentally. Do not write your planning.
 
 5. **What state changes occur?** — Which variables to adjust, and how.
 
-# Story Context
-**Language:** {LANGUAGE}
-**Seg limits:** narration ≤{NARR_LIMIT} characters, dialogue ≤{DIAL_LIMIT} characters
+# Story Setting
 
-**Premise:** {premise}
+## Language
+{LANGUAGE}
 
-**Characters:**
+## Premise
+{premise}
+
+## Characters
 {characters}
 
-**Locations:**
+## Locations
 {locations}
 """
 
-ROUND_TEMPLATE = """**Outline:**
+ROUND_TEMPLATE = """# Current Status
+
+## Outline
 {outline_text}
 
-**Active Node:** {active_node} — {node_goal}
+**Active:** {active_node} — {node_goal}
 
-**Current State:**
-{state_vars_text}{error_feedback}
-Output {MIN_LINES}-{MAX_LINES} total lines. Exactly one `<bridge/>`. Less is fine — do not pad to hit the upper bound.
-Choices aren't just for branching — place them freely as moments of play and interaction.
-The active node may take several rounds to reach. Do not force progress — simply continue from where the story left off.
-{bridge_text}"""
+## Variables
+{state_vars_text}
+
+## Feedback
+{error_feedback}
+
+## Continue From
+{bridge_text}
+
+Plan silently using "Before You Write". Satisfy every rule in "Requirements". Follow "Story Setting" and "Current Status".
+"""
 
 
 class PromptBuilder:
@@ -291,13 +299,12 @@ class PromptBuilder:
     Round 1 user message = ROUND1_PREFIX + ROUND_TEMPLATE.
     Round N user message = ROUND_TEMPLATE only.
 
-    ROUND1_PREFIX: role, format spec, example, core rules, story
-    background. Sent once, never compressed.
+    ROUND1_PREFIX: role, format spec, examples, core rules, story
+    setting. Sent once, never compressed.
 
     ROUND_TEMPLATE: outline progress, current node, state snapshot,
-    error feedback, output constraints, bridge text. Shared by every
-    round — Round 1 has empty bridge_text and no error feedback,
-    later rounds fill them in.
+    error feedback, bridge text. Shared by every round — Round 1
+    uses placeholder values, later rounds fill them in.
     """
 
     @staticmethod
@@ -313,12 +320,11 @@ class PromptBuilder:
     ) -> str:
         """Build Round 1 prompt (permanent anchor).
 
-        Concatenates ROUND1_PREFIX (format + rules + story context)
-        with ROUND_TEMPLATE (outline + state + constraints).
+        Concatenates ROUND1_PREFIX (format + rules + story setting)
+        with ROUND_TEMPLATE (outline + state + continuation).
 
-        Round 1 fills bridge_text with a start-of-story placeholder
-        instead of actual post-bridge text.  error_feedback is empty
-        (no previous round to reject changes from).
+        Round 1 uses placeholder values for bridge_text and
+        error_feedback — no previous round exists yet.
 
         Args:
             story_config: Story configuration dict (tier, title,
@@ -335,15 +341,12 @@ class PromptBuilder:
             Full Round 1 prompt string.
         """
         language = story_config.get("language", DEFAULT_LANGUAGE)
-        limits = LANGUAGE_SEG_LIMITS.get(language, LANGUAGE_SEG_LIMITS[DEFAULT_LANGUAGE])
-        narr_limit = limits["narration"]
-        dial_limit = limits["dialogue"]
 
         state_vars_text = PromptBuilder._format_current_state(
             state_vars, variables or [],
         )
 
-        # Build unified story context (plan D9/D15)
+        # Build story setting
         premise = story_config.get("premise", "")
         premise_text = premise if premise else "(none)"
         characters_text = PromptBuilder._format_characters(characters or [])
@@ -357,8 +360,6 @@ class PromptBuilder:
             MAX_LINES=LINES_PER_ROUND_MAX,
             BRIDGE_PCT=bridge_pct,
             LANGUAGE=language,
-            NARR_LIMIT=narr_limit,
-            DIAL_LIMIT=dial_limit,
             premise=premise_text,
             characters=characters_text,
             locations=locations_text,
@@ -370,8 +371,6 @@ class PromptBuilder:
             node_goal=goal or "Begin the story from the active node.",
             state_vars_text=state_vars_text,
             error_feedback="(No issues)",
-            MIN_LINES=LINES_PER_ROUND_MIN,
-            MAX_LINES=LINES_PER_ROUND_MAX,
             bridge_text="(Story begins)",
         )
 
@@ -440,8 +439,6 @@ class PromptBuilder:
             node_goal=goal,
             state_vars_text=state_vars_text,
             error_feedback=error_feedback,
-            MIN_LINES=LINES_PER_ROUND_MIN,
-            MAX_LINES=LINES_PER_ROUND_MAX,
             bridge_text=bridge_text or "",
         )
 
