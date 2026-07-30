@@ -181,7 +181,7 @@ class CoCreateSendReply(BaseModel):
 
 
 @app.post("/api/co-create/send", response_model=CoCreateSendReply)
-async def co_create_send(body: CoCreateSendBody):
+def co_create_send(body: CoCreateSendBody):
     """Send a user message in the co-creation Q&A.
 
     Returns the LLM's reply text.  On API failure, returns HTTP 502
@@ -200,7 +200,7 @@ async def co_create_send(body: CoCreateSendBody):
 
 
 @app.post("/api/co-create/retry-send", response_model=CoCreateSendReply)
-async def co_create_retry_send():
+def co_create_retry_send():
     """Retry the last failed send() call."""
     flow = sessions.get_co_create()
     if flow is None:
@@ -215,7 +215,7 @@ async def co_create_retry_send():
 
 
 @app.post("/api/co-create/generate")
-async def co_create_generate():
+def co_create_generate():
     """Generate the story setup from the Q&A conversation.
 
     On success, creates the save file immediately (``_init.json``) and
@@ -248,7 +248,7 @@ async def co_create_generate():
 
 
 @app.post("/api/co-create/retry-generate")
-async def co_create_retry_generate():
+def co_create_retry_generate():
     """Retry the last failed generate() call."""
     flow = sessions.get_co_create()
     if flow is None:
