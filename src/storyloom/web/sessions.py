@@ -13,7 +13,7 @@ Game store:
     inject_choice / wait_for_choice
 """
 
-import queue
+import asyncio
 import threading
 
 from storyloom.core.co_create import CoCreateFlow
@@ -81,7 +81,7 @@ def remove_game(game_id: str) -> None:
 
 # Per-game event queues for SSE streaming.
 # Populated by the background thread; drained by the async SSE endpoint.
-_game_streams: dict[str, queue.Queue] = {}
+_game_streams: dict[str, asyncio.Queue] = {}
 
 # Per-game GameLoop reference stored at stream creation time.
 # Used by pop_game_stream() / game_stream guard to cancel the *correct*
@@ -104,7 +104,7 @@ _game_stop_events: dict[str, threading.Event] = {}
 
 def store_game_stream(
     game_id: str, gl: "GameLoop"
-) -> tuple[queue.Queue, threading.Event]:
+) -> tuple[asyncio.Queue, threading.Event]:
     """Create and store an event queue and stop signal for a game SSE stream.
 
     Also stores *gl* so that ``get_game_stream_loop()`` can retrieve the
@@ -116,7 +116,7 @@ def store_game_stream(
     ``is_game_stream_stopped()`` lookup (which races with a new
     ``store_game_stream()`` call overwriting the event).
     """
-    q: queue.Queue = queue.Queue()
+    q: asyncio.Queue = asyncio.Queue()
     evt = threading.Event()
     _game_streams[game_id] = q
     _game_stream_loops[game_id] = gl
@@ -164,7 +164,7 @@ def is_game_stream_stopped(game_id: str) -> bool:
     return evt.is_set() if evt is not None else True
 
 
-def pop_game_stream(game_id: str, q: queue.Queue | None = None) -> queue.Queue | None:
+def pop_game_stream(game_id: str, q: asyncio.Queue | None = None) -> asyncio.Queue | None:
     """Remove a game stream queue, stop signal, and choice state.
 
     If *q* is provided, ALL state (queue, stop event, choice state)
@@ -192,7 +192,7 @@ def pop_game_stream(game_id: str, q: queue.Queue | None = None) -> queue.Queue |
     return _game_streams.pop(game_id, None)
 
 
-def get_game_stream(game_id: str) -> queue.Queue | None:
+def get_game_stream(game_id: str) -> asyncio.Queue | None:
     """Return a game stream queue without removing it."""
     return _game_streams.get(game_id)
 

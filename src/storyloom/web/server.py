@@ -37,7 +37,6 @@ GameSession construction:
 import asyncio
 import json
 import os
-import queue
 import sys
 import threading
 from pathlib import Path
@@ -330,8 +329,9 @@ async def game_stream(game_id: str):
     """SSE endpoint for the narrative event stream.
 
     A background daemon thread runs the game loop (stream_round()
-    generator).  Events are pushed into a ``queue.Queue`` and the
-    async generator drains it, yielding SSE messages to the client.
+    generator).  Events are pushed into an ``asyncio.Queue`` via
+    ``call_soon_threadsafe`` and the async generator drains it with
+    ``await q.get()`` — zero-polling, event-driven SSE.
 
     When the generator yields an ``options`` event, the background
     thread blocks on ``wait_for_choice()`` until the player sends a
@@ -362,6 +362,7 @@ async def game_stream(game_id: str):
             await asyncio.sleep(0.1)
 
     q, stop_evt = sessions.store_game_stream(game_id, gl)
+    loop = asyncio.get_running_loop()
 
     # ── Background thread: run game loop ──────────────────────────
     def run_loop() -> None:
@@ -379,7 +380,7 @@ async def game_stream(game_id: str):
                     if stop_evt.is_set():
                         return
 
-                    q.put(event)
+                    loop.call_soon_threadsafe(q.put_nowait, event)
                     if event["type"] == "options":
                         # Block until choice arrives via POST /choice
                         key = sessions.wait_for_choice(game_id)
@@ -395,7 +396,7 @@ async def game_stream(game_id: str):
                             # Phase 5 (add_round + _launch_api) was
                             # not executed.  This is an abnormal state;
                             # report to client and stop.
-                            q.put({
+                            loop.call_soon_threadsafe(q.put_nowait, {
                                 "type": "error",
                                 "message": (
                                     "Generator exhausted after choice — "
@@ -413,13 +414,24 @@ async def game_stream(game_id: str):
                         # Round complete.  If ending, exit the while
                         # loop after this round.
                         if gl.ending_flag:
-                            q.put({"type": "stream_end"})
+                            loop.call_soon_threadsafe(
+                                q.put_nowait, {"type": "stream_end"}
+                            )
                             return
                         # Otherwise, loop continues to next round.
                         break  # exit for loop, continue while loop
         except Exception as exc:
-            q.put({"type": "error", "message": str(exc)})
+            loop.call_soon_threadsafe(
+                q.put_nowait, {"type": "error", "message": str(exc)}
+            )
         finally:
+            # Signal the async consumer that we're done, then clean up.
+            # call_soon_threadsafe is safe even if the loop is closing
+            # (the callback is a no-op in that case).
+            try:
+                loop.call_soon_threadsafe(q.put_nowait, None)
+            except RuntimeError:
+                pass  # loop already closed — consumer is already gone
             # Identity-checked pop — only removes the queue if a new
             # stream hasn't already replaced it (see sessions.py).
             sessions.pop_game_stream(game_id, q)
@@ -429,36 +441,28 @@ async def game_stream(game_id: str):
 
     # ── Async SSE generator ───────────────────────────────────────
     async def event_generator():
-        # Track last keepalive time so we can poll the queue at short
-        # intervals while still sending keepalive comments every 15 s
-        # to prevent proxy idle timeout (typically 60 s).
-        import time as _time
-        _last_keepalive = _time.monotonic()
-        _KEEPALIVE_INTERVAL = 15.0   # well under typical 60 s proxy timeout
-        _POLL_INTERVAL = 0.1         # 100 ms — tight enough to avoid
-                                     # perceptible loading delays while
-                                     # keeping CPU overhead negligible
+        """Drain the asyncio.Queue with zero-polling await.
+
+        Uses ``asyncio.wait_for(q.get(), timeout=15)`` so keepalive
+        comments still go out every 15 s during idle periods (prevents
+        proxy timeout, typically 60 s).  The producer signals stream
+        end by putting a ``None`` sentinel.
+        """
+        _KEEPALIVE_INTERVAL = 15.0  # well under typical 60 s proxy timeout
 
         try:
             while True:
-                # Non-blocking poll of the queue
                 try:
-                    event = q.get_nowait()
-                except queue.Empty:
-                    # No event ready — check if stream is still alive
-                    if sessions.get_game_stream(game_id) is None:
-                        break
-                    # Send keepalive if due, then sleep a short interval
-                    # before polling again.  A short poll (100 ms) means
-                    # post-choice events injected while the generator was
-                    # waiting for user input are picked up almost
-                    # immediately — no 15 s stall.
-                    now = _time.monotonic()
-                    if now - _last_keepalive >= _KEEPALIVE_INTERVAL:
-                        yield ": keepalive\n\n"
-                        _last_keepalive = now
-                    await asyncio.sleep(_POLL_INTERVAL)
+                    event = await asyncio.wait_for(
+                        q.get(), timeout=_KEEPALIVE_INTERVAL
+                    )
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
                     continue
+
+                # None sentinel — producer thread has exited cleanly.
+                if event is None:
+                    break
 
                 etype = event.get("type", "")
 
