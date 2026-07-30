@@ -28,7 +28,7 @@
 - 库中都包含若干基本的媒体数据类型（角色立绘、背景图像等）
 - 游戏库为全局库的子集，可以直接引用全局的数据；而每次游戏库新“生成”的媒体数据都需要加入全局库
 - 相同媒体数据在游戏库与全局库可能有不同“名称”——不影响，重要的是 ID 或者路径唯一
-- 为了保证全局库不过度膨胀，需要有清理机制，可以内部记录使用次数，当总量过多时清理使用次数少的媒体数据
+- 为了保证全局库不过度膨胀，需要有清理机制，需要内部记录使用次数，当总量过多时清理使用次数少的媒体数据
 - 存档时需要存储当前的游戏库状态，如果读档时数据破坏，交给专门的错误处理机制
 
 ### 选择 & 生成（两者后文统称“制作”）
@@ -51,7 +51,7 @@
 
 **C.游戏素材预构建 AI**（新增）：
 - 基于生成设定中的“地点”“角色”，**制作**游戏的初始媒体数据，直接加入库中
-- 不要求一一对应，可以制作更多，例如地点为“学校”，可以制作“学校.教室”、“学校.操场”等背景图像
+- 不要求一一对应，可以制作更多，例如地点为“学校”，可以制作“学校”、“学校.教室”、“学校.操场”等背景图像
 - 完全支持“选择”模式，即直接把全局库的数据放入到本局的游戏库中，类似于流程 `E`
 
 **D.叙事阶段 LLM**（修改）：
@@ -65,7 +65,7 @@
   - 此标签负责场景切换，UI 侧处理时，需要和 `<seg>` 一样占用专门的等待时间
 - 角色立绘：
   - 变化频率极高，若不需要描述，建议作为 `<seg>` 的子元素，例如 `<seg character="xxx">........</seg>`
-  - 若需要描述，添加标签：`<character name="xxx"/>...description...</character>`，然后再正常使用，此标签不切换立绘
+  - 若需要描述，添加标签：`<character name="xxx">...description...</character>`，然后再正常使用，此标签不切换立绘
   - 立绘也可以不展示，此时保留原样：`<seg>......</seg>`，表示此处不需要展示角色立绘
 - 当遇到 scene、character 等标签时，触发“制作”任务（告知 AI 名称、描述），获得图像结果，并最终与 `SCENE`、`SEG`、`CHARACTER` 事件进行对应。`CHARACTER` 只负责提前制作图像并直接入库，不需要向 UI 发送
 
@@ -87,11 +87,11 @@
 
 **游戏素材预构建 Prompt**
 - 角色立绘、场景图片等用不同的提示词
-- 对于每一个角色/场景，建议使用多线程执行构建流程，减少生成用时
+- 对于每一个角色/场景，建议并发执行构建流程，减少生成用时
 - 传入角色/场景的名称、描述，以及完整的全局库（此时游戏库为空），调用 LLM 快速判断
 - 这个阶段传入全局库信息时可以不说明“名称”，防止仅仅因为名称不同被 LLM 丢弃
 - 若判断结果为需要“生成”，传入详细描述和“范例图像”，调用图像生成 API 进行生成
-- 说明同一内容要求可以生成多个不同方向的图片，大约1-3个，例如角色：笑/平静/愤怒，学校：教师/操场/图书馆
+- 说明同一要求可以生成多个不同方向的图片，大约1-3个，同名内容必须包含，例如学校：学校/学校.教室/学校.操场
 
 **叙事阶段提示词 Prompt**
 - 主要修改在前缀部分
@@ -100,174 +100,165 @@
   - 彻底更新或重构示例，保持示例 1 侧重交互自由度，示例 2 侧重剧情大纲关联性。
 
 **媒体数据实时制作 Prompt**
-- 每次“制作”任务触发时，自身维持一个线程，API 调用流程在程序直接匹配失败后进入
+- 每次“制作”任务触发时，自身维持一个任务流程，API 调用流程在程序直接匹配失败后进入
 - 角色立绘、场景图片等用不同的提示词
 - 传入角色/场景的名称、描述，以及游戏库、全局库（按频率截取20个左右）图像的名称、描述，调用 LLM （无“思考”）快速判断
-- 若判断结果为需要“生成”，传入详细描述和近三张同类型图像（Event Generator存储，不足时传游戏库内容），调用 API 进行生成
+- 若判断结果为需要“生成”，传入详细描述和近三张同类型图像（引擎侧存储，不足时传游戏库内容），调用 API 进行生成
 - 保证流程用时短为核心，一次仅能选择或生成一张图像
 
 ## 流程解析
 
 ### 共创流程
-- 额外添加：游戏素材构建流程
-- 将一些关键素材加入到素材库
+
+1. 构建故事设定和大纲（不变）
+2. 执行游戏素材“制作”流程
+3. 初始化游戏素材库，并加入全局库
 
 ### 叙事流程
 
-**Main LLM(Director)**
-produce: XML tokens
-to: Token Buffer
+```mermaid
+graph TD
+    LLM[LLM]
+    Parser[Stream Parser]
+    StateMng[State Manager]
+    TaskGen[Task Generator]
+    EventDis[Event Dispatcher]
+    UI[UI]
 
--- tokens -->
-**Token Buffer(Queue1)**
-store: tokens
-to: if (consume): Line Generator
+    LLM -- "token" --> Parser
+    Parser -- "Event(unhandled)" --> StateMng
+    Parser -. "trigger" .-> TaskGen
 
--- tokens -->
-**Line Generator**
-produce: 
-- Line: index(003), type(seg), info
-- Requirement: type(scene), name, description("")
-to:
-- Lines Buffer (Line)
-- if (type=scene or character or seg(has_character)): Task Generator(Requirement)
+    StateMng -- "Event(unmatched)" --> EventDis
+    TaskGen -- "Task" --> EventDis
 
-route1: 
+    EventDis -- "Event" --> UI
+    UI -. "feedback" .-> StateMng
 
-    -- Line -->
-    **Lines Buffer(Queue2)**
-    store: Line
-    to: if (consume): Event Generator
-
-route2: 
-
-    -- Requirement -->
-    **Task Generator**
-    process: Produce tasks that get media data result
-    produce: Task: type(character), branch(main), buffer, daemon_thread(opt), completed(false), result(scene_img)
-    to: Tasks Buffer
-
-    -- Task -->
-    **Tasks Buffer(Queue3)**
-    store: Task
-    to: if (GET_TASK): Event Generator
-
--- Line -->/
--- Task -->/
--- UI_feedback -->
-**Event Generator**
-process: 
-- Stream-parse Line to Event
-- Correspond Event
-    - if (CHOICE_END)
-        - if (UI_feedback): get_result(UI_feedback)
-        - else: wait
-    - if (SCENE or CHARACTER or SEG(has_character))
-        - do GET_TASK while (Task.branch != main/current_branch)
-        - if (Task.completed): get_result(Task.result)
-        - else: wait
-- Apply: SET/CHECKPOINT/BRIDGE...
-produce: Event
-to:
-- if (SET or BRIDGE or CHARACTER...): null
-- else: UI Buffer
+    StateMng -. "trigger(pre-fetch)" .-> LLM
+```
 
 ### 关键说明
 
-时序模型：
-> LLM 生成 >= 程序流式解析/媒体数据制作 >= UI 展示
+**数据流**
+- 实线：持续传输和消费的数据流，通常输入和消费不同步、依赖缓冲队列，需判断使用同步、异步还是多线程模式
+- 虚线：单次触发、直接传输的数据或流程
 
-LLM 生成：
-- 使用了一个简单的小缓冲队列 Token Buffer ，和一个行生成器 Line Generator
-- Line Generator 时序几乎和 LLM 生成完全一致，基本从不存在时间差异
-- 效果是将 LLM 生成流：从产生 token 的流程转换为生成 Line 的流程，好处是生成的第一时间就可以判断类型，类似于“预处理”
-- 主要就是需要检测“制作”媒体数据的行标签，并交给新增的后续流程进行提前处理
+**时序模型**：
+- LLM 生成 -> 引擎处理/媒体数据制作 -> UI 展示
+- 相对项目现有状态的变更：
+    - 将解析与数据处理在时序上拆分(`Parser + StateMng`)
+        - 实质：将内容源头从产生 `token` 转换为直接产生程序可处理的 `Event`
+        - 效果：在生成的第一时间就可以判断类型并发起制作任务，是一种“预处理”
+    - 添加：任务生成和媒体数据匹配管线 `TaskGen + EventDis`
 
-媒体数据制作：
-- 包含一个任务生成器 Task Generator 和一个任务存储队列 Tasks Buffer
-- Task Generator 本质服务于 Line Generator，且 Requirement 类型为抽象设计—— Line Generator 会产生两种类型并放入不同队列
-- 对于每个媒体数据制作需求，创建一个后台线程任务 Task ，相对独立、互不干扰，完成顺序不重要，保证队列顺序稳定即可
-- 队列需要持续监听 Event Generator 的消费请求，若发起请求：不管队首 Task 是否完成直接出队
+**Stream Parser**
+- 对输入 token 进行流式解析，解析出其对应的 `Event`（需要存储起始**行号**，作为匹配标识）
+- 时序与 LLM 生成基本一致，接收、消费从不主动阻塞
+- 若类型为 `SCENE / CHARACTER / SEG(has_character)` ，需要同步触发 TaskGen 构造 `Task`
 
-程序流式解析：
-- 事件生成器 Event Generator（内含解析器），接收 Lines Buffer, Tasks Buffer, UI 三路输入
-- 原来的解析器已经被拆分，Event Generator 只需要完成从 Line 到 Event 的解析即可
-- 触发选项事件时，需要等待用户反馈才能继续
-- 触发媒体制作相关事件时，从队列消费 Task，不符合分支的 Task 关闭并丢弃，需要等待 Task 完成才能继续
+**State Manager**
+- 数据处理和流程管理
+    - `SET` 应用、`CHECKPOINT` 应用等
+    - `CHOICE_END` 等待 UI 反馈，**阻塞**消费
+    - `BRANCH` 根据 `current_branch` 执行过滤
+    - `BRIDGE` 切换模式，极速解析至 `STORY_END` ，触发 `pre-fetch` 桥接流程
 
+**Task Generator**
+- 构造制作图像的并发任务 `Task` ，大致包括：
+    - `line`: 对应事件的起始行号
+    - `type`: character/scene，或设计为 `Task` 的两个子类
+    - `process`: 执行的任务（程序匹配 -> LLM 判断 -> 图像 AI 生成）
+    - `completed`: 完成标记
+    - `result`: 返回的图像结果（ID或路径）
+- `Task` 相对独立、互不干扰，完成顺序不关注，但发起和消费的顺序需保持一致
+- 若 EventDis 发起消费请求，不管队首 `Task` 是否完成，都直接出队，由匹配器执行过滤和等待
+
+**Event Dispatcher**
+- 将 `Event` 与 `Task` 进行**匹配**
+- 流程伪代码：
+```
+consume(Event)
+while Task.line < Event.line:   # 推进 cursor，清孤 Task
+    consume(Task)
+if Task.line == Event.line:     # 对齐了 → 匹配
+    wait + match
+# Task.line > Event.line 或队列空 → 无匹配需求
+send(Event)
+```
 
 ## 实现方案
 
-### 重构解析器（仍属于 Phase1）
+### 重构解析/管理/分发流程（仍属于 Phase1）
 
-- 设计 Line 类：包含行号，标签，内容信息等成员
-- 基于原有队列设计，构建出两种线程安全队列：Token Buffer 和 Line Buffer
-- 将解析器流程拆分为两个部分：Lines Generator 和 Event Generator ，中间用 Line Buffer 连接
-- 前者负责初步处理：截取行，拆分行编号，分析标签类型，传输 Line 类
-- 后者负责后续解析处理，对于不同类型标签采用不同解析方式
+- 重构 Event 类：需要额外包含起始**行号**
+- 构造两个处理模块：`StreamParser`(基于 `StreamingXmlParser`) 和 `StateManager`
+- 构造事件分发器 `EventDispatcher` ，仅负责事件的分发
 
-验证：重构后依然能够完整跑通 Phase1 流程
+验证：重构后依然能够完整跑通 Phase1 流程，发布 1.x.x 系列最后版本
 
-### 图像生成模块搭建和模式区分
+### 模式区分与图像生成（进入 Phase2）
 
-- 设计专门的媒体数据存储目录
-- 搭建基本的图像 API 调用模块，初步实现图像“生成”功能
-- 为用户基本配置添加模式配置、图像 API 配置等功能
-- UI 进行适配
+- 规划专用的媒体数据存储目录结构
+- 参考 `api_client` ，搭建基本的图像 API 调用模块
+- `user_config` 添加游戏模式（text/graph）、图像 API 配置等，UI、测试等进行适配
+- 在 `GameSession` 初始化时就进行模式区分，走不同的管线，复用相同的 Parser, StateMng, EventDis
 
-验证：能够在本地目录中看到 AI 生成图像结果，且纯文本模式可稳定运行
+验证：初步实现图像“生成”功能，区分游戏模式，纯文本模式完整
 
-### 添加场景、角色元素
+### 构建媒体数据库管理架构
 
-- 重构叙事阶段 Prompt ，添加 scene, character 相关元素
-- Event Generator 和 Line Generator 添加对于 scene, character 相关元素的解析
-- 仅适配纯文本模式：Line Generator 仅判断其类型不处理；Event Generator 暂时对相关类型直接丢弃（带 character 的 seg 以简单 SEG 事件传输）
-
-验证：在新提示词和返回设计下 UI 游玩纯文本模式依然稳定，不存在问题
-
-### 构建基本媒体数据库管理架构
-
-- 设计特定媒体数据类，目前包括：角色立绘、场景图像
-- 搭建全局与游戏媒体数据库，实现特定类型的频率排序、完整展示（有无name）、全局截取展示、自动清理、错误处理等基础功能
+- 数据库不直接存储图像文件，而是存储元数据并管理图像文件路径
+- 设计媒体数据类，目前包括：角色立绘、场景图像
+- 搭建全局与游戏媒体数据库：实现频率排序、完整展示（有无name）、截取展示、自动清理、错误处理等基础设施
 
 验证：通过测试代码和图像（人工添加）验证数据库基础功能完整性
 
-### 设计共创阶段图像“制作”流程
+### 添加角色和场景元素
 
-- 需要保留对纯文本模式的兼容性，提供不同进入渠道
-- 验证无“思考”模式可行性，并设计无“思考”（可选，传参区分）的 LLM “选择”流程
-- 设计**游戏素材预构建 Prompt**和并搭建完整的“制作”流程，初步填充游戏库与全局库内容
-- 参照共创阶段设计，可初步搭建叙事阶段的图像“制作”流程框架，暂不设计 Prompt、不调用流程
+- 新建图像模式专用的叙事阶段 Prompt ，添加 `scene`, `character` 相关元素
+- 新建 `SCENE`, `CHARACTER`, `SEG_CHARACTER` 等事件，并支持解析
+- 图像模式 Parser 暂时不触发任务构建
 
-验证：通过共创阶段能够在本地生成初始的媒体数据库，具备“选择”机制，且能够多线程同时生成
+验证：测试新提示词， LLM 返回结果可被正确解析
 
-### 设计叙事阶段图像“制作”流程
+### UI 图像模式：兼容新类型&设计新界面
 
-- 参照共创阶段，设计**媒体数据实时制作 Prompt**
-- 参照共创阶段，搭建完整的“制作”流程
+- 共创阶段新增“素材初始化”过渡界面，暂时固定时长
+- 设计全新的叙事阶段界面
+- 兼容新增事件类型的处理
 
-验证：通过测试代码调用，能在本地查看到生成的图像数据，具备“选择”机制，且能够多线程同时生成
+验证：通过测试脚本的模拟事件输入，能够达到视觉小说游戏的演出效果
 
-### 新增任务构建与任务缓冲
+### 搭建任务构建和匹配管线
 
-- 设计 Task 类，满足创建“制作”任务、后台线程独立执行等各种复杂要求
-- 设计 Task Buffer 线程安全队列
-- 为 Lines Generator 添加图像模式的类型检测和 Requirement 抽象创建
-- 为 Lines Generator 添加 Task Generator 模块，并实现 Task 构建功能
+- 设计 `Task` 类，`process` 用固定时长并发任务临时占位，`result` 统一赋值
+- 设计 `Task Generator` 模块，实现 `Task` 构建功能
+- Parser 添加图像类事件检测和任务构建触发
+- EventDis 基于行号比较逻辑，添加图像匹配功能
+- 保证流程对于无图像类元素的纯文本模式兼容
 
-验证：通过测试代码调用，Lines Generator 和 Task 能够正确处理其工作，填充任务队列，产生正确的数据库影响
+验证：图像模式能够正常跑通，所有图像为非生成式的统一临时图像
 
-### 事件生成器新增任务类型处理
+### 共创阶段图像“制作”流程
 
-- 为 Event Generator 设计基本的任务获取消费和等待逻辑
-- 能向 UI 正常发送场景、角色相关事件
-- UI 暂时不处理相关事件，带 character 的 SEG 以普通 SEG 形式处理
+- 验证 LLM 无“思考”模式可行性，实现无“思考”（参数控制）的 LLM “选择”流程
+- 设计游戏素材生成 Prompt(区分类型，多图生成)，实现基于图像生成 AI 的“生成”流程
+- 基于“地点”和“角色”数据，搭建多图像“制作”的并发架构
+- UI 适配
 
-验证：图像模式可以在文本模式的 UI 效果下完整跑通，数据图像正常管理
+验证：图像模式的共创阶段完整实现，本地全局库得到填充
 
-### 设计图像模式的新 UI
+### 叙事阶段图像“制作”流程
 
-- 为图像模式添加新的 UI 叙事界面
+- 参照共创阶段，实现无“思考”（参数控制）的 LLM “选择”流程
+- 参照共创阶段，设计游戏素材生成 Prompt(单图)，实现“生成”流程
+- 搭建完整的“制作”流程架构，实现程序“直接匹配”机制
+- 正式填充 Task ，使其功能完整实现
+
+验证：图像模式能够完整跑通全流程
+
+### 测试与优化
 
 验证：Phase2 构想完全落地
 

@@ -6,6 +6,45 @@
 
 ---
 
+## 2026-07-30（周四）
+
+> **概述**：Phase 2 图形模式管道架构深度讨论与设计优化——bridge 机制分析、解析/匹配分离、行号匹配算法、Event 三态命名。设计草稿经历多轮迭代重构。
+
+### 图形模式管道架构——设计优化
+
+**背景**：07-29 的设计草稿初版包含两段式解析器（Line Generator + Event Generator）+ Task Generator + Tasks Buffer 的管道架构，但在 bridge pre-fetch 时序、中间数据类型、匹配算法等方面存在模糊地带。本日对管道架构做了系统性评审和重新设计。
+
+**决策**（`docs/spec/graph-mode-design-draft.md` 多轮迭代）：
+
+1. **管道四段式架构**：
+
+```
+LLM → StreamParser → StateManager → EventDispatcher → UI
+         │                                 ↑
+         └──→ TaskGenerator ──Task─────────┘
+```
+
+| 组件 | 职责 | 阻塞行为 |
+|------|------|---------|
+| **StreamParser** | token → Event(unhandled)，检测媒体标签时 fire-and-forget 触发 TaskGen | 从不阻塞 |
+| **StateManager** | SET/CHECKPOINT 应用、BRANCH 过滤、CHOICE 等待、BRIDGE → pre-fetch | CHOICE 处阻塞 |
+| **TaskGenerator** | 构造并发图像制作 Task，有序队列，pull 模型出队 | 不阻塞 |
+| **EventDispatcher** | 文本模式透传，图形模式按行号匹配 Task → 组装后发送 UI | 图像等待处阻塞 |
+
+2. **bridge pre-fetch 时序分析**：图形模式下 bridge 后可能出现图像任务等待，但下一轮 Prompt 仅需文本内容（bridge_text），不需图像数据。StreamParser 在 `</story>` 前已完成全部文本提取，StateManager 在 `</story>` 处触发 pre-fetch——不受 EventDispatcher 图像阻塞影响。CHOICE 阻塞影响 bridge 触发（正确且不可避免），图像阻塞不影响。
+
+3. **行号匹配替代分支匹配**：Task 与 Event 通过 LLM 输出行号对位——`while Task.line < Event.line: consume`。分支匹配不可行的根因：(a) BRANCH 事件在 StateManager 中被消费，无法到达下游；(b) current_branch 是动态状态，匹配器无法复现；(c) Event 不携带 branch 信息。行号作为全局唯一、单调递增的标识，自动处理孤 Task 清理和分支过滤。
+
+4. **Event 三态命名**：同类型贯穿管线——`Event(unhandled)` → `Event(unmatched)` → `Event`，完整性递增。StreamParser 产出 unhandled（字段完整但 SET 未应用），StateManager 产出 unmatched（状态已应用但媒体未附加），EventDispatcher 产出最终的 Event（媒体已附加）。
+
+5. **EventDispatcher 命名**：原设计称 MediaMatcher，因文本模式复用该模块（仅透传事件，无 Task 处理）而改为通用名称。两种模式差异收敛在构造时——传入 TaskGen 或 None。
+
+6. **与现有代码对应**：StreamParser ≈ `StreamingXmlParser`，StateManager ≈ `GameLoop`。重构在 Phase 1 内完成（Parser + StateManager + EventDispatcher），Phase 2 在其上增量添加 TaskGen + 媒体制作管线。
+
+**依据**：`docs/spec/graph-mode-design-draft.md` §流程解析。
+
+---
+
 ## 2026-07-29（周三）
 
 > **概述**：12 次提交，Story Context 架构拆分、冒险日志 Prompt 重设计、四个阶段 Prompt 全面审查与措辞修复、Phase 2 图像生成模式设计草稿。315 测试全绿。
@@ -2678,7 +2717,7 @@ Step 4: 生成大纲树（=== outline ===）
 - **依据**：优先引用 commit hash + message、spec 文档章节号、memory 文件名。避免模糊表述
 - **跨日引用**：同一主题跨多日时，最早出现日写完整背景，后续日用"见 X 日日志"链接
 - **废弃/推翻决策**：保留不删，在后续日期标注"推翻/替代"并交叉引用到修正决策
-- **扩充**：新日志插入在最新日期下方（倒序），保持最近工作最先可见
+- **扩充**：新日志插入文首（最新日期之前），保持倒序排列
 
 ---
 
