@@ -6,6 +6,32 @@
 
 ---
 
+## 2026-07-31（周五）
+
+> **概述**：实现 `<set>` 驱动的数据分支控制——`BRANCH` 保留变量允许 LLM 根据 state_vars 条件自动切换 `current_branch`，无需玩家选项介入。同时使 `<set>` 的 `op` 属性可选化，缺省为 `=`。
+
+### `<set>` 驱动的分支控制
+
+**背景**：剧情的分支走向理应根据数据决定（如好感度>50走路线A，<50走路线B）。已有机制中，`checkpoint` + `<route>` 只能在大纲层级路由，而内容层级的 `<branch>` 切换仅能通过玩家选项 (`<opt branch="...">`) 实现——无法表达"根据数据条件自动选择分支"的需求。原始设计意图中 `<set>` 应能设置 `current_branch`，但实施时未包含。
+
+**决策**：
+
+1. **引入 `BRANCH` 保留变量**（`BRANCH_VAR_NAME = "BRANCH"`，放在 `config.py` 全局常量）：`<set var="BRANCH" val="分支名"/>` 在 `stream_round()` 的 SET 事件处理中被拦截，通过 `evaluate_condition` 评估 `if` 条件后直接更新 `current_branch`——不经过 `GameState.apply_set()`，无需注册为 state variable，不产生 "unknown variable" 拒绝。
+
+2. **`op` 属性可选化**：`_RE_SET` 正则将 `op` 改为可选组，解析时缺省为 `"="`。向后兼容——已有显式 `op` 的 `<set>` 不受影响。
+
+3. **Prompt 全面同步**：Example 1 替换为含 `BRANCH` 用法的完整故事（Greta/Kael/stranger），展示 pre-bridge 条件分支；Example 2 使用无 `op` 写法；`<set>` 文档更新 `op` 为可选，补充 `BRANCH` 保留变量说明和 snippet。
+
+4. **规范更新**：`block-spec.md` §3 新增数据驱动来源，§4 `op` 改为可选；`data-model.md` §A.2 补充 `BRANCH_VAR_NAME` 常量。
+
+**依据**：
+- commits：`efa3f0f`（解析器+引擎）、`bd9cb0b`（常量表）、`db63993`（prompt 同步）
+- `docs/spec/block-spec.md` §3-4、`docs/spec/data-model.md` §A.2
+- 测试：`TestBranchSetControl`（6 个）+ `test_set_without_op_defaults_to_assign`（3 个）+ `test_round1_contains_branch_var_in_prompt`
+- 325 全量测试通过
+
+---
+
 ## 2026-07-30（周四）
 
 > **概述**：Phase 2 图形模式管道架构深度讨论与设计优化——bridge 机制分析、解析/匹配分离、行号匹配算法、Event 三态命名。设计草稿经历多轮迭代重构。
