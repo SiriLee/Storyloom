@@ -46,6 +46,27 @@
 - commit：`11746e4`（设计草稿全面重写，+83/-68 lines）
 - `docs/spec/graph-mode-design-draft.md`
 
+### 并发模型全面审计与修复
+
+**背景**：图形模式设计草稿中管线涉及线程、生成器链、异步等多层并发机制，需要先厘清当前项目的并发现状，再评估设计草稿中并发方案的合理性和可行性。
+
+**决策**：
+
+1. **当前并发模型梳理**：项目以多线程为主，asyncio 仅用于 Web 层 SSE 轮询。核心 4 线程——主线程（asyncio 事件循环）、游戏循环守护线程（同步生成器）、API 预取守护线程（每轮一个）、冒险日志线程（结局时）。引擎核心零 async，全部同步生成器 + 后台线程。
+
+2. **两处代码修复**：
+   - **共创端点阻塞事件循环**（P1）：4 个 `async def` 端点内部调用同步 `api.chat()` 阻塞 10-60s。改为 `def` 让 FastAPI 自动线程池执行。commit `d2abb53`
+   - **SSE 忙轮询 → 事件驱动**（P2）：`queue.Queue.get_nowait()` + `sleep(0.1)` 轮询 → `asyncio.Queue` + `await q.get()` + `call_soon_threadsafe`。消费者零 CPU 唤醒，生产者线程安全投递。commit `6fdd123`
+
+3. **Phase 2 并发方案选择**：共创阶段 15-30 个并发素材制作 Task，叙事阶段每轮 1-3 个。对比 ThreadPoolExecutor vs asyncio，选择 asyncio——15-30 个 IO 等待型协程远轻于同等数量线程，且 Task 的"发射后不管"语义与 `asyncio.create_task()` 天然匹配。游戏循环保持同步生成器（`gen.send` 需求），Task 执行在独立事件循环上异步并发。
+
+4. **设计文档线程/异步章节**：补充线程模型（事件线程 + API 线程的两线程布局）和异步并发（SSE 推送 + Task 制作两处异步）说明，修正数据流描述中队列与生成器 `yield` 的区分。commit `2841c9d`
+
+**依据**：
+- commits：`d2abb53`、`6fdd123`、`2841c9d`
+- `docs/spec/graph-mode-design-draft.md` §线程模型、§异步并发
+- 315 全量测试通过
+
 ---
 
 ## 2026-07-30（周四）
