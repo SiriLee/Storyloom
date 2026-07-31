@@ -154,6 +154,7 @@ saves/
 | `STORY_TITLE_MAX_CHARS` | 30 | 故事标题最长字符数 |
 | `VARIABLE_CAP` | 6 | 变量全局总数上限（不管 scope 或类型） |
 | `GLOBAL_SCOPE` | `"GLOBAL"` | 默认作用域标识（变量无 scope 时归属此 scope） |
+| `BRANCH_VAR_NAME` | `"BRANCH"` | `<set>` 保留变量名，直接设置 `current_branch`，不经过 `state_vars` |
 | `SUPPORTED_LANGUAGES` | `{"zh-CN", "zh-TW", "en"}` | 支持的语言集合 |
 | `DEFAULT_LANGUAGE` | `"en"` | 默认语言（语言未指定或不受支持时的 fallback） |
 
