@@ -1,6 +1,7 @@
 """Build Round 1 and Round N prompt content for conversation-based architecture."""
 
 from storyloom.config import (
+    BRANCH_VAR_NAME,
     LINES_PER_ROUND_MIN,
     LINES_PER_ROUND_MAX,
     BRIDGE_POSITION_RATIO,
@@ -22,57 +23,50 @@ ROUND1_PREFIX = """You are the director for an interactive text adventure game. 
 ## Example 1
 
 001| <story>
-002| <seg>The fire in the Sleeping Fox had burned low, and the evening crowd was thin</seg>
-003| <seg>Kael shook the snow from his coat and made for the bar</seg>
-004| <seg>Greta looked up from the mug she was drying and smiled</seg>
-005| <seg>Greta: Look what the wind blew in. Long week?</seg>
-006| <seg>Kael: Pour me something warm and I might tell you about it</seg>
-007| <choice id="bar_talk">
-008|   <opt key="1">"Any gossip? Who's been through here lately?"</opt>
-009|   <opt key="2">"Just a quiet corner and a meal. I'm laying low."</opt>
-010|   <opt key="3">"I'm looking for someone. Woman, dark hair, travels with a hawk."</opt>
-011| </choice>
-012| <seg>Greta poured a drink that smelled of honey and cloves</seg>
-013| <seg>Greta: Had merchants, caravan guards, some diplomats. Nobody with a hawk, though — I'd remember that</seg>
-014| <seg>She leaned closer, lowering her voice</seg>
-015| <seg>Greta: But there was a man. Two nights ago. Paid in silver, asked about the old watchtower road</seg>
-016| <set var="Greta.favor" op="+" val="5"/>
-017| <seg>Kael's hand tightened on the cup. The watchtower road led to the border — and the one person who'd send a man with silver</seg>
-018| <seg>The tavern door swung open. Cold air cut through the room</seg>
-019| <seg>A tall stranger in a patched cloak stepped inside, scanning the faces</seg>
-020| <seg>His eyes paused on Kael, then moved on</seg>
-021| <seg>Greta: That's him. Back again asking for a room</seg>
-022| <seg>The stranger sat at the far end of the bar, back to the wall, and ordered nothing</seg>
-023| <choice id="handle_stranger">
-024|   <opt key="1" branch="confront">Slide over and introduce himself — blunt and direct</opt>
-025|   <opt key="2" branch="watch">Stay put and watch. Let the stranger speak first</opt>
-026| </choice>
-027| <set var="Greta.favor" op="+" val="10" if="handle_stranger==1"/>
-028| <set var="Greta.favor" op="-" val="5" if="handle_stranger==2"/>
-029| <branch name="confront">
-030| <seg>Kael walked to the far end of the bar and sat down across from the stranger</seg>
-031| <seg>Kael: You were asking about the watchtower road. Who sent you?</seg>
-032| <seg>The stranger turned, a faint smile on his weathered face</seg>
-033| <seg>Stranger: Straight to business. Sit. We have a mutual problem</seg>
-034| </branch>
-035| <branch name="watch">
-036| <seg>Kael stayed where he was, watching the stranger in the brass reflection of a lamp</seg>
-037| <seg>The man sat still as stone, eyes on the fire</seg>
-038| <seg>After a long silence, he spoke without turning around</seg>
-039| <seg>Stranger: You're either patient or scared. I'm hoping the first one</seg>
-040| </branch>
-041| <bridge/>
-042| <seg>Greta had stopped drying mugs. Her hand rested near the cudgel under the bar</seg>
-043| <seg>Nobody spoke. The whole room was holding its breath</seg>
-044| <seg>The stranger pulled a folded letter from his cloak — worn parchment, black wax seal</seg>
-045| <seg>Stranger: The watchtower is a rendezvous. She said you'd know the way</seg>
-046| <seg>Kael stared at the seal: two crossed keys over a broken crown</seg>
-047| <seg>Stranger: The Guild's patience is thin. Her offer still stands</seg>
-048| <seg>Greta: Whatever that is — take it outside. Not in my tavern</seg>
-049| <seg>The merchants gathered their ledger. The huntsman's crossbow shifted</seg>
-050| <seg>Kael broke the seal. The letter was three lines, no signature, in handwriting he knew too well</seg>
-051| <seg>The Guild wanted their property back. Refusal was not an option</seg>
-052| </story>
+002| <seg>The stranger's eyes didn't waver. Whatever he was selling, he wasn't afraid of a man with questions</seg>
+003| <seg>Kael: You know the Guild's reputation. Why would I take their offer?</seg>
+004| <seg>Stranger: Because the alternative is worse. They didn't send me to negotiate — they sent me to deliver</seg>
+005| <seg>Greta set a mug down harder than necessary, water sloshing the counter</seg>
+006| <seg>Greta: If you're here to deliver, deliver. Then leave</seg>
+007| <choice id="approach_tone">
+008|   <opt key="1">Back Greta's hostility — she knows something you don't</opt>
+009|   <opt key="2">De-escalate. Antagonizing a Guild messenger is a short career</opt>
+010| </choice>
+011| <set var="Greta.favor" op="+" val="15" if="approach_tone==1"/>
+012| <set var="Greta.favor" op="-" val="10" if="approach_tone==2"/>
+013| <seg>The stranger ignored Greta entirely, his focus locked on Kael</seg>
+014| <seg>Stranger: The watchtower road. Midnight. Come alone. If you bring anyone, the deal is void</seg>
+015| <seg>He slid a brass token across the bar — stamped with the crossed-keys seal</seg>
+016| <seg>Kael didn't touch it. A Guild token meant insurance, and the Guild didn't insure deals they planned to honor</seg>
+017| <seg>Kael: And if I don't show?</seg>
+018| <seg>Stranger: Then they send someone less polite. Probably someone you've already met</seg>
+019| <set var="BRANCH" val="greta_intervenes" if="Greta.favor>=20"/>
+020| <set var="BRANCH" val="greta_stays_back" if="Greta.favor<20"/>
+021| <branch name="greta_intervenes">
+022| <seg>Greta reached under the bar and set something heavy beside the register — wrapped in cloth, unmistakably a weapon</seg>
+023| <seg>Greta: Midnight at the watchtower. That's four hours from now</seg>
+024| <seg>She looked at Kael, not the stranger</seg>
+025| <seg>Greta: I know a back way. No roads, no patrols. You won't go alone</seg>
+026| </branch>
+027| <branch name="greta_stays_back">
+028| <seg>The stranger pocketed the token with a thin smile and stood</seg>
+029| <seg>Stranger: Smart man. You'll go far — assuming you show up</seg>
+030| <seg>Greta watched him leave, her jaw tight, but she said nothing. She'd been burned by Guild business before</seg>
+031| <seg>When the door swung shut, the silence was heavier than the conversation</seg>
+032| </branch>
+033| <bridge/>
+034| <seg>Kael picked up the brass token. It was warm — body heat or something worse, he couldn't tell</seg>
+035| <seg>The crossed keys caught the lamplight. Beneath them, letters so fine he had to squint: "Property of the Guild. Return upon completion."</seg>
+036| <seg>Greta: I meant what I said. Don't let pride make you stupid</seg>
+037| <seg>She pulled the cloth off the weapon — an old crossbow, well-oiled, with a stock worn smooth by years of use</seg>
+038| <seg>Greta: My father's. He ran the north road for thirty years. The Guild killed him too</seg>
+039| <seg>Kael had known Greta for five years. She'd never once mentioned a father</seg>
+040| <seg>The fire crackled. The huntsman in the corner gathered his things and left without a word</seg>
+041| <seg>Kael: Four hours. How far to the back way?</seg>
+042| <seg>Greta: Far enough that we leave now. Finish your drink</seg>
+043| <seg>The wind outside had picked up, rattling the shutters. Somewhere in the dark, a dog barked twice and went silent</seg>
+044| <seg>Kael slipped the token into his coat. The metal was still warm against his ribs</seg>
+045| </story>
 
 ## Example 2
 
@@ -102,7 +96,7 @@ ROUND1_PREFIX = """You are the director for an interactive text adventure game. 
 024| </choice>
 025| <set var="Silan.loyalty" op="+" val="20" if="vault_choice==1"/>
 026| <set var="Silan.loyalty" op="-" val="15" if="vault_choice==2"/>
-027| <set var="Awakening" op="+" val="30"/>
+027| <set var="Seal" val="Broken"/>
 028| <checkpoint node="ch3_vault" summary="Elena and Silan opened the Vault of Echoes, sealed since the Sundering. Her choice to enter together or send him first shifted the balance of their fragile trust.">
 029|   <route if="vault_choice==1" target="ch4_together"/>
 030|   <route if="vault_choice==2" target="ch4_alone"/>
@@ -144,7 +138,7 @@ ROUND1_PREFIX = """You are the director for an interactive text adventure game. 
 **Attributes**:
 | Attribute | Required | Description |
 |-----------|----------|-------------|
-| `name` | yes | Branch identifier. Must match the `branch` attribute of an `<opt>` exactly |
+| `name` | yes | Branch identifier. Must match the branch name from `<opt branch="...">` or `<set var="{BRANCH_VAR_NAME}" val="...">` |
 
 ## <choice> + <opt> — Player interaction
 
@@ -155,7 +149,7 @@ ROUND1_PREFIX = """You are the director for an interactive text adventure game. 
 |-----------|---------|----------|-------------|
 | `id` | `<choice>` | yes | Variable name for the choice result. Available in conditions as `id==key` |
 | `key` | `<opt>` | yes | Number `1`/`2`/`3`/`4` — the key the player presses |
-| `branch` | `<opt>` | no | Sets `current_branch` to this value. Matches `<branch name="...">` |
+| `branch` | `<opt>` | no | Sets `current_branch` to this value. |
 | `if` | `<opt>` | no | Availability condition. Unavailable options are hidden from the player |
 
 **Requirements**:
@@ -179,20 +173,21 @@ ROUND1_PREFIX = """You are the director for an interactive text adventure game. 
 **Attributes**:
 | Attribute | Required | Description |
 |-----------|----------|-------------|
-| `var` | yes | Variable name. Use `Scope.Name` for character-scoped variables, bare name for globals |
-| `op` | yes | `+` (add), `-` (subtract), `=` (set). Number: all three. String: `=` only |
+| `var` | yes | variable name |
+| `op` | no | `+`, `-`, `=`(set). Number: all three. String: `=` only. Omit for `=` |
 | `val` | yes | The value to apply |
 | `if` | no | Condition — only apply if true. Same syntax as `<opt if="...">` |
 
 **Requirements**:
-- `var` MUST use the exact names from "Current State" — do not invent, translate, or substitute
-- Number values stay in [0, 100] — out-of-range results are clamped, not rejected
+- Use `var="{BRANCH_VAR_NAME}"` to set `current_branch` to its value
+- State variables must use the exact names from "Current State" — use `Scope.Name` for character-scoped variables, bare name for globals
+- Number values stay in [0, 100] — out-of-range results are clamped
 
 **Snippet**:
 ```
 <set var="Suzu.affection" op="+" val="10"/>
-<set var="Jack.trust" op="-" val="15" if="approach==1"/>
-<set var="Faction" op="=" val="Rebels" if="Jack.trust >= 30 and approach==1"/>
+<set var="{BRANCH_VAR_NAME}" val="speak_out" if="courage>=80"/>
+<set var="Faction" val="Rebels" if="Jack.trust >= 30 and approach==1"/>
 ```
 
 ## <checkpoint> + <route> — Outline checkpoint & routing
@@ -431,6 +426,7 @@ class PromptBuilder:
             MIN_LINES=LINES_PER_ROUND_MIN,
             MAX_LINES=LINES_PER_ROUND_MAX,
             BRIDGE_PCT=bridge_pct,
+            BRANCH_VAR_NAME=BRANCH_VAR_NAME,
             LANGUAGE=language,
             premise=premise_text,
             characters=characters_text,

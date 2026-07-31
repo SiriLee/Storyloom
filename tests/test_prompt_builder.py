@@ -57,8 +57,16 @@ class TestBuildRound1:
     def test_round1_contains_format_example(self):
         pb = PromptBuilder()
         result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES)
-        assert "Sleeping Fox" in result
+        assert "The stranger's eyes didn't waver" in result
         assert "Greta" in result
+
+    def test_round1_contains_branch_var_in_prompt(self):
+        """BRANCH_VAR_NAME placeholder resolved to 'BRANCH' in prompt."""
+        pb = PromptBuilder()
+        result = pb.build_round1(SAMPLE_STORY_CONFIG, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易", SAMPLE_STATE_VARS, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES)
+        assert 'var="BRANCH"' in result
+        assert "<set var=\"BRANCH\" val=\"greta_intervenes\"" in result
+        assert "set `current_branch` to its value" in result
 
     def test_round1_contains_story_context(self):
         pb = PromptBuilder()
