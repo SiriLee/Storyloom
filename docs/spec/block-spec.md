@@ -138,6 +138,7 @@ LLM 输出使用 XML 格式，根元素为 `<story>`。程序通过 `StreamingXm
 | 来源 | 机制 | 示例 |
 |------|------|------|
 | 玩家选择 | 选中的 `<opt>` 的 `branch` 属性 | 选 `key="1"` 且 `branch="direct"` → `current_branch = "direct"` |
+| 数据驱动 | `<set var="BRANCH" val="分支名"/>` 直接设置 | `<set var="BRANCH" val="trust_path" if="信任度>=50"/>` → `current_branch = "trust_path"` |
 
 **`choice_dict` 修改来源**：`<choice>` 的 `id` 属性声明 choice 名，玩家选择后 `choice_dict[id] = 选项数字键序号`。
 
@@ -215,7 +216,7 @@ LLM 输出使用 XML 格式，根元素为 `<story>`。程序通过 `StreamingXm
 | 属性 | 必填 | 说明 |
 |------|------|------|
 | `var` | 是 | 变量名。`scope.name` 指定作用域，裸名称 = GLOBAL |
-| `op` | 是 | 操作符：`+`（number 加减），`-`（number 减），`=`（赋值） |
+| `op` | 否 | 操作符：`+`（number 增加），`-`（number 减少），`=`（赋值）。缺省为 `=` |
 | `val` | 是 | 操作值 |
 | `if` | 否 | 条件表达式。满足才执行。格式 `变量名 运算符 值`，用 `and`/`or` 组合（最多一个） |
 

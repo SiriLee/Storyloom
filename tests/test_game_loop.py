@@ -1131,3 +1131,164 @@ class TestCheckpointProcessing:
             saves = sm.list_saves()
             assert len(saves) == 1
             assert saves[0]["checkpoint_node"] == "ch3_ally"
+
+
+# ── BRANCH Set XML (data-driven branch control) ──────────────────
+
+BRANCH_SET_XML = """<story>
+<seg n="1">You approach the ancient door, its carvings pulsing with faint light.</seg>
+<set var="BRANCH" val="trust_path" if="信任度>=50"/>
+<set var="BRANCH" val="doubt_path" if="信任度<50"/>
+<bridge/>
+<branch name="trust_path">
+<seg n="2">A warmth spreads through your chest — the memory of a promise kept.</seg>
+</branch>
+<branch name="doubt_path">
+<seg n="3">Your hand hesitates. Cold emanates from the stone. Something is wrong.</seg>
+</branch>
+</story>"""
+
+BRANCH_SET_UNCONDITIONAL_XML = """<story>
+<seg n="1">The path splits before you.</seg>
+<set var="BRANCH" val="left_path"/>
+<bridge/>
+<branch name="left_path">
+<seg n="2">You take the left fork, descending into the moss-covered ravine.</seg>
+</branch>
+<branch name="right_path">
+<seg n="3">The right path climbs toward sunlight and birdsong.</seg>
+</branch>
+</story>"""
+
+BRANCH_SET_WITH_CHOICE_OVERRIDE_XML = """<story>
+<seg n="1">Two figures emerge from the shadows.</seg>
+<choice id="react">
+  <opt key="1" branch="fight">Draw your weapon</opt>
+  <opt key="2" branch="talk">Try to reason with them</opt>
+</choice>
+<set var="BRANCH" val="secret_ally" if="信任度>=80"/>
+<bridge/>
+<branch name="fight">
+<seg n="2">You reach for your blade.</seg>
+</branch>
+<branch name="talk">
+<seg n="3">You raise your hands and speak.</seg>
+</branch>
+<branch name="secret_ally">
+<seg n="4">One of them lowers their hood — a familiar face.</seg>
+</branch>
+</story>"""
+
+
+class TestBranchSetControl:
+    """Tests for <set var="BRANCH" val="..."/> data-driven branch control."""
+
+    def test_unconditional_branch_set(self):
+        """<set var="BRANCH" val="..."/> without condition changes current_branch."""
+        mock = MockApiClient(response=BRANCH_SET_UNCONDITIONAL_XML)
+        gl = GameLoop(
+            story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
+            outline_nodes=SAMPLE_OUTLINE_NODES,
+            api_client=mock,
+        )
+        gl.start_game()
+        _run_round(gl)
+        # current_branch should be "left_path" from the unconditional <set>
+        assert gl.current_branch == "left_path"
+
+    def test_conditional_branch_set_match(self):
+        """<set var="BRANCH" ... if="..."/> applies when condition is met."""
+        mock = MockApiClient(response=BRANCH_SET_XML)
+        gs = GameState(SAMPLE_VARIABLES)
+        gs.apply_set(SetOperation("信任度", "=", "70"), {})  # set trust to 70
+        gl = GameLoop(
+            story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
+            outline_nodes=SAMPLE_OUTLINE_NODES,
+            api_client=mock,
+            game_state=gs,
+        )
+        gl.start_game()
+        _run_round(gl)
+        # 信任度=70 >= 50 → trust_path
+        assert gl.current_branch == "trust_path"
+
+    def test_conditional_branch_set_no_match(self):
+        """<set var="BRANCH" ... if="..."/> skips when condition is not met."""
+        mock = MockApiClient(response=BRANCH_SET_XML)
+        gs = GameState(SAMPLE_VARIABLES)
+        gs.apply_set(SetOperation("信任度", "=", "20"), {})  # set trust to 20
+        gl = GameLoop(
+            story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
+            outline_nodes=SAMPLE_OUTLINE_NODES,
+            api_client=mock,
+            game_state=gs,
+        )
+        gl.start_game()
+        _run_round(gl)
+        # 信任度=20 < 50 → doubt_path
+        assert gl.current_branch == "doubt_path"
+
+    def test_branch_set_does_not_affect_game_state(self):
+        """BRANCH set should NOT go through GameState — no 'unknown variable' rejection."""
+        mock = MockApiClient(response=BRANCH_SET_UNCONDITIONAL_XML)
+        gl = GameLoop(
+            story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
+            outline_nodes=SAMPLE_OUTLINE_NODES,
+            api_client=mock,
+        )
+        gl.start_game()
+        _run_round(gl)
+        # BRANCH is not in GameState — current_branch changed without
+        # touching state_vars.  Rejected changes should be empty.
+        assert gl._rejected_changes == []
+
+    def test_branch_set_overrides_choice(self):
+        """BRANCH set after <choice> overrides the player's chosen branch."""
+        mock = MockApiClient(response=BRANCH_SET_WITH_CHOICE_OVERRIDE_XML)
+        gs = GameState(SAMPLE_VARIABLES)
+        gs.apply_set(SetOperation("信任度", "=", "90"), {})  # trust >= 80
+        gl = GameLoop(
+            story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
+            outline_nodes=SAMPLE_OUTLINE_NODES,
+            api_client=mock,
+            game_state=gs,
+        )
+        gl.start_game()
+        # Player picks key "1" (branch="fight"), but BRANCH set overrides
+        # with "secret_ally" because 信任度>=80.
+        _run_round(gl, choice_key="1")
+        assert gl.current_branch == "secret_ally"
+
+    def test_branch_set_no_override_without_condition_match(self):
+        """BRANCH set with unmet condition does NOT override choice branch."""
+        mock = MockApiClient(response=BRANCH_SET_WITH_CHOICE_OVERRIDE_XML)
+        gs = GameState(SAMPLE_VARIABLES)
+        # trust=30 < 80 → BRANCH set condition not met
+        gl = GameLoop(
+            story_config=SAMPLE_STORY_CONFIG,
+            characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
+            variables=SAMPLE_VARIABLES,
+            outline_nodes=SAMPLE_OUTLINE_NODES,
+            api_client=mock,
+            game_state=gs,
+        )
+        gl.start_game()
+        _run_round(gl, choice_key="1")
+        # Choice branch "fight" should stick — BRANCH set not applied
+        assert gl.current_branch == "fight"

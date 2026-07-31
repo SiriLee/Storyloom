@@ -14,7 +14,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Callable
 
-from storyloom.config import SAVE_VERSION, STREAM_STALL_TIMEOUT_SEC, GLOBAL_SCOPE
+from storyloom.config import BRANCH_VAR_NAME, SAVE_VERSION, STREAM_STALL_TIMEOUT_SEC, GLOBAL_SCOPE
 from storyloom.io.api_client import ApiClient
 from storyloom.core.context_manager import ContextManager
 from storyloom.core.prompt_builder import PromptBuilder
@@ -806,16 +806,26 @@ class GameLoop:
                         }
 
                     elif etype == EventType.SET:
-                        change = self._handle_set_event(
-                            event, self.game_state, choice_dict,
-                            new_rejected,
-                        )
-                        if change is not None:
-                            yield {
-                                "type": "state",
-                                "vars": self.game_state.state_vars,
-                                "changes": [change],
-                            }
+                        if event.set_var == BRANCH_VAR_NAME:
+                            # Data-driven branch control — update
+                            # current_branch directly without going
+                            # through GameState (BRANCH is not a
+                            # registered state variable).
+                            if self.game_state.evaluate_condition(
+                                event.set_if, choice_dict
+                            ):
+                                current_branch = event.set_val or "main"
+                        else:
+                            change = self._handle_set_event(
+                                event, self.game_state, choice_dict,
+                                new_rejected,
+                            )
+                            if change is not None:
+                                yield {
+                                    "type": "state",
+                                    "vars": self.game_state.state_vars,
+                                    "changes": [change],
+                                }
 
                     elif etype == EventType.CHOICE_END:
                         if event.choice_data:

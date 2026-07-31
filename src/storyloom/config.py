@@ -27,6 +27,11 @@ MIN_TAIL_LINES = 25           # minimum lines per branch after bridge
 # ── Context budget ────────────────────────────────────────────
 MAX_CONTEXT_TOKENS = 50_000   # target ceiling
 
+# ── Reserved variable names ──────────────────────────────────
+# <set var="BRANCH" val="..."/> sets current_branch directly
+# without going through GameState (no state variable registration needed).
+BRANCH_VAR_NAME = "BRANCH"
+
 # ── Co-creation ──────────────────────────────────────────────────
 
 # Scoped variable caps (per 2026-07-21 scoped-variables spec)

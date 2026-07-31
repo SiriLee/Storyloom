@@ -207,6 +207,40 @@ class TestStreamingXmlParser:
         set_events = [e for e in events if e.type == EventType.SET]
         assert set_events[0].set_if == "受伤==1"
 
+    def test_set_without_op_defaults_to_assign(self):
+        """<set> without op attribute should default to op='='."""
+        sp = StreamingXmlParser()
+        events = self._feed_lines(
+            sp, '<story>\n<set var="BRANCH" val="trust_path"/>\n</story>'
+        )
+        set_events = [e for e in events if e.type == EventType.SET]
+        assert len(set_events) == 1
+        assert set_events[0].set_var == "BRANCH"
+        assert set_events[0].set_op == "="
+        assert set_events[0].set_val == "trust_path"
+
+    def test_set_missing_val_is_none(self):
+        """<set> with missing op — verify val captured correctly despite
+        optional op group."""
+        sp = StreamingXmlParser()
+        events = self._feed_lines(
+            sp, '<story>\n<set var="flag" val="activated"/>\n</story>'
+        )
+        set_events = [e for e in events if e.type == EventType.SET]
+        assert set_events[0].set_var == "flag"
+        assert set_events[0].set_op == "="
+        assert set_events[0].set_val == "activated"
+
+    def test_set_with_explicit_op_still_works(self):
+        """<set> with explicit op still works (backward compat)."""
+        sp = StreamingXmlParser()
+        events = self._feed_lines(
+            sp, '<story>\n<set var="体力" op="+" val="10"/>\n</story>'
+        )
+        set_events = [e for e in events if e.type == EventType.SET]
+        assert set_events[0].set_op == "+"
+        assert set_events[0].set_val == "10"
+
     def test_checkpoint_event(self):
         sp = StreamingXmlParser()
         events = self._feed_lines(

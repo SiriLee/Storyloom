@@ -145,7 +145,7 @@ _RE_OPT = re.compile(
     r'^<opt key="(\d+)"(?: branch="([^"]+)")?(?: if="([^"]+)")?>(.*)</opt>\s*$'
 )
 _RE_SET = re.compile(
-    r'^<set var="([^"]+)" op="([^"]+)" val="([^"]+)"'
+    r'^<set var="([^"]+)"(?: op="([^"]+)")? val="([^"]+)"'
     r'(?: if="([^"]+)")?\s*/>\s*$'
 )
 _RE_CHECKPOINT_OPEN = re.compile(
@@ -384,7 +384,7 @@ class StreamingXmlParser:
         m = _RE_SET.match(clean)
         if m:
             var = m.group(1)
-            op = m.group(2)
+            op = m.group(2) or "="  # op defaults to "=" when omitted
             val = m.group(3)
             if_cond = m.group(4)  # None if no if="..."
 
