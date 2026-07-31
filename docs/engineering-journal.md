@@ -30,6 +30,22 @@
 - 测试：`TestBranchSetControl`（6 个）+ `test_set_without_op_defaults_to_assign`（3 个）+ `test_round1_contains_branch_var_in_prompt`
 - 325 全量测试通过
 
+### 图形模式标签设计——从专用标签到统一声明
+
+**背景**：原设计草稿为场景和角色各自定义了专用标签（`<scene>` / `<character>`），其中 `<scene>` 身兼"描述背景 + 切换场景"双重职责，`<character>` 只描述不切换——同一维度的两种类型行为不一致。此外每新增一种媒体类型都需新标签+新解析规则+新事件，扩展成本高。
+
+**决策**：采用统一声明 + SET 驱动的设计：
+
+1. **`<declare kind="CHAR/SCENE" name="...">desc</declare>`** — 统一声明标签，仅触发素材制作 Task，不产生 UI 事件、不影响内容展示。`kind` 属性区分类型（可扩展）。
+2. **`<set var="SCENE" val="..."/>`** — 场景切换复用现有 SET 机制，与 `BRANCH` 保留变量对称（`SCENE` 同为保留变量）。
+3. **`<seg char="...">`** — 角色立绘切换保持为 seg 属性（语义微调：`character` → `char`）。
+4. **三种事件类型**：`SEG`、`SCENE`（同级，发 UI）、`DECLARE`（仅引擎内部，不发 UI/StateMng）。
+5. **DECLARE Task 特殊处理**：`line=0` 不参与行号匹配，但必须等待完成才能消费后续事件。
+
+**依据**：
+- commit：`11746e4`（设计草稿全面重写，+83/-68 lines）
+- `docs/spec/graph-mode-design-draft.md`
+
 ---
 
 ## 2026-07-30（周四）
