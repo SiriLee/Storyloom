@@ -73,7 +73,7 @@
   - 产生 `SCENE` 事件，**需要**传输到 UI ，可以和 `SEG` 一样占用专门的等待时间
 - 角色立绘：
   - 变化频率极高，作为 `<seg>` 的成员字段，例如 `<seg char="小明">小明: 老师，我来交作业。</seg>`
-  - 若缺省：：`<seg>......</seg>`，表示此处不需要展示角色立绘
+  - 若缺省：`<seg>......</seg>`，表示此处不需要展示角色立绘
   - 同样产生 `SEG` 事件，其内容和处理方式需要更新
 - `SCENE` 和带 `char` 的 `SEG` 需要与对应的制作任务结果进行匹配，再分发
 
@@ -96,7 +96,7 @@
 - 角色立绘、场景图片等用不同的提示词
 - 对于每一个角色/场景，建议并发执行构建流程，减少生成用时
 - 传入角色/场景的名称、描述，以及完整的全局库（此时游戏库为空），调用 LLM 快速判断
-- 告知LLM 无需关注“名称”匹配度，防止名称不合适但描述契合的图像被丢弃，图像选择后在游戏库中重新命名
+- 告知 LLM 无需关注“名称”匹配度，防止名称不合适但描述契合的图像被丢弃，图像选择后在游戏库中重新命名
 - 若判断结果为需要“生成”，传入详细描述和“范例图像”，调用图像生成 API 进行生成
 - 说明可以生成多个不同方向的图片，大约1-3个，例如学校：学校 / 学校.教室 / 学校.操场
 
@@ -124,7 +124,7 @@
 
 ### 叙事流程
 
-**流程模型**
+**流程图**
 
 ```mermaid
 graph TD
@@ -150,13 +150,15 @@ graph TD
 
 **线程模型**
 
-1. 事件线程: StreamParser -> StateManager / TaskGenerator -> EventDispatcher
-2. API 线程: LLM -> (queue.Queue) -> StreamParser
+1. Server 主线程: HTTP + SSE
+2. 事件线程: StreamParser, TaskGenerator, StateManager, EventDispatcher
+3. API 线程: LLM token 流式读取
+4. Task 执行线程: Task.process 异步执行
 
 **异步并发**
 
-1. 核心事件管线: EventDispatcher -> (asyncio.Queue) -> UI Server -> SSE
-2. Task 制作管线: TaskGenerator -> (asyncio event loop) -> EventDispatcher
+1. 事件 → Server: EventDispatcher -> (asyncio.Queue) -> Server 主线程 -> SSE
+2. 任务提交: TaskGenerator -> (asyncio) -> Task 执行线程
 
 ### 关键说明
 
@@ -175,6 +177,7 @@ graph TD
 **Stream Parser**
 - 对输入 token 进行流式解析，解析出其对应的 `Event`（需要存储起始**行号**，作为匹配标识）
 - 时序与 LLM 生成基本一致，接收、消费从不主动阻塞
+- `<set var="SCENE">` 不解析为 `SET` ，而是解析为独特的 `SCENE` 事件
 - 若类型为 `DECLARE / SCENE / SEG(has_char)` ，需要同步触发 TaskGen 构造 `Task`
 - `DECLARE` 不传输给 StateMng ，这个事件仅和 TaskGen 相关
 
