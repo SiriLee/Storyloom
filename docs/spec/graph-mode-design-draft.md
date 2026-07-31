@@ -124,6 +124,8 @@
 
 ### 叙事流程
 
+**流程模型**
+
 ```mermaid
 graph TD
     LLM[LLM]
@@ -146,11 +148,21 @@ graph TD
     StateMng -. "trigger(pre-fetch)" .-> LLM
 ```
 
+**线程模型**
+
+1. 事件线程: StreamParser -> StateManager / TaskGenerator -> EventDispatcher
+2. API 线程: LLM -> (queue.Queue) -> StreamParser
+
+**异步并发**
+
+1. 核心事件管线: EventDispatcher -> (asyncio.Queue) -> UI Server -> SSE
+2. Task 制作管线: TaskGenerator -> (asyncio event loop) -> EventDispatcher
+
 ### 关键说明
 
 **数据流**
-- 实线：持续传输和消费的数据流，通常输入和消费不同步、依赖缓冲队列，需判断使用同步、异步还是多线程模式
-- 虚线：单次触发、直接传输的数据或流程
+- 实线：持续传输的流式数据，跨线程处依赖队列，同线程组件间通过生成器 `yield` 传递
+- 虚线：单次触发、不走持续数据流的控制信号
 
 **时序模型**：
 - LLM 生成 -> 引擎处理/素材制作 -> UI 展示
@@ -250,7 +262,7 @@ send(Event)
 - 设计 `Task Generator` 模块，实现 `Task` 构建功能
 - Parser 添加图像类事件检测和任务构建触发
 - EventDis 基于行号比较逻辑，添加图像匹配功能
-- 保证流程对于纯文本模式兼容（管线不包含 Task Generator 和 EventDis）
+- 保证流程对于纯文本模式兼容（管线不包含 Task Generator）
 
 验证：图像模式能够正常跑通，所有图像为非生成式的统一临时图像
 
