@@ -106,7 +106,7 @@ class MockApiClient:
         self.response = response
         self.last_messages = None
 
-    def stream_chat_iter(self, messages: list[dict]):
+    def stream_chat_iter(self, messages: list[dict], max_tokens=None, response_format=None, extra_params=None):
         """Yield tokens from response, then done chunk (matches ApiClient)."""
         self.last_messages = messages
         # Yield one chunk per character (simulates per-token streaming)
@@ -117,7 +117,7 @@ class MockApiClient:
             "done": True,
         }
 
-    def stream_chat(self, messages: list[dict]) -> MockApiResult:
+    def stream_chat(self, messages: list[dict], max_tokens=None, response_format=None, extra_params=None) -> MockApiResult:
         """Convenience wrapper around stream_chat_iter."""
         collected = []
         ttft = None
@@ -132,7 +132,7 @@ class MockApiClient:
         return MockApiResult("".join(collected), ttft=ttft or 0.5,
                             tokens=tokens or {"prompt": 100, "completion": 50, "total": 150})
 
-    def chat(self, messages: list[dict]) -> str:
+    def chat(self, messages: list[dict], max_tokens=None, response_format=None, extra_params=None) -> str:
         self.last_messages = messages
         return self.response
 

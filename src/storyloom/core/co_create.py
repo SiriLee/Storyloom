@@ -80,8 +80,7 @@ class CoCreateValidator:
         except json.JSONDecodeError as e:
             return None, (
                 f"Invalid JSON format (line {e.lineno}, col {e.colno}: "
-                f"{e.msg}). Please output valid JSON only — no markdown "
-                f"fences, no commentary before or after."
+                f"{e.msg}). Please output valid JSON only."
             )
 
         if not isinstance(data, dict):
@@ -507,7 +506,7 @@ Write ALL content — title, premise, character names, node titles, goals, and v
 
 # Output Format
 
-Your response must be a single JSON object. Output ONLY the JSON — no markdown fences, no commentary before or after.
+Your response must be a single JSON object containing all sections below.
 
 ## Format Example
 
@@ -950,7 +949,9 @@ class CoCreateFlow:
 
         # API call (single attempt — no auto-retry)
         try:
-            response = self._api.chat(self._messages)
+            response = self._api.chat(
+                self._messages, response_format={"type": "json_object"}
+            )
         except ApiError as e:
             self._retry_state = ("generate_api", "")
             raise CoCreateError(
@@ -1111,7 +1112,9 @@ class CoCreateFlow:
 
         # API call (single attempt)
         try:
-            response = self._api.chat(self._messages)
+            response = self._api.chat(
+                self._messages, response_format={"type": "json_object"}
+            )
         except ApiError as e:
             self._retry_state = ("generate_api", "")
             raise CoCreateError(

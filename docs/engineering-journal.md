@@ -6,6 +6,34 @@
 
 ---
 
+## 2026-08-01（周六）
+
+> **概述**：`ApiClient` 新增 `response_format` 与 `extra_params` 参数支持——为共创 JSON 生成的 API 层硬约束与未来图形模式的无思考模式、温度控制等需求提供统一的参数扩展机制。
+
+### ApiClient 参数扩展机制
+
+**背景**：共创阶段 `generate()` 调用 LLM 生成 JSON 设定，此前完全依赖 prompt engineering 约束输出格式，但 API 本身支持 `response_format={"type": "json_object"}` 强制 JSON 输出。此外，图形模式设计草稿提出"通过 `extra_body` 关闭 LLM 思考以加快素材选择响应"（graph-mode-design-draft.md §E），未来还可能涉及 `temperature`、`top_p` 等参数控制。需要一个统一的参数扩展入口。
+
+**决策**：
+
+1. **两层参数设计**：
+   - `response_format` 一等公民——OpenAI 官方 API 标准字段，类型明确（`{"type": "json_object"}`），共创 JSON 生成必传。
+   - `extra_params` 通用 escape hatch——任意顶层 JSON 字段的 dict，合并到请求体中。覆盖 `temperature`、DeepSeek `thinking`、OpenAI `reasoning_effort` 等现在及未来的提供商特有参数。
+   - 命名选择 `extra_params` 而非设计草稿中的 `extra_body`：本项目直接构建 HTTP JSON body（无 OpenAI SDK 层），`extra_params` 更准确描述"额外的顶层 JSON 字段"。
+
+2. **改动集中**：`_build_payload()` 新增两个可选参数（默认 `None`），三个公开方法（`chat` / `stream_chat_iter` / `stream_chat`）签名同步扩展。所有现有调用方零影响。
+
+3. **共创 Prompt 简化**：Output Format 指令从 "no markdown fences, no commentary" 简化为 "containing all sections below"——API 层负责硬约束（合法 JSON），Prompt 负责软引导（字段语义），`validate_json` 的 markdown fence 清理保留作为最后兜底。
+
+**依据**：
+- `src/storyloom/io/api_client.py`：`_build_payload` + 3 个公开方法
+- `src/storyloom/core/co_create.py`：`generate()` / `retry_generate()` 传入 `response_format`；`CO_CREATE_GENERATION_PROMPT` §Output Format；`validate_json()` 错误提示
+- `docs/spec/prompt-design.md` §3.2.1：Prompt Output Format 同步
+- `docs/spec/graph-mode-design-draft.md` §E（extra_body 需求来源）
+- 325 全量测试通过
+
+---
+
 ## 2026-07-31（周五）
 
 > **概述**：实现 `<set>` 驱动的数据分支控制——`BRANCH` 保留变量允许 LLM 根据 state_vars 条件自动切换 `current_branch`，无需玩家选项介入。同时使 `<set>` 的 `op` 属性可选化，缺省为 `=`。

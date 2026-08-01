@@ -100,6 +100,8 @@ class ApiClient:
         messages: list[dict],
         stream: bool = False,
         max_tokens: int | None = None,
+        response_format: dict | None = None,
+        extra_params: dict | None = None,
     ) -> dict:
         payload: dict = {
             "model": self.model,
@@ -110,6 +112,10 @@ class ApiClient:
         }
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
+        if response_format is not None:
+            payload["response_format"] = response_format
+        if extra_params:
+            payload.update(extra_params)
         return payload
 
     @staticmethod
@@ -154,13 +160,23 @@ class ApiClient:
     # ── public API ────────────────────────────────────────────────────
 
     def chat(
-        self, messages: list[dict], max_tokens: int | None = None
+        self,
+        messages: list[dict],
+        max_tokens: int | None = None,
+        response_format: dict | None = None,
+        extra_params: dict | None = None,
     ) -> str:
         """Non-streaming chat for one-shot calls.
 
         Args:
             messages: List of message dicts with role and content keys.
             max_tokens: Optional max completion tokens (None = API default).
+            response_format: Optional OpenAI response_format dict
+                (e.g. ``{"type": "json_object"}``).
+            extra_params: Optional dict of extra top-level JSON fields
+                merged into the request body (e.g. ``{"temperature": 0.3}``
+                or provider-specific fields like ``{"thinking": {"type":
+                "disabled"}}``).
 
         Returns:
             Content string from the assistant response.
@@ -170,7 +186,13 @@ class ApiClient:
         """
         self._validate_config()
         url = f"{self.base_url}/chat/completions"
-        payload = self._build_payload(messages, stream=False, max_tokens=max_tokens)
+        payload = self._build_payload(
+            messages,
+            stream=False,
+            max_tokens=max_tokens,
+            response_format=response_format,
+            extra_params=extra_params,
+        )
 
         try:
             response = self._get_client().post(
@@ -192,7 +214,11 @@ class ApiClient:
         return self._extract_content(data)
 
     def stream_chat_iter(
-        self, messages: list[dict], max_tokens: int | None = None
+        self,
+        messages: list[dict],
+        max_tokens: int | None = None,
+        response_format: dict | None = None,
+        extra_params: dict | None = None,
     ) -> Iterator[dict]:
         """Yield streaming chat tokens one by one.
 
@@ -203,6 +229,9 @@ class ApiClient:
         Args:
             messages: List of message dicts with role and content keys.
             max_tokens: Optional max completion tokens (None = API default).
+            response_format: Optional OpenAI response_format dict.
+            extra_params: Optional dict of extra top-level JSON fields
+                merged into the request body.
 
         Yields:
             Token dicts as described above.
@@ -212,7 +241,13 @@ class ApiClient:
         """
         self._validate_config()
         url = f"{self.base_url}/chat/completions"
-        payload = self._build_payload(messages, stream=True, max_tokens=max_tokens)
+        payload = self._build_payload(
+            messages,
+            stream=True,
+            max_tokens=max_tokens,
+            response_format=response_format,
+            extra_params=extra_params,
+        )
         t_start = time.perf_counter()
         ttft: float | None = None
 
@@ -280,7 +315,11 @@ class ApiClient:
             raise ApiError(f"Encoding error: {e}") from e
 
     def stream_chat(
-        self, messages: list[dict], max_tokens: int | None = None
+        self,
+        messages: list[dict],
+        max_tokens: int | None = None,
+        response_format: dict | None = None,
+        extra_params: dict | None = None,
     ) -> ApiResult:
         """Send messages via streaming API, collect and return the full response.
 
@@ -290,6 +329,9 @@ class ApiClient:
         Args:
             messages: List of message dicts with role and content keys.
             max_tokens: Optional max completion tokens (None = API default).
+            response_format: Optional OpenAI response_format dict.
+            extra_params: Optional dict of extra top-level JSON fields
+                merged into the request body.
 
         Returns:
             ApiResult with content, TTFT (time to first token), and token usage.
@@ -301,7 +343,12 @@ class ApiClient:
         ttft: float | None = None
         tokens: dict | None = None
 
-        for chunk in self.stream_chat_iter(messages, max_tokens=max_tokens):
+        for chunk in self.stream_chat_iter(
+            messages,
+            max_tokens=max_tokens,
+            response_format=response_format,
+            extra_params=extra_params,
+        ):
             if chunk.get("done"):
                 tokens = chunk.get("usage")
             else:

@@ -499,7 +499,7 @@ class MockApiClient:
         self.call_count = 0
         self.messages_history = []
 
-    def chat(self, messages):
+    def chat(self, messages, max_tokens=None, response_format=None, extra_params=None):
         self.messages_history.append(messages)
         if self.call_count < len(self.responses):
             resp = self.responses[self.call_count]
@@ -509,7 +509,7 @@ class MockApiClient:
             return self.responses[-1]
         return ""
 
-    def stream_chat(self, messages):
+    def stream_chat(self, messages, max_tokens=None, response_format=None, extra_params=None):
         return self.chat(messages)
 
 
@@ -711,7 +711,7 @@ class TestCoCreateFlowSendEndToEnd:
         """Parse validation failure → CoCreateError with phase='generate_parse'."""
         api = make_mock_api_client()
         # Return invalid JSON (array instead of object)
-        api.chat = lambda msgs: '[1, 2, 3]'
+        api.chat = lambda msgs, **kw: '[1, 2, 3]'
         flow = CoCreateFlow(api)
         flow._messages = [
             {"role": "system", "content": "test"},
@@ -730,7 +730,7 @@ class TestCoCreateFlowSendEndToEnd:
         """Field validation errors → CoCreateError with phase='generate_parse'."""
         api = make_mock_api_client()
         # Return JSON with invalid tier
-        api.chat = lambda msgs: (
+        api.chat = lambda msgs, **kw: (
             '{"story_config":{"tier":"epic","title":"Test","language":"en","premise":"p"},'
             '"characters":[{"name":"Hero","role":"protagonist","description":"d","appearance":"a"}],'
             '"locations":[{"id":"test","name":"Test","description":"desc"}],'

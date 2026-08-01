@@ -191,7 +191,7 @@ Write ALL content — title, premise, character names, node titles, goals, and v
 
 # Output Format
 
-Your response must be a single JSON object. Output ONLY the JSON — no markdown fences, no commentary before or after.
+Your response must be a single JSON object containing all sections below.
 
 ## Format Example
 
