@@ -19,7 +19,7 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 
 ## Core Design Concepts
 
-These are the foundational ideas. The authoritative spec is `docs/spec/exec-flow.md`.
+These are the foundational ideas. The design theory is in `docs/theory/`; the authoritative implementation spec is `docs/spec/exec-flow.md`. Theory and spec carry equal authority — theory defines *why*, spec defines *how*.
 
 ### Bridge Mechanism
 Each story segment contains a `<bridge/>` marker. When the program reaches it during parsing, it immediately submits the next round's prompt to the LLM — while continuing to display the tail text after the bridge. The player perceives continuous narration with no segment boundary pauses.
@@ -50,7 +50,10 @@ Full documentation index with reading order and authority hierarchy: [`docs/READ
 
 | Document | Role |
 |----------|------|
-| `docs/theory/` | Design philosophy — timing model, bridge mechanism, core problems |
+| `docs/theory/first-principles.md` | Axioms & derivations — **authoritative** |
+| `docs/theory/bridge-mechanism.md` | Bridge mechanism — **authoritative** |
+| `docs/theory/streaming-parse.md` | Streaming parse theory — **authoritative** |
+| `docs/theory/asset-generation.md` | Asset generation timing — **authoritative** |
 | `docs/spec/exec-flow.md` | Execution pipeline — **authoritative** |
 | `docs/spec/block-spec.md` | XML element syntax — **authoritative** |
 | `docs/spec/prompt-design.md` | Prompt templates — **authoritative** |

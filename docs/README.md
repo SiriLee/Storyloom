@@ -4,7 +4,7 @@
 
 | 文档 | 内容 | 受众 | 权威性 |
 |------|------|------|--------|
-| [`theory/`](./theory/) | 设计理论基础——时序模型、桥接机制、核心问题定义 | 所有开发者 | **理论指导** |
+| [`theory/`](./theory/) | 设计理论基础——第一性原理、桥接机制、流式解析、素材生成 | 所有开发者 | **权威** |
 | [`spec/exec-flow.md`](./spec/exec-flow.md) | Phase 1 程序执行管线（启动→结局） | 开发者、AI 工具 | **权威** |
 | [`spec/block-spec.md`](./spec/block-spec.md) | XML 元素语法、编号规范、分支路由、状态校验 | 开发者 | **权威** |
 | [`spec/data-model.md`](./spec/data-model.md) | GameState、存档系统、常量、约定 | 开发者 | **权威** |
@@ -43,14 +43,16 @@
 ## 权威层级
 
 ```
-theory/                  ──── 设计哲学（仅在理念转变时修改）
-spec/exec-flow.md        ──── 最高权威（执行流程）
-spec/block-spec.md       ──── 同等权威（XML 元素规范）
-spec/prompt-design.md    ──── 同等权威（Prompt 模板）
-spec/data-model.md       ──── 同等权威（数据模型）
+theory/                  ──── 设计理论 — 回答"为什么"（同等权威）
+spec/exec-flow.md        ──── 执行流程 — 回答"怎么做"（同等权威）
+spec/block-spec.md       ──── XML 元素规范（同等权威）
+spec/prompt-design.md    ──── Prompt 模板（同等权威）
+spec/data-model.md       ──── 数据模型（同等权威）
 ```
 
-**冲突解决**：spec 文档之间应保持一致。Prompt 格式以 `prompt-design.md` 中的当前模板为最终标准。engineering-journal 记录历史决策，spec 反映当前规范——如不一致，以 spec 为准。theory 为指导性文档，不参与冲突仲裁。
+**theory 与 spec 的关系**：theory 定义设计的原则与约束（从第一性原理推导），spec 定义满足这些约束的具体实现。两者同等权威——theory 回答"为什么这样设计"，spec 回答"如何实现这个设计"。实现必须同时满足 spec 的规定和 theory 的约束。
+
+**冲突解决**：spec 文档之间应保持一致。Prompt 格式以 `prompt-design.md` 中的当前模板为最终标准。engineering-journal 记录历史决策，spec 和 theory 反映当前规范——如不一致，以 spec / theory 为准。若 spec 与 theory 冲突，以 theory 为准（theory 是更根本的约束）。
 
 ## 扩展路线
 
