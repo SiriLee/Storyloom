@@ -8,7 +8,28 @@
 
 ## 2026-08-01（周六）
 
-> **概述**：`ApiClient` 新增 `response_format` 与 `extra_params` 参数支持——为共创 JSON 生成的 API 层硬约束与未来图形模式的无思考模式、温度控制等需求提供统一的参数扩展机制。
+> **概述**：`ApiClient` 新增 `response_format` 与 `extra_params` 参数支持；图形模式设计草稿重构——素材管线拆分为匹配/生成两条独立路径。
+
+### 图形模式设计：素材管线拆分
+
+**背景**：`graph-mode-design-draft.md` 初稿中，所有图像需求（SCENE 切换、SEG 角色立绘、DECLARE 新素材声明）走同一套"程序匹配 → LLM 选择 → AI 生成"三步管线。这导致两个问题：(1) 高频的 SCENE/SEG 事件可能触发图像生成，叙事流延迟不可预测；(2) 不同事件类型的语义（"使用已有素材"vs"引入新素材"）被模糊处理。
+
+**决策**：
+
+1. **素材匹配与素材生成彻底拆分**：
+   - **匹配**（SCENE / SEG(char) 触发）：仅从游戏素材列表中强制选择，绝不走生成。程序匹配（名称精确匹配）为前置保底，失败则由 LLM 从列表中语义选择最贴合者。
+   - **生成**（DECLARE / 共创预构建触发）：先 LLM 选择（查游戏列表 + 全局素材库），若无合适素材则调用 AI 生成。
+
+2. **DECLARE 的"先占位、后填充"策略**：程序匹配失败时立即在游戏素材列表创建 AssetItem（暂不设 target），后续 LLM 选择或 AI 生成完成后通过 `set_target` 赋值。这防止了后续 SCENE/SEG 匹配任务等待 DECLARE 生成完成时的逻辑顺序冲突——AssetItem 立即可见，EventDispatcher 的 `line=0` 阻塞机制保证 UI 收到事件时素材已就绪。
+
+3. **导演 LLM 的名称约束**：SCENE/SEG 使用的素材名称必须在 `locations/characters` 或 `<declare>` 中出现过。引擎层保证"声明过的必可用"，使用层保证"只使用已声明的"。
+
+4. **数据结构三层模型**：`Asset`（物理文件 + 元数据）→ `AssetLibrary`（程序全局，按类型 + ID 索引）→ `GameAssetList`（单局游戏，按类型 + local_name 索引，通过 `AssetItem.target` 间接引用 Asset ID）。
+
+**依据**：
+- commit: `0b5bc8c` — `docs/spec/graph-mode-design-draft.md` 全文重构（132 insertions, 75 deletions）
+- `docs/theory/asset-generation.md`：素材生成服从公理 1（生成有时延），需求识别 ≠ 展示时刻，预声明是纯时序优化
+- 关键术语统一：素材/素材库/素材列表、匹配/生成、绑定（EventDispatcher）
 
 ### ApiClient 参数扩展机制
 
