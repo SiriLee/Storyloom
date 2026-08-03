@@ -9,6 +9,7 @@
 | [`spec/block-spec.md`](./spec/block-spec.md) | XML 元素语法、编号规范、分支路由、状态校验 | 开发者 | **权威** |
 | [`spec/data-model.md`](./spec/data-model.md) | GameState、存档系统、常量、约定 | 开发者 | **权威** |
 | [`spec/prompt-design.md`](./spec/prompt-design.md) | 全阶段 Prompt 模板、对话式消息数组架构 | 开发者、调试者 | **权威** |
+| [`spec/graph-mode-design.md`](./spec/graph-mode-design.md) | Phase 2 图像模式完整程序设计规范 | 开发者、AI 工具 | **权威** |
 | [`engineering-journal.md`](./engineering-journal.md) | 工程日志——完整设计决策时间线（2026-07-02 → 至今） | 开发者、审查者 | 参考 |
 | [`api/co-create.md`](./api/co-create.md) | 共创 API 参考（供界面层开发者） | 界面层开发者 | 参考 |
 | [`api/session.md`](./api/session.md) | GameSession 集成 API 参考（供界面层开发者） | 界面层开发者 | 参考 |
