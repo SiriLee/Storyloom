@@ -240,14 +240,15 @@ graph TD
 **Task Generator**
 - 构造制作图像的并发任务 `Task` ，大致包括：
     - `line`: 对应事件的起始行号，`DECLARE` 触发的任务设为特殊值 `0`
-    - `type`: character/scene(或设置为不同子类) + match/generate(也可仅通过行号区分)
-    - `process`: 执行的任务（匹配 / 生成）
+    - `asset_type`: `AssetType` 类型
+    - `process`: 执行的并发任务（LLM 匹配 / 生成）
     - `completed`: 完成标记
-    - `result`: 返回的图像 ID 
+    - `result`: 对应素材列表中 `AssetItem` 的名称 `local_name` 
 - `Task` 相对独立、互不干扰，完成顺序不关注，但发起和消费的顺序需保持一致
+- `Task` 构造时先执行 O(1) 的“程序匹配”，若成功则 `process = None` 
 - `SCENE` 和 `SEG(char)` 触发的 `Task` 执行匹配任务，需将结果赋值 `result`
-- `DECLARE` 触发的 `Task` 执行生成任务，立即添加 `asset_item` ，后续填充 `target`，不用赋值 `result`
-- `DECLARE` 触发的 `Task` 不绑定事件，但不能直接过滤，必须等待其完成才能继续消费后续 `Task` 
+- `DECLARE` 的 `Task` 匹配失败时，立即创建 `asset_item` ，后续 `process` 填充其 `target`，不必赋值 `result`
+- `DECLARE` 的 `Task` 不绑定事件，但不能直接过滤，必须等待其完成才能继续消费后续 `Task` 
 - 若 EventDis 发起消费请求，不管队首 `Task` 是否完成，都直接出队，由事件分发器执行过滤和等待
 
 **Event Dispatcher**
