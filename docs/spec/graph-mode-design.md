@@ -15,6 +15,8 @@
 | 管线 | StreamParser → StateManager → EventDispatcher | 同上 + **TaskGenerator** |
 | AI 角色 | 共创 + 导演 + 冒险日志 LLM | 上述全部 + 预构建 AI + 匹配 LLM + 生成 AI |
 
+**文档原则**：每条设计事实只在一处权威定义，其余位置引用而非重复。修改时只改一处。
+
 **设计原则**：
 - **管线复用**：图像模式与文本模式共享核心管线，差别仅在于是否挂载 TaskGenerator
 - **素材管线并行**：素材匹配/生成异步执行，不阻塞文本管线流转
@@ -227,10 +229,13 @@ consume_event(event):
     if task_queue 非空 and 队首.line == event.line:
         task = pop()
         wait(task.completed)       # 等待匹配完成
-        event.payload["asset_result"] = task.result
+        asset_id = roster.lookup(task.asset_type, task.result).target
+        event.payload["assets"] = {task.asset_type.value: asset_id}
 
     send_to_ui(event)
 ```
+
+> Task.result 存储 local_name，EventDispatcher 通过名册将其解析为 asset ID 后再写入 Event。UI 只接收 ID，不感知 local_name。`assets` 字段为 `{AssetType: asset_id}` 字典——当前每个 Event 只绑定一个素材，格式预留未来多素材扩展（如 SCENE 同时绑定背景图 + BGM）。
 
 **line=0 的设计意图**：
 - 所有 Event 的 line ≥ 1 → `Task(0).line < Event.line` 恒成立 → DECLARE Task 永远落入过滤分支，不与任何 Event 绑定
