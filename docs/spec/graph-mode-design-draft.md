@@ -6,10 +6,23 @@
 
 - 静态角色立绘 + 静态背景图片
 - 为保持可拓展性：程序设计兼容任意类型的“素材”（特效、角色语音等），本文主要以上述两类图像数据为例
-- 图像模式与文本模式进行分离，两模式在核心管线上只有 Prompt 的区别
+- 图像模式与文本模式进行分离，两模式复用核心管线（ Prompt 不同）
 - 展示模式为传统视觉小说游戏模式（Galgame、《明日方舟》等）
 
 ## 核心数据
+
+### 三层抽象
+
+以背景图片为例：
+
+| 层 | 名称 | 含义 | 使用 |
+| --- | --- | --- | --- |
+| 故事设定 | locations | 抽象地点 | "locations": [{xxx}, {xxx}] |
+| 导演调度 | SCENE | 具体布景 | <declare kind=xxx, ...> |
+| 素材存储 | BACKGROUND | 素材类型 | 引擎内部映射 |
+
+示例：
+"学校" -> "学校"&"学校.教室" -> "学校.教室"背景图片&背景音乐
 
 ### 素材数据库
 
@@ -25,9 +38,9 @@ class AssetType(Enum):
     def default_extension(self)
 
 class Asset:
+    asset_type: AssetType
     id: str # 唯一标识，与存储文件对应
     name: str
-    asset_type: AssetType
     description: str = ""
     use_count: int = 0 # 使用计数
     @property
@@ -49,7 +62,7 @@ class AssetLibrary:
     def increase_usage(self, asset_type, asset_id)
     def decrease_usage(self, asset_type, asset_id)
     def get_sorted_by_usage(self, asset_type, count) # 按使用计数排序
-    def clean(self, max_count) # 按计数清理，至多保留 max_count ，计数非零不删
+    def clean(self, asset_type, max_count) # 按计数清理，至多保留 max_count ，计数非零不删
     # ...
 ```
 
@@ -72,20 +85,20 @@ class GameAssetRoster:
         # AssetType -> (local_name, AssetItem)
         self._items: Dict[AssetType, Dict[string, AssetItem]] = load_file(game_ID)
 
-    def add(self, asset_type, asset_item) # target 非空时需 increase_usage
-    def set_target(self, asset_type, local_name, target) # 设置 item 指向素材，需 increase_usage
-    def clear(self) # 删除游戏存档时调用，需 decrease_usage
+    def add(self, asset_type, asset_item) # target 非空时调用 increase_usage
+    def set_target(self, asset_type, local_name, target) # 设置 item 指向素材，调用 increase_usage
+    def clear(self) # 删除游戏存档时调用，调用 decrease_usage
 ```
 
 ### 素材匹配 & 生成
 
 - 素材匹配
-    - 素材切换事件(`SCENE`, `SEG(char)`)触发，依据输入素材名称，强制从游戏素材名册中选择合适的素材进行匹配
+    - 素材切换事件(`SCENE`, `SEG(char)`)触发，依据输入素材名称，强制从**游戏素材名册**中选择合适的素材进行匹配
     - 程序匹配：程序进行名称比较，若在素材名册中找到匹配的素材，赋值 `result` 并 `complete` ，否则由 LLM 执行
     - LLM 匹配：LLM 进行主观判定，基于名册中素材的名称和描述，选择最合适的素材赋值 `result` 并 `complete` 
 - 素材生成
     - 共创阶段或素材声明事件(`DECLARE`)触发，依据声明素材的名称和描述，尝试复用已有素材或新生成素材
-    - 程序匹配(共创阶段无)：若成功，直接 `complete` ；若失败，立即依据名称、描述构建并添加 `asset_item` ，暂不赋值 `target`
+    - 程序匹配(素材名册)：若成功，直接 `complete` ；若失败，立即依据名称、描述构建并添加 `asset_item` ，暂不赋值 `target`
     - LLM 选择：提供游戏素材名册和素材库(部分)，由 LLM 极速判断：返回 ID 或 `NULL`(无合适素材)
     - AI 生成：若无合适内容，调用专用 AI ，根据需求和关联素材，生成新素材并添加到素材库，记录其 ID
     - LLM 选择和 AI 生成的素材 ID 需通过 `set_target` 给先前 `asset_item` 赋值，然后 `complete` ，无需记录 `result` 
@@ -126,7 +139,7 @@ class GameAssetRoster:
 - 若程序精准匹配名称失败（小概率），发起 API 请求，进行强制选择
 - LLM 匹配
     - LLM 快速匹配也许不需要“思考”，可以尝试通过添加参数关闭“思考”，加快响应速度、减少 token 消耗
-    - LLM 接收素材的名称和描述，素材名册中名称和描述，返回选择的图像 ID
+    - LLM 接收素材的名称和描述，素材名册中名称和描述，返回选择的图像的 `local_name`
 
 **F.素材生成 AI**（新增）：
 - 若程序精准匹配名称成功（小概率），直接结束任务，无 API 请求
@@ -201,7 +214,7 @@ graph TD
 
 1. Server 主线程: HTTP + SSE
 2. 事件线程: StreamParser, TaskGenerator, StateManager, EventDispatcher
-3. API 线程: LLM token 流式读取
+3. API 线程: 导演 LLM token 流式读取
 4. Task 执行线程: Task.process 异步执行
 
 **异步并发**
@@ -224,7 +237,7 @@ graph TD
     - 添加：任务生成和事件分发管线 `TaskGen + EventDis`
 
 **Stream Parser**
-- 对输入 token 进行流式解析，解析出其对应的 `Event`（需要存储起始**行号**，作为配对标识）
+- 对输入 token 进行流式解析，解析出其对应的 `Event`（需要存储起始**行号**），**所有标签**都需要转换为事件
 - 时序与 LLM 生成基本一致，接收、消费从不主动阻塞
 - `<set var="SCENE">` 不解析为 `SET` ，而是解析为独特的 `SCENE` 事件
 - 若类型为 `DECLARE / SCENE / SEG(char)` ，需要同步触发 TaskGen 构造 `Task`
