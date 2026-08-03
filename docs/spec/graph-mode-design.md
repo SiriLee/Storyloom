@@ -354,71 +354,67 @@ DECLARE → TaskGenerator 构造 GENERATE Task（line=0）
 
 ## §7 实现方案
 
-### 7.1 重构解析/管理/分发流程（仍属 Phase 1）
+> 每步独立验证，通过后即确定该维度正确性。步骤间依赖明确，不返工。7.4 ∥ 7.5、7.7 ∥ 7.8 可并行。
 
-- 重构 Event 类：增加起始行号字段
-- 拆分 `StreamingXmlParser` 为 StreamParser + StateManager + EventDispatcher 三个独立组件
-- StreamParser 通过 generator yield 传递事件，StateManager 和 EventDispatcher 在同一线程消费
+### 7.1 重构管线（仍属 Phase 1）
 
-**验证**：重构后完整跑通 Phase 1 流程，发布 1.x.x 系列最后版本。
+StreamParser + StateManager + EventDispatcher 拆分。Event 增加行号字段。同线程 generator yield 传递。
 
-### 7.2 图像生成与模式区分（进入 Phase 2）
+**验证**：Phase 1 全量测试通过 → **管线拆分正确，无回归**。
 
-- 规划 `media/` 目录结构
-- 参考 `api_client` 搭建图像 API 调用模块
-- `UserConfig` 添加 `game_mode`（text/graph）及图像 API 配置
-- `GameSession` 初始化时根据模式挂载不同管线（是否挂载 TaskGenerator）
+### 7.2 素材数据库
 
-**验证**：初步实现图像生成功能，文本模式完整。
+Asset、AssetLibrary、GameAssetRoster 完整实现——增删、计数、排序截取、清理。提供 UI 管理渠道。
 
-### 7.3 素材数据库管理架构
+**验证**：单元测试覆盖所有操作 + 边界条件 → **数据层可独立工作**。
 
-- 实现 Asset、AssetLibrary、GameAssetRoster
-- 实现增删、计数管理、排序截取、自动清理基础设施
-- 提供 UI 管理渠道
+### 7.3 图像 API 与模式配置
 
-**验证**：通过测试代码验证数据库基础功能完整性。
+参考 `api_client` 搭建图像生成 API 调用模块。`UserConfig` 添加 `game_mode`（text/graph）及图像 API 配置。规划 `media/` 目录结构。`GameSession` 按模式挂载管线。
 
-### 7.4 添加角色和场景元素
+**验证**：单次图像生成成功 + 文本模式不受影响 → **API 层可独立工作，模式切换正确**。
 
-- 新建图像模式叙事 Prompt，添加 `<declare>`、修改 `<set>`/`<seg>` 标签说明
-- StreamParser 支持解析新事件类型（暂不触发任务构建——TaskGenerator 以 stub 挂载）
-- 保持文本模式兼容
+### 7.4 Task 框架（stub）
 
-**验证**：LLM 返回含新标签的 XML 可被正确解析。
+实现 Task 类 + TaskGenerator（独立模块，Parser 不感知）+ EventDispatcher 行号对齐与绑定。`process` 用固定时长占位，`result` 统一赋值为临时图像。此阶段 Parser **不**触发 TaskGen——通过手动构造事件序列验证管线。测试用例设计为可复用的集成测试，7.6 用真实事件重放同一套用例。
 
-### 7.5 UI 图像模式界面
+**验证**：stub 管线跑通，所有"素材"为统一临时图像，文本模式不受影响 → **事件-任务-绑定架构正确**。
 
-- 共创阶段新增"素材初始化"过渡界面
-- 设计视觉小说叙事界面（立绘 + 背景 + 文本对话框）
-- 文本模式界面保持稳定
+### 7.5 XML 元素与 Prompt
 
-**验证**：模拟事件输入能达到视觉小说演出效果。
+新建图像模式叙事 Prompt（含 `<declare>`、`<set var="SCENE">`、`<seg char="...">` 完整说明与示例）。StreamParser 解析新标签，产出对应 Event。Parser 改动最小化——仅增加标签识别，不涉及 TaskGen。文本模式 Prompt 不变。
 
-### 7.6 任务构建和配对管线
+**验证**：LLM 输出被正确解析为 DECLARE/SCENE/SEG 事件，文本模式无影响 → **LLM 契约正确**。
 
-- 实现 Task 类，`process` 用固定时长占位，`result` 统一赋值
-- 实现 TaskGenerator + EventDispatcher 行号对齐与绑定逻辑
-- 文本模式管线不包含 TaskGenerator
+### 7.6 管线集成
 
-**验证**：图像模式全管线跑通，所有图像为统一临时图像。
+将 Parser 的图像事件与 TaskGenerator 挂接——通过管线协调层在 Event 产出后调用 TaskGenerator（Parser 自身不持有 TaskGen 引用）。文本模式不挂载。
 
-### 7.7 共创阶段图像生成
+**验证**：stub 管线 + 真实事件流端到端跑通 → **集成正确，封装性保持**。
 
-- 验证无"思考"模式可行性，实现 LLM 选择流程
-- 设计预构建 Prompt（区分类型，多图生成），实现图像生成 API 调用
-- 搭建共创阶段并发架构
+### 7.7 UI 图像模式
 
-**验证**：共创阶段完整实现，全局素材库得到填充。
+基于已确定的事件格式，设计视觉小说界面（立绘 + 背景 + 文本对话框）。共创阶段新增"素材初始化"过渡界面。文本模式界面保持稳定。
 
-### 7.8 图像匹配/生成流程
+**验证**：真实事件流驱动达到视觉小说演出效果 → **接口正确，UI 与引擎独立**。
 
-- 实现无"思考" LLM 匹配/选择流程
-- 设计单图生成 Prompt，实现完整匹配/生成架构
-- 填充 Task.process 使其功能完整
-- 素材库与 UI 适配
+### 7.8 AI 集成
 
-**验证**：图像模式全流程跑通。
+分三步，逐步替换 stub：
+
+| 子步骤 | 内容 | 验证 |
+|--------|------|------|
+| 8a. LLM 匹配 | 实现无"思考"匹配/选择流程，填充 MATCH Task.process | 匹配返回正确 local_name |
+| 8b. AI 图像生成 | 实现图像生成 API 调用，填充 GENERATE Task.process | 素材库得到填充，名册 target 正确赋值 |
+| 8c. 共创预构建 | 并发架构 + 预构建 Prompt（区分类型，多图生成） | 共创阶段完整，全局素材库填充 |
+
+**验证**：图像模式全流程跑通，真实素材替代临时图像 → **AI 集成正确**。
+
+### 7.9 回归验证
+
+文本模式全量测试 + 图像模式端到端测试。
+
+**验证**：全部通过 → **Phase 2 交付就绪**。
 
 ---
 
