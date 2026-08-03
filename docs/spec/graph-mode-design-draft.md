@@ -1,4 +1,4 @@
-# Phase 2: 图像生成模式
+# Phase 2: 图像模式
 
 本文为设计草稿，文档中的所有内容：命名、设计等均未确定，可能修改。本文档确认没有问题后才开始写正式设计文档。
 
@@ -56,7 +56,7 @@ class AssetLibrary:
 **游戏素材名册**
 
 作用：
-- 记录游戏时所需要的素材，在 `saves/game_ID/_asset_roster_.json` 记录
+- 记录游戏时所需要的素材，在 `saves/game_ID/_asset_roster.json` 记录
 - 形式类似于一个按类型分类、以名称为键的通讯录，故称其为“素材名册”
 
 ```python
@@ -73,7 +73,7 @@ class GameAssetRoster:
         self._items: Dict[AssetType, Dict[string, AssetItem]] = load_file(game_ID)
 
     def add(self, asset_type, asset_item) # target 非空时需 increase_usage
-    def set_target(self, asset_type, name, target) # 设置 item 指向素材，需 increase_usage
+    def set_target(self, asset_type, local_name, target) # 设置 item 指向素材，需 increase_usage
     def clear(self) # 删除游戏存档时调用，需 decrease_usage
 ```
 
@@ -84,7 +84,7 @@ class GameAssetRoster:
     - 程序匹配：程序进行名称比较，若在素材名册中找到匹配的素材，赋值 `result` 并 `complete` ，否则由 LLM 执行
     - LLM 匹配：LLM 进行主观判定，基于名册中素材的名称和描述，选择最合适的素材赋值 `result` 并 `complete` 
 - 素材生成
-    - 共创阶段或素材声明事件(`DECLARE`)触发，依据声明素材的名称和描述，尝试复用库中已有素材或新生成素材
+    - 共创阶段或素材声明事件(`DECLARE`)触发，依据声明素材的名称和描述，尝试复用已有素材或新生成素材
     - 程序匹配(共创阶段无)：若成功，直接 `complete` ；若失败，立即依据名称、描述构建并添加 `asset_item` ，暂不赋值 `target`
     - LLM 选择：提供游戏素材名册和素材库(部分)，由 LLM 极速判断：返回 ID 或 `NULL`(无合适素材)
     - AI 生成：若无合适内容，调用专用 AI ，根据需求和关联素材，生成新素材并添加到素材库，记录其 ID
@@ -227,7 +227,7 @@ graph TD
 - 对输入 token 进行流式解析，解析出其对应的 `Event`（需要存储起始**行号**，作为配对标识）
 - 时序与 LLM 生成基本一致，接收、消费从不主动阻塞
 - `<set var="SCENE">` 不解析为 `SET` ，而是解析为独特的 `SCENE` 事件
-- 若类型为 `DECLARE / SCENE / SEG(has_char)` ，需要同步触发 TaskGen 构造 `Task`
+- 若类型为 `DECLARE / SCENE / SEG(char)` ，需要同步触发 TaskGen 构造 `Task`
 - `DECLARE` 不传输给 StateMng ，这个事件仅和 TaskGen 相关
 
 **State Manager**
