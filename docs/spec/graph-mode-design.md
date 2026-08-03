@@ -279,7 +279,9 @@ SCENE/SEG 程序匹配失败后触发。输入：目标名称 + 名册条目（l
 
 ### 5.5 F. 素材生成 AI（新增）
 
-DECLARE 触发。两阶段：LLM 选择（素材库截取，无"思考"，返回 Asset.id 或 NULL）→ 若 NULL 则 AI 图像生成（一次一张，延迟优先）。完成后通过 `set_target` 填充占位条目。
+DECLARE 触发。两阶段：LLM 选择（名册 + 素材库截取，无"思考"，返回 Asset.id 或 NULL）→ 若 NULL 则 AI 图像生成（一次一张，延迟优先）。完成后通过 `set_target` 填充占位条目。
+
+> LLM 选择包含名册——防止 LLM 在不同轮次对同一实体使用不同名称而无法复用已有素材。需排除当前 DECLARE 自身在名册中的占位条目。匹配策略：名册中名称匹配优先于描述；素材库中描述匹配优先于名称。
 
 ### 5.6 提示词要点
 
@@ -349,7 +351,7 @@ DECLARE → TaskGenerator 构造 GENERATE Task（line=0）
   ├── 程序匹配（名册中是否已有同名条目）
   │   └── 成功 → completed=True（无需操作）
   └── 失败 → 立即创建占位 AssetItem（target=None）
-       → Task Pool：LLM 选择（素材库截取）
+       → Task Pool：LLM 选择（名册 + 素材库截取）
          ├── 返回 Asset.id → set_target
          └── NULL → AI 图像生成 → 加入 AssetLibrary → set_target
 → EventDispatcher：line=0 过滤分支，wait 完成后丢弃
