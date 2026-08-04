@@ -278,7 +278,7 @@ if Task.line == Event.line:     # 对齐了 → 绑定
 send(Event)
 ```
 
-> **设计决策（2026-08-03）**：上述伪代码隐含 do-while 语义（先出队再判断）。正式规范中改为 peek-then-pop 结构——先检查队首 `line` 是否满足条件，满足才 `pop`。原因：do-while 在循环退出时（`Task.line >= Event.line`），下一个 Task 已被提前取出，无处放回；peek-then-pop 保证不满足条件的 Task 始终留在队首，由后续 Event 按行号自然消费。详见 `graph-mode-design.md` §4.3。
+> **设计决策（2026-08-03）**：上述伪代码隐含 do-while 语义（先出队再判断）。正式规范中改为 peek-then-pop 结构——先检查队首 `line` 是否满足条件，满足才 `pop`。原因：do-while 在循环退出时（`Task.line >= Event.line`），下一个 Task 已被提前取出，无处放回；peek-then-pop 保证不满足条件的 Task 始终留在队首，由后续 Event 按行号自然消费。详见 `design.md` §4.3。
 
 ## 实现方案
 
