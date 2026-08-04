@@ -1,7 +1,7 @@
 # Phase 2: 图像模式 — 程序设计规范
 
 > **定位**：图像模式的完整程序设计——数据模型、管线架构、流程定义与分阶段实现方案。
-> **配套**：[`exec-flow.md`](./exec-flow.md)、[`block-spec.md`](./block-spec.md)、[`data-model.md`](./data-model.md)、[`prompt-design.md`](./prompt-design.md)、[`theory/asset-generation.md`](../theory/asset-generation.md)
+> **配套**：[`theory/first-principles.md`](../theory/first-principles.md)、[`theory/asset-generation.md`](../theory/asset-generation.md)
 
 ---
 
@@ -72,7 +72,7 @@ AssetItem:
   target: str | None          # 指向 AssetLibrary 中的 Asset.id
 
 GameAssetRoster:
-  _items: Dict[AssetType, Dict[str, AssetItem]]
+  _items: Dict[AssetType, Dict[str, AssetItem]] # AssetType -> (local_name -> AssetItem)
 ```
 
 操作：`add`（target 非空时 increase_usage）/ `set_target`（increase_usage）/ `remove`（decrease_usage）/ `lookup`（精确字符串比较）/ `clear`（所有条目的 decrease_usage）。
@@ -208,12 +208,13 @@ line 取值：
 **Task 生命周期**：
 
 ```
-1. 创建 → 2. 同步程序匹配（O(1)）
+1. 创建 → 立即入 Task Queue（保证 FIFO 顺序）
+2. 同步程序匹配（O(1)）
    ├── 成功 → completed=True, process=None
    └── 失败 → MATCH: process=LLM匹配闭包
               GENERATE: 立即创建占位 AssetItem → process=LLM选择+AI生成闭包
-3. process 非 None → 入 Task Queue（completed=False）→ 提交 Task Pool
-4. Task Pool 执行 → completed=True
+3. process 非 None → 提交 Task Pool 异步执行
+4. Task Pool 执行完毕 → completed=True
 ```
 
 ### 4.3 EventDispatcher 算法
@@ -255,7 +256,7 @@ consume_event(event):
 | **C. 素材预构建 AI** | 选择+生成 | **新增**——共创阶段基于 locations/characters 生成初始素材，填充名册 |
 | **D. 叙事导演 LLM** | 生成 | **修改**——新增 `<declare>`、`<set var="SCENE">`、`<seg char="...">` |
 | **E. 素材匹配 LLM** | 选择 | **新增**——程序匹配失败后从名册中强制选择，无"思考"模式 |
-| **F. 素材生成 AI** | 选择+生成 | **新增**——DECLARE 触发，LLM 选择（素材库）→ AI 生成（新素材） |
+| **F. 素材生成 AI** | 选择+生成 | **新增**——DECLARE 触发，LLM 选择 → AI 生成（新素材） |
 | **G. 冒险日志 LLM** | 生成 | 不变 |
 
 ### 5.2 D. 叙事导演 LLM（修改）
@@ -265,7 +266,7 @@ consume_event(event):
 - `<set var="SCENE" val="...">` — 切换场景（只能切换不能置空）
 - `<seg char="...">` — 关联角色立绘（缺省 = 无立绘）
 
-约束：SCENE 和 char 的值必须在 locations/characters 或 `<declare>` 中出现过；`<declare>` 靠近使用点声明；状态部分额外携带上轮末尾场景信息。
+约束：SCENE 和 char 的值要求在 locations/characters 或 `<declare>` 中出现过；`<declare>` 靠近使用点声明；状态部分额外携带上轮末尾场景信息。
 
 ### 5.3 C. 素材预构建 AI（新增）
 
@@ -275,11 +276,14 @@ consume_event(event):
 
 SCENE/SEG 程序匹配失败后触发。输入：目标名称 + 名册条目（local_name + local_description）。输出：一个 local_name（强制选择，必须返回结果）。无"思考"模式——快速选择。不同素材类型使用不同 Prompt。
 
-> 与 F（素材生成 AI）中 LLM 选择的关键区别：匹配是**强制选择**——必须从名册中选出一个条目；选择允许返回 NULL——表示素材库中无合适素材。
+> 与 F（素材生成 AI）中 LLM 选择的区别：
+> - 匹配是**强制选择**（必返回结果），选择允许返回 NULL
+> - 匹配触发概率低（Prompt 约束下程序匹配大多成功），无"思考"节省 token
+> - 选择触发概率高（声明的内容基本无法程序匹配），范围大（名册 + 素材库），轻度"思考"可避免无意义的 AI 生成——多花的推理 token 远少于一次不必要的图像生成
 
 ### 5.5 F. 素材生成 AI（新增）
 
-DECLARE 触发。两阶段：LLM 选择（名册 + 素材库截取，无"思考"，返回 Asset.id 或 NULL）→ 若 NULL 则 AI 图像生成（一次一张，延迟优先）。完成后通过 `set_target` 填充占位条目。
+DECLARE 触发。两阶段：LLM 选择（名册 + 素材库截取，轻度"思考"，返回 Asset.id 或 NULL）→ 若 NULL 则 AI 图像生成（一次一张，延迟优先）。完成后通过 `set_target` 填充占位条目。
 
 > LLM 选择包含名册——防止 LLM 在不同轮次对同一实体使用不同名称而无法复用已有素材。需排除当前 DECLARE 自身在名册中的占位条目。匹配策略：名册中名称匹配优先于描述；素材库中描述匹配优先于名称。
 
@@ -287,7 +291,7 @@ DECLARE 触发。两阶段：LLM 选择（名册 + 素材库截取，无"思考"
 
 所有系统 Prompt 使用英文，素材名称/描述使用故事语言。
 - **叙事 Prompt**：新增元素的 Purpose→Attributes→Requirements→Snippet 描述；两个示例加入图像标签并彻底重构（示例 1 侧重交互自由度，示例 2 侧重剧情大纲关联性）；新增约束（SCENE 不置空、declare 靠近使用点等）
-- **预构建/匹配/生成 Prompt**：按素材类型区分；LLM 选择阶段使用无"思考"模式；AI 生成阶段需传入参考图像——光有文字描述不足以保证生成质量。传入内容：详细描述 + 最近 N 张同类型图像（引擎侧存储，区分类型，不足时传范例图像）
+- **预构建/匹配/生成 Prompt**：按素材类型区分；LLM 匹配/选择阶段使用无/轻度"思考"模式；AI 生成阶段需传入参考图像——光有文字描述不足以保证生成质量。传入内容：详细描述 + 最近 N 张同类型图像（引擎侧存储，区分类型，不足时传范例图像）
 - 共创聊天、故事生成、冒险日志 Prompt 不变
 
 ---
@@ -323,14 +327,14 @@ Round N 开始
   │
   ├─ 3. StateManager 处理：
   │     SET（SCENE 除外）、CHECKPOINT 路由、BRANCH 过滤
-  │     CHOICE_END 阻塞、BRIDGE 模式切换
+  │     CHOICE_END 阻塞、BRIDGE 模式切换、STORY_END 触发 pre-fetch
   │     → 处理后事件传给 EventDispatcher
   │
   ├─ 4. EventDispatcher（按 §4.3 算法）：
   │     消费 Task Queue 直到 Task.line >= Event.line
   │     对齐时等待+绑定 → 推入 UI Event Queue
   │
-  └─ 5. </story>：合并格式错误 → 组装下轮 Prompt → 后台 API 调用
+  └─ 5. STORY_END：合并格式错误 → 组装下轮 Prompt → 后台 API 调用
 ```
 
 ### 6.3 素材匹配流程（SCENE / SEG with char）
@@ -365,19 +369,19 @@ DECLARE → TaskGenerator 构造 GENERATE Task（line=0）
 
 ### 7.1 重构管线（仍属 Phase 1）
 
-StreamParser + StateManager + EventDispatcher 拆分。Event 增加行号字段。同线程 generator yield 传递。
+StreamParser + StateManager + EventDispatcher 拆分。Event 增加行号字段、现有标签适配。同线程 generator yield 传递。
 
 **验证**：Phase 1 全量测试通过 → **管线拆分正确，无回归**。
 
 ### 7.2 素材数据库
 
-Asset、AssetLibrary、GameAssetRoster 完整实现——增删、计数、排序截取、清理。提供 UI 管理渠道。
+Asset、AssetLibrary、GameAssetRoster 完整实现——增删、计数、排序截取、清理。提供 UI 管理渠道。规划 `media/` 目录结构。
 
 **验证**：单元测试覆盖所有操作 + 边界条件 → **数据层可独立工作**。
 
 ### 7.3 图像 API 与模式配置
 
-参考 `api_client` 搭建图像生成 API 调用模块。`UserConfig` 添加 `game_mode`（text/graph）及图像 API 配置。规划 `media/` 目录结构。`GameSession` 按模式挂载管线。
+参考 `api_client` 搭建图像生成 API 调用模块。`UserConfig` 添加 `game_mode`（text/graph）及图像 API 配置。`GameSession` 按模式挂载管线。
 
 **验证**：单次图像生成成功 + 文本模式不受影响 → **API 层可独立工作，模式切换正确**。
 
@@ -429,7 +433,7 @@ Asset、AssetLibrary、GameAssetRoster 完整实现——增删、计数、排�
 
 图像模式与文本模式共享 StreamParser、StateManager、EventDispatcher。区别在于管线构建时是否挂载 TaskGenerator。
 
-文本模式下：Parser 正常解析所有标签，TaskGenerator 不存在故触发信号无接收者。若 LLM 误输出图像标签：`<set var="SCENE">` → 普通 SET、`<seg char="...">` → 普通 SEG、`<declare>` → 跳过。
+文本模式下：Parser 正常解析所有标签，TaskGenerator 不存在故触发信号无接收者。若 LLM 误输出图像标签视为错误输出。
 
 两个模式使用不同的叙事 Prompt 文件。`UserConfig.game_mode` 决定模式和 UI 布局。其余 Prompt（共创、故事生成、冒险日志）不受影响。
 
