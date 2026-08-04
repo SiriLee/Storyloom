@@ -6,6 +6,88 @@
 
 ---
 
+## 2026-08-04（周二）——下午：管线重构与 v1.3.0
+
+> **概述**：Phase 1 管线核心重构——`StreamingXmlParser` 拆分为 `StreamParser` + `StateManager` + `EventDispatcher` 三组件架构，为 Phase 2 图形模式管线扩展铺路。伴随 3 个 bug 修复 + 1 个前端修复 + v1.3.0 发布。
+
+### 管线三组件重构（§7.1 第一步）
+
+**背景**：旧 `StreamingXmlParser` 承担了三项职责——原始 XML 行解析（LineBuffer + 行号计数 + Event 生成）、状态管理（SET 处理、checkpoint 累积、CHOICE_END 阻塞、分支选择、node_goals 构建）、以及 UI 事件转换（Event → Dict → Observer）。这三项职责耦合在一个类中，GameLoop 需要直接调用解析器的状态方法（`_handle_set_event`、`_handle_checkpoint`、`_set_node_status`、`_accumulate_checkpoint`、`_get_selected_branch`、`_build_node_goals`），导致 GameLoop 膨胀至 ~500 行业务逻辑。按 `graph-mode-spec/design.md` §7.1 的要求，Phase 2 管线需要在 Event 流中插入素材相关的 Task 生成与消费，现有架构无法支持。
+
+**决策**（commit `0bc37be`，+2066/-1452 lines across 12 files）：
+
+1. **`StreamParser`**（`parser/stream_parser.py`，569 行）：承担纯解析职责——`LineBuffer` 缓冲 + 行号计数 + `NNN|` 前缀校验 + `parse_line()` → `list[Event]`。同时承载共享数据类型（`Event`、`EventType`）——原 `streaming_parser.py` 中的 `ParseEvent` 和 dataclass 全部迁入此处。不再包含任何状态逻辑。
+
+2. **`StateManager`**（`core/state_manager.py`，584 行）：承担流式事件处理——`process(event)` 是生成器，一个 Event 进 → 零或多个 Event 出。内部管理所有游戏状态：SET 变量、checkpoint 累积（nodes、routes、ending_flag）、CHOICE_END 阻塞标记（`needs_input`）、分支选择算法（`*default` + `current_branch` 匹配）、node_goals 构建。`get_result()` 返回本轮累积的所有数据（nodes、routes、choices、segment_text 等）。
+
+3. **`EventDispatcher`**（`core/event_dispatcher.py`，141 行）：承担 Event → UI Dict 转换——`dispatch(event)` → `dict`，供 Observer 和 Web UI 使用。预留 `consume_event()` 空方法作为 Phase 2 扩展点——子类覆写后可在 Event 流中插入素材消费逻辑（如 SEG 事件触发 Task 校验）。
+
+4. **GameLoop 精简**：`stream_round()` 使用新管线 `StreamParser → StateManager → EventDispatcher`——删除了 `_handle_set_event`、`_handle_checkpoint`、`_set_node_status`、`_accumulate_checkpoint`、`_get_selected_branch`、`_build_node_goals` 六个方法（-498 行）。Flush 事件现在通过完整管线路由；`checkpoint_snapshots` 从 StateManager 同步；`format_errors` 合并到 `StateManager.get_result()`。
+
+**设计合规性**：
+- `Event.payload: dict` — 符合设计规范 §4.1
+- `Event.line: int` — 本地行号计数器（权威来源），含 `NNN|` 前缀校验
+- 所有 Event 经 StateManager 流转 — 符合 §4.1 事件表
+- `process()` 生成器：单 Event 入 → 零/多 Event 出
+- 错误处理：程序 bug 直接修复（非 LLM 输出问题），LLM 输出错误记录为 `format_error` 供下一轮反馈，未知类型透传默认分支
+
+**测试**：新增 `test_stream_parser.py`（231 行）+ `test_state_manager.py`（382 行），更新 `test_integration.py`（81 行变更），删除旧的 `test_streaming_parser.py`（424 行）。全量 353 测试通过，零回归。
+
+**依据**：
+- commit: `0bc37be`（+2066/-1452 across 12 files）
+- `docs/graph-mode-spec/design.md`：§7.1（管线重构作为全部后续步骤的前置）
+- `docs/graph-mode-spec/design.md`：§4.1（事件类型表）、§4.3（EventDispatcher 算法）
+
+### 规范文档澄清——bridge_text 多分支提取
+
+**背景**：`block-spec.md` 中 bridge_text 提取逻辑的描述在旧版中不够精确——"提取其中 `<seg>` 和 `<branch>` 内的 `<seg>` 的文本节点"未区分裸 seg 与 branch 内 seg，也未明确说明非 current_branch 的 branch 如何处理。
+
+**决策**（commit `d1ddf60`）：
+1. 裸 seg（不在任何 `<branch>` 内）始终提取
+2. `<branch>` 内的 seg 仅提取 `name` 匹配 `current_branch` 的分支
+3. 未命中的 branch 不提取、不注入下一轮
+
+**依据**：
+- commit: `d1ddf60`（+7/-6 in `docs/spec/block-spec.md`）
+- `docs/spec/block-spec.md`：bridge_text 提取章节
+
+### 重构后 Bug 修复
+
+**背景**：管线重构后立即发现 2 个回归问题 + 1 个 spec 合规缺口。
+
+**决策**（3 个修复 commits）：
+
+1. **choice_data 生命周期修正**（commit `cd2d764`）：`apply_choice()` 不再清除 `_last_choice_data`——该字段必须在整个轮次内保持，因为 `get_result().choices` 依赖最后一次 CHOICE_END 的 payload 构建 choices / choice_id / opt_branches 字段。下一轮 CHOICE_END 会自然覆盖。
+
+2. **PARSE_ERROR 事件发射**（commit `b96a970`）：旧代码中无法识别的 XML 行仅记录 `format_error`，不产生 Event——不符合设计规范 §4.1 事件表（每个错误行应产生 PARSE_ERROR 事件）。`StreamParser.parse_line()` 现在同时记录 `format_error` 并返回 `Event(type=PARSE_ERROR, ...)`。
+
+3. **空 `<choice>` 防护**（commit `b96a970`）：`StateManager` 的 CHOICE_END 处理器仅在 `choice_data is not None`（即存在 `<opt>` 子元素）时设置 `needs_input=True`——空 `<choice>` 标签（无 `<opt>` 子元素）不再触发 UI 等待，避免前端崩溃。
+
+**依据**：
+- commits: `cd2d764`、`b96a970`
+- `src/storyloom/core/state_manager.py`、`src/storyloom/parser/stream_parser.py`
+
+### 前端修复——手动模式加载指示器卡死
+
+**背景**：Web 前端在自动滚动模式下手动切换至手动模式时，加载指示器（"加载中..."）会永久卡住。根因：`_wakeDisplay()` 仅在 `_isPolling=True` 时隐藏加载指示器；用户切换到手动模式时 `_toggleMode()` 设置 `_isPolling=False`，导致后续数据到达时 `_wakeDisplay()` 跳过清除逻辑。
+
+**决策**（commit `2bba85c`）：`_wakeDisplay()` 将 `_cancelLoading()` + `Display.hideLoading()` 提升到 `_isPolling` 判断之外——无论轮询状态如何，只要新 SSE 数据到达就清除加载指示器。同时在 `_toggleMode()` 中也加入加载状态清理，双重保险。
+
+**依据**：
+- commit: `2bba85c`（+4 lines in `src/storyloom/web/static/js/game.js`）
+
+### v1.3.0 发布
+
+**背景**：管线三组件重构完成，Phase 1 架构已为 Phase 2 图形模式做好准备。向后兼容——所有 Phase 1 测试通过。
+
+**决策**（commits `b1d29dd` + `740bb8c`）：版本从 1.2.1 → 1.3.0（小版本号，因为架构重构属于内部改进且保持向后兼容）。同步更新 `pyproject.toml` 和 `src/storyloom/__init__.py` 两处版本号。
+
+**依据**：
+- commits: `b1d29dd`（pyproject.toml）、`740bb8c`（__init__.py）
+- `docs/graph-mode-spec/design.md`：§7.1 管线重构步骤完成
+
+---
+
 ## 2026-08-04（周二）
 
 > **概述**：Phase 2 文档目录重组——图形模式规范从 `docs/spec/` 迁入独立 `docs/graph-mode-spec/`；Task 生命周期三处关键修正（入队时机、线程池更新方式、GENERATE 选择范围）。
