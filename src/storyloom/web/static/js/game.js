@@ -347,6 +347,8 @@ const GameView = (function () {
      *  auto-mode pacing delays or manual-mode waits. */
     function _wakeDisplay() {
         if (!_displayRunning) return;
+        _cancelLoading();
+        Display.hideLoading();
         if (_isPolling) {
             _isPolling = false;
             if (_drainTimer) { clearTimeout(_drainTimer); _drainTimer = null; }
@@ -555,6 +557,8 @@ const GameView = (function () {
 
         _isPolling = false;
         if (_drainTimer) { clearTimeout(_drainTimer); _drainTimer = null; }
+        _cancelLoading();
+        Display.hideLoading();
 
         /* Release any pending manual-mode wait.  The .then() microtask
            will call _displayTick() — do NOT call it here, or the
