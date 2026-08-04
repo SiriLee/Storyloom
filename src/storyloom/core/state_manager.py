@@ -212,9 +212,11 @@ class StateManager:
                 choice_data["enabled"] = enabled
 
             self._last_choice_data = choice_data
-            self.needs_input = True
-            # Do NOT yield — the caller handles the pause via
-            # EventDispatcher.dispatch_choice().
+            # Only pause if there are actual options to present.
+            # An empty <choice> (no <opt> children) produces
+            # choice_data=None — nothing to show the player.
+            if choice_data is not None:
+                self.needs_input = True
             return
 
         # ── CHECKPOINT / ROUTE: accumulate ─────────────────────────

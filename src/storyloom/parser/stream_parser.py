@@ -416,11 +416,17 @@ class StreamParser:
                     )
 
         # Lines that look like XML but match no known pattern are LLM
-        # output errors — record so the LLM can self-correct next round.
+        # output errors.  Emit a PARSE_ERROR event (for the pipeline /
+        # UI) and record a format_error (for LLM feedback next round).
         if "<" in clean and ">" in clean:
             self._format_errors.append(
                 f"Unrecognized element at line {self._line_count}: {clean}"
             )
+            return [Event(
+                type=EventType.PARSE_ERROR,
+                line=self._line_count,
+                payload={"error": f"Unrecognized element: {clean}"},
+            )]
 
         return []
 
