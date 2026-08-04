@@ -267,8 +267,9 @@ class StateManager:
             self._choice_dict[cid] = int(key)
 
         self.needs_input = False
-        self._last_choice_data = None
-        # No Events to yield after choice in Phase 1.
+        # _last_choice_data is intentionally NOT cleared — it must
+        # remain available for get_result().choices.  A subsequent
+        # CHOICE_END in the same round would overwrite it.
         return
         yield  # make this a generator
 
