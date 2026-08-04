@@ -6,6 +6,144 @@
 
 ---
 
+## 2026-08-04（周二）
+
+> **概述**：Phase 2 文档目录重组——图形模式规范从 `docs/spec/` 迁入独立 `docs/graph-mode-spec/`；Task 生命周期三处关键修正（入队时机、线程池更新方式、GENERATE 选择范围）。
+
+### 图形模式文档目录重组
+
+**背景**：图形模式规范在 `docs/spec/` 下共存于 Phase 1 文本模式规范旁，两份 `design.md`（Phase 1 `graph-mode-design.md` + draft `graph-mode-design-draft.md`）混在一起，CLAUDE.md 也过于冗长（~160 行）。随着图形模式规范体量增大（正式设计 + 草案共 ~850 行），需要独立的文档空间。
+
+**决策**：
+
+1. **新建 `docs/graph-mode-spec/` 目录**：`design.md`（正式规范）与 `design-draft.md`（早期草案，参考）迁入独立目录，各配 `README.md` 导航。
+2. **`docs/spec/` 专注 Phase 1**：仅保留文本模式规范（`exec-flow.md`、`block-spec.md`、`prompt-design.md`、`data-model.md`），新增 `README.md`。
+3. **CLAUDE.md 精简**：从 ~160 行压至 ~65 行——删除冗长的"Core Design Concepts"章节（已在 theory/ 和 spec/ 中维护），文档表增加 `docs/graph-mode-spec/` 行，状态描述简化。
+
+**依据**：
+- commit: `8738d35`（+126/-179 lines across 6 files）
+- `docs/graph-mode-spec/README.md`、`docs/spec/README.md`（新建）
+- `CLAUDE.md`（重构）
+
+### Task 生命周期三处修正
+
+**背景**：图形模式正式规范 `graph-mode-design.md` 初版中存在三处 Task 模型语义不精确的问题：(1) Task 入队时机不明确——"process 非 None 则入队"还是"创建即入队"？(2) Task Pool 线程池如何更新 Task——dequeue → 执行 → enqueue 还是原地标记？(3) GENERATE 任务中 LLM 选择阶段的输入是否包含游戏素材名册（GameAssetRoster）？
+
+**决策**：
+
+1. **Task 创建即入队**（commit `290a88b`）：Task 在构造完成、放入 Task Queue 的那一刻即为"已在队列中"——无论 `process` 是否为 None。`completed=True`（程序匹配成功）时跳过 Task Pool 提交，但 Task 仍在队列中供 EventDispatcher 按行号消费。此修正统一了 MATCH 和 GENERATE 两种类型的入队语义。
+
+2. **Task Pool 原地更新 Task**（commit `454c3c8`）：线程池取出 Task 后直接设置 `task.completed = True` 和 `task.result`，不执行 dequeue→重新 enqueue。EventDispatcher 通过检查 `task.completed` 标记判断是否等待——Task 始终在队列中，线程池和 EventDispatcher 共享同一引用。避免了 dequeue/enqueue 期间 EventDispatcher 漏读 Task 的竞态窗口。
+
+3. **GENERATE 的 LLM 选择必须包含名册**（commit `130033f`）：GENERATE 任务中 LLM 选择阶段（Material Selection LLM）的输入范围应包含游戏素材名册——如果名册中已有合适的 local_name（由预构建或之前的 DECLARE 创建），LLM 应返回该条目而非调用 AI 生成。防止重复生成已存在的素材。
+
+此外，补充了 LLM 推理深度对照表——匹配类 LLM 用"无思考"（快速选择），生成类用"默认"（创造需要推理），选择类用"低/关闭"（二元判断）。
+
+**依据**：
+- commits: `290a88b`、`454c3c8`、`130033f`（仅修改 `graph-mode-design.md`）
+- `docs/graph-mode-spec/design.md`：§4.2 Task 模型 + §4.3 EventDispatcher 算法
+
+---
+
+## 2026-08-03（周一）
+
+> **概述**：Phase 2 图形模式正式设计规范创建（480 行）——数据模型、管线架构、事件/任务系统、AI 角色、流程定义与分阶段实现方案。随后经历两轮规范精炼：命名统一、错误修复、实现方案重构。
+
+### 图形模式正式设计规范
+
+**背景**：设计草稿 `graph-mode-design-draft.md` 经过 2026-07-31 和 2026-08-01 两轮重构（统一 `<declare>` 标签、素材管线拆分）后，结构和语义已趋于稳定，需要一份正式的、可直接指导实现的程序设计规范。草稿侧重于"提案与讨论"，正式规范侧重于"定义与实现"。
+
+**决策**：创建 `docs/spec/graph-mode-design.md`（480 行），包含 7 个章节：
+
+- **§1 概述与设计目标**：图像模式定位（视觉小说演出）、与 Phase 1 的关系（共享核心引擎，管线分道）
+- **§2 素材数据模型**：三层抽象（故事设定 → 导演调度 → 素材存储）、AssetLibrary（全局注册表）、GameAssetRoster（单局映射表）
+- **§3 管线架构**：组件拓扑（StreamParser → StateManager → EventDispatcher + TaskGenerator）、线程与队列模型、阻塞点分析、时序模型
+- **§4 事件与任务系统**：5 种事件类型（SEG/SCENE/DECLARE + Phase 1 事件）、Task 模型（MATCH/GENERATE + 生命周期）、EventDispatcher 按行号对齐算法
+- **§5 AI 角色与提示词**：7 种 AI 角色（共创/设定/预构建/导演/匹配/生成/日志）、各 Prompt 要点
+- **§6 流程解析**：共创流程（含素材预构建）、单轮叙事流程（7 阶段完整序列图）
+- **§7 实现方案**：分 8 步实现（管线重构 → 数据库 → API → Task stub → XML/Prompt → 真实管线 → 预构建 → UI），含验证标准和并行标记
+
+**依据**：
+- commit: `35a650c`（+483 insertions）
+- 前置工作：`11746e4`（统一 `<declare>`）、`0b5bc8c`（管线拆分）
+- `docs/graph-mode-spec/design.md`（最终位置）
+
+### 规范精炼——命名、错误修复、Task 字段细化
+
+**背景**：正式规范初稿完成后，进行了一轮全面的自审和修正，涉及命名一致性、术语准确性、Task 字段语义。
+
+**决策**（三轮修正，commits `72f197a` → `f49e5d3` → `07201cc` → `8c436d1`）：
+
+1. **命名修正**：`GameAssetList` → `GameAssetRoster`（"名册"比"列表"更准确描述 local_name→AssetItem 的映射语义）；中文术语"素材列表"→"素材名册"全面同步。
+2. **错误与歧义修复**：修正了管线架构图中的数据流方向、事件类型表中 SEG/SCENE 的触发条件描述、Task 生命周期步骤编号。
+3. **Task 字段细化**：
+   - `asset_type: AssetType` — 显式声明素材类型，使 MATCH 和 GENERATE 的 Prompt 可根据类型区分
+   - `result` 字段语义明确——MATCH 返回 `local_name`（供 EventDispatcher 绑定），GENERATE 不绑定（`result` 仅用于日志）
+   - 程序匹配描述从"O(1)名称精确匹配"改为更准确的"在名册中查找 local_name 精确匹配"
+
+**依据**：
+- commits: `72f197a`、`f49e5d3`、`07201cc`、`8c436d1`
+- `docs/graph-mode-spec/design.md`：§2.3（名册）、§4.2（Task 模型）
+
+### 实现方案重构与 EventDispatcher 单源原则
+
+**背景**：§7 实现方案的初稿按"逻辑分组"排列步骤，未充分考虑步骤间的依赖关系。同时 EventDispatcher 中的 `local_name` → `asset_id` 解析位置未明确——是在 Task 完成时解析还是 EventDispatcher 消费时解析？涉及"谁持有映射权威"的架构问题。
+
+**决策**（commit `9281e03` + `7efb934`）：
+
+1. **实现步骤按依赖链重排**：8 步明确依赖方向——7.1（管线重构）是全部后续步骤的前置；7.2（素材数据库）和 7.3（图像 API）可并行；7.4（Task stub）依赖 7.1+7.2；7.5（XML/Prompt）依赖 7.1 但不依赖 7.2~7.4，可与 7.4 并行（标注 ∥）。每步明确验证标准，通过即锁定该维度正确性，后续不返工。
+
+2. **测试设计可复用**：7.4 的集成测试用例设计为后续步骤复用——7.6 用真实 Task 重放同一套用例，验证行为一致性。
+
+3. **EventDispatcher 单源原则**：`local_name` → `asset_id` 的解析在 EventDispatcher 中完成——游戏素材名册是唯一映射权威。Task 完成时返回 `local_name`（字符串），EventDispatcher 通过 `roster.lookup(local_name)` 解析为 `asset_id` 并绑定到事件。避免 Task 和 EventDispatcher 各自维护映射逻辑导致的不一致。
+
+**依据**：
+- commits: `9281e03`、`7efb934`
+- `docs/graph-mode-spec/design.md`：§7（实现方案结构）+ §4.3（EventDispatcher 算法中 `roster.lookup()` 调用）
+
+---
+
+## 2026-08-01（周六）续
+
+> **概述**：理论文档重写——`first-principles.md` 从零重建为公理-推导体系；桥接机制补充交互边界分析；理论与规范并列为权威。
+
+### 理论文档重建
+
+**背景**：Phase 1 期间积累的设计理论（first-principles、bridge-mechanism、streaming-parse、timing-model）体例不统一，部分为早期探索笔记。进入 Phase 2 图形模式设计前，需要清晰的理论基础来约束设计决策——素材管线是否阻塞叙事流、预构建的时序依据、生成时延模型等。
+
+**决策**（commits `deb7487` → `7190fcf` → `3a14524`）：
+
+1. **`first-principles.md` 从零重写**（+70 lines）：建立公理→推导体系：
+   - 公理 1（生成有时延）、公理 2（叙事流优先）、公理 3（状态在本地）
+   - 从公理推导出桥接预取、素材预处理、单源权威等设计原则
+   - 删除旧的 `timing-model.md`——其内容合并入 first-principles 和 bridge-mechanism
+
+2. **`bridge-mechanism.md` 补充交互边界**：新增"交互边界"分析——桥接机制的本质是"在人类阅读时间窗口内隐藏 LLM 生成延迟"，边界条件包括：choice 回合不可预取（等待玩家输入）、seg 长度影响桥接覆盖、极端短 seg 的降级策略。
+
+3. **`streaming-parse.md` 重写**：从实现记录转为原理阐述——为什么行级流式解析优于块级缓冲、NNN| 前缀的单字符触发效率、解析器与状态管理器拆分的理论依据。
+
+4. **`asset-generation.md` 新建**（+38 lines）：素材生成服从公理 1（生成有时延）→ 需求识别 ≠ 展示时刻 → 预声明是纯时序优化 → DECLARE 的 line=0 阻塞机制理论依据。
+
+5. **Theory 与 Spec 并列权威**：更新 `CLAUDE.md` 和 `docs/README.md`——theory/ 定义"为什么"，spec/ 定义"怎么做"，二者具有同等权威性。设计决策需同时符合理论约束与实现规范。
+
+**依据**：
+- commits: `deb7487`、`7190fcf`、`3a14524`
+- `docs/theory/first-principles.md`、`bridge-mechanism.md`、`streaming-parse.md`、`asset-generation.md`
+- `docs/theory/README.md`（更新）
+- 删除 `docs/theory/timing-model.md`（内容已合并）
+
+### 图形模式设计草稿——编者提问精炼
+
+**背景**：设计草稿附录中的"编者提问"（对设计未决问题的自问自答）初稿措辞偏学术化，部分问题表述冗长，不利于快速定位未决项。
+
+**决策**（commits `5e0b80c` → `67eee0c` → `2d0f52c`）：三轮措辞精炼——简化问题表述、统一问答格式、每个问题增加"当前倾向"标注。共涉及 ~15 个问题，涵盖管线阻塞语义、Task 优先级、名册持久化、UI 缓冲区策略等。
+
+**依据**：
+- commits: `5e0b80c`、`67eee0c`、`2d0f52c`
+- `docs/graph-mode-spec/design-draft.md` 附录
+
+---
+
 ## 2026-08-01（周六）
 
 > **概述**：`ApiClient` 新增 `response_format` 与 `extra_params` 参数支持；图形模式设计草稿重构——素材管线拆分为匹配/生成两条独立路径。
