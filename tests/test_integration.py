@@ -2,6 +2,33 @@
 
 from storyloom.core.context_manager import ContextManager
 from storyloom.core.prompt_builder import PromptBuilder
+from storyloom.parser.stream_parser import StreamParser
+from storyloom.core.state_manager import StateManager
+from storyloom.core.game_loop import GameState
+
+
+def _parse_bridge_text(xml_text):
+    """Parse XML through the full pipeline, return branch-filtered bridge_text.
+
+    Processes choices (defaulting to option 1) so ``current_branch``
+    reflects the player's selection before post-bridge segments are
+    accumulated.  Returns bridge_text filtered by ``current_branch``,
+    matching the real GameLoop behavior.
+    """
+    from storyloom.parser.stream_parser import EventType as ET
+
+    parser = StreamParser()
+    sm = StateManager(GameState([]))
+    for line in xml_text.split("\n"):
+        for event in parser.feed_line(line):
+            list(sm.process(event))
+            if sm.needs_input:
+                list(sm.apply_choice("1"))
+            if event.type == ET.CHECKPOINT and not parser.in_checkpoint:
+                list(sm.process_checkpoint())
+            elif event.type == ET.CHECKPOINT_END:
+                list(sm.process_checkpoint())
+    return sm.get_bridge_text(sm.current_branch)
 
 
 SAMPLE_STORY = {
@@ -38,8 +65,8 @@ ROUND1_OUTPUT = """<story>
 <seg>耗子的酒吧藏在第三层地下通道的尽头。</seg>
 <seg>林焰: 芯片在哪儿？</seg>
 <choice id="approach">
-  <opt key="A" branch="direct">直接问价</opt>
-  <opt key="B" branch="careful">先探口风</opt>
+  <opt key="1" branch="direct">直接问价</opt>
+  <opt key="2" branch="careful">先探口风</opt>
 </choice>
 <set var="信任度" op="+" val="5" if="approach==1"/>
 <set var="信任度" op="-" val="5" if="approach==2"/>
@@ -63,8 +90,8 @@ ROUND2_OUTPUT = """<story>
 <seg>门后是一条狭窄的走廊，荧光灯管嗡嗡作响。</seg>
 <seg>耗子: 芯片在安全屋里。不过去之前——我们得谈谈价。</seg>
 <choice id="negotiation">
-  <opt key="A" branch="pay">按原价支付</opt>
-  <opt key="B" branch="haggle">讨价还价</opt>
+  <opt key="1" branch="pay">按原价支付</opt>
+  <opt key="2" branch="haggle">讨价还价</opt>
 </choice>
 <set var="信任度" op="+" val="5" if="negotiation==1"/>
 <set var="体力" op="-" val="10" if="negotiation==2"/>
@@ -83,8 +110,6 @@ ROUND2_OUTPUT = """<story>
 class TestIntegration:
     def test_full_5_round_conversation_flow(self):
         """Simulate 5 rounds and verify message structure at each step."""
-        from storyloom.parser.streaming_parser import StreamingXmlParser
-
         pb = PromptBuilder()
         cm = ContextManager()
 
@@ -95,11 +120,8 @@ class TestIntegration:
             characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS,
             variables=SAMPLE_VARIABLES,
         )
-        sp1 = StreamingXmlParser()
-        for line in ROUND1_OUTPUT.split("\n"):
-            sp1.feed_line(line)
         cm.set_round1(r1_prompt, ROUND1_OUTPUT,
-                      bridge_text=sp1.get_bridge_text())
+                      bridge_text=_parse_bridge_text(ROUND1_OUTPUT))
         msgs = cm.get_messages()
         assert len(msgs) == 2
         assert cm.round_count == 1
@@ -116,37 +138,25 @@ class TestIntegration:
             variables=SAMPLE_VARIABLES,
             bridge_text=bridge1,
         )
-        sp2 = StreamingXmlParser()
-        for line in ROUND2_OUTPUT.split("\n"):
-            sp2.feed_line(line)
         cm.add_round(r2_prompt, ROUND2_OUTPUT,
-                     bridge_text=sp2.get_bridge_text())
+                     bridge_text=_parse_bridge_text(ROUND2_OUTPUT))
         assert cm.round_count == 2
         assert cm.get_compressed_rounds() == []
 
         # Round 3
-        sp3 = StreamingXmlParser()
-        for line in ROUND2_OUTPUT.split("\n"):
-            sp3.feed_line(line)
         cm.add_round("r3 context", ROUND2_OUTPUT,
-                     bridge_text=sp3.get_bridge_text())
+                     bridge_text=_parse_bridge_text(ROUND2_OUTPUT))
         assert cm.round_count == 3
 
         # Round 4
-        sp4 = StreamingXmlParser()
-        for line in ROUND2_OUTPUT.split("\n"):
-            sp4.feed_line(line)
         cm.add_round("r4 context", ROUND2_OUTPUT,
-                     bridge_text=sp4.get_bridge_text())
+                     bridge_text=_parse_bridge_text(ROUND2_OUTPUT))
         assert cm.round_count == 4
         assert cm.get_compressed_rounds() == []
 
         # Round 5 — triggers compression
-        sp5 = StreamingXmlParser()
-        for line in ROUND2_OUTPUT.split("\n"):
-            sp5.feed_line(line)
         cm.add_round("r5 context", ROUND2_OUTPUT,
-                     bridge_text=sp5.get_bridge_text())
+                     bridge_text=_parse_bridge_text(ROUND2_OUTPUT))
         assert cm.round_count == 5
         compressed = cm.get_compressed_rounds()
         assert len(compressed) >= 1
@@ -178,18 +188,13 @@ class TestIntegration:
 
     def test_bridge_text_flows_between_rounds(self):
         """Bridge text extracted from round N feeds into round N+1 context."""
-        from storyloom.parser.streaming_parser import StreamingXmlParser
-
         pb = PromptBuilder()
         cm = ContextManager()
 
-        sp = StreamingXmlParser()
-        for line in ROUND1_OUTPUT.split("\n"):
-            sp.feed_line(line)
         cm.set_round1(
             pb.build_round1(SAMPLE_STORY, SAMPLE_OUTLINE, "ch2", "交易", {"GLOBAL": {"体力": 80, "信任度": 10}}, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES),
             ROUND1_OUTPUT,
-            bridge_text=sp.get_bridge_text(),
+            bridge_text=_parse_bridge_text(ROUND1_OUTPUT),
         )
 
         bridge1 = cm.get_last_bridge_text()
@@ -205,26 +210,18 @@ class TestIntegration:
 
     def test_compression_format(self):
         """Compressed messages use the correct format."""
-        from storyloom.parser.streaming_parser import StreamingXmlParser
-
         pb = PromptBuilder()
         cm = ContextManager()
 
-        sp = StreamingXmlParser()
-        for line in ROUND1_OUTPUT.split("\n"):
-            sp.feed_line(line)
         cm.set_round1(
             pb.build_round1(SAMPLE_STORY, SAMPLE_OUTLINE, "ch2", "交易", {"GLOBAL": {"体力": 80, "信任度": 10}}, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES),
             ROUND1_OUTPUT,
-            bridge_text=sp.get_bridge_text(),
+            bridge_text=_parse_bridge_text(ROUND1_OUTPUT),
         )
 
         for i in range(2, 6):
-            sp_n = StreamingXmlParser()
-            for line in ROUND2_OUTPUT.split("\n"):
-                sp_n.feed_line(line)
             cm.add_round(f"r{i}", ROUND2_OUTPUT,
-                         bridge_text=sp_n.get_bridge_text())
+                         bridge_text=_parse_bridge_text(ROUND2_OUTPUT))
 
         msgs = cm.get_messages()
         contents = [m["content"] for m in msgs]

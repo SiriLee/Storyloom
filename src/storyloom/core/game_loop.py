@@ -1,8 +1,8 @@
 """Main narrative game loop, GameState, and result types.
 
 Coordinates all modules: PromptBuilder, ContextManager, ApiClient,
-StreamingXmlParser.  Validates all LLM-suggested state changes
-(local source of truth).
+StreamParser, StateManager, EventDispatcher.  Validates all
+LLM-suggested state changes (local source of truth).
 """
 
 import copy
@@ -11,24 +11,22 @@ import re
 import threading
 import time
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable
 
-from storyloom.config import BRANCH_VAR_NAME, SAVE_VERSION, STREAM_STALL_TIMEOUT_SEC, GLOBAL_SCOPE
+from storyloom.config import SAVE_VERSION, STREAM_STALL_TIMEOUT_SEC, GLOBAL_SCOPE
 from storyloom.io.api_client import ApiClient
 from storyloom.core.context_manager import ContextManager
 from storyloom.core.prompt_builder import PromptBuilder
-from storyloom.parser import (
-    ParsedOutput,
-    RouteTarget,
-    SetOperation,
-)
-from storyloom.parser.streaming_parser import (
+from storyloom.parser.stream_parser import (
     EventType,
     LineBuffer,
-    ParseEvent,
-    StreamingXmlParser,
+    ParsedOutput,
+    SetOperation,
+    StreamParser,
 )
+from storyloom.core.state_manager import StateManager
+from storyloom.core.event_dispatcher import EventDispatcher
 
 
 @dataclass
@@ -488,9 +486,7 @@ class GameLoop:
             self._outline_nodes[0].get("goal", "")
             if self._outline_nodes else None
         )
-        self._node_goals: dict[str, str] = self._build_node_goals()
         self.last_parsed: ParsedOutput | None = None
-        self._last_bridge_text: str = ""
         self._rejected_changes: list[str] = []
         self._format_error: str | None = None
         self._game_started: bool = False
@@ -712,19 +708,32 @@ class GameLoop:
         self._active_queue = result_queue
 
         # ── Per-round state (fresh each round per block-spec.md §3) ─
-        current_branch = "main"
-        choice_dict: dict[str, int] = {}
-        new_rejected: list[str] = []
-        pending_cp: dict[str, str | None] = {"node": None, "summary": None}
+        # State variables are now managed by StateManager.
         self._format_error = None  # reset each round — errors are fed back
         # via build_round_n() in Phase 5; must not persist into later rounds.
 
         # ── Phase 1-4: Streaming parse ──────────────────────────────
         # Per exec-flow.md §4.4: token chunks → LineBuffer complete
-        # lines → StreamingXmlParser events.  SET and CHECKPOINT are
-        # handled *immediately* at parse time — no deferral.
+        # lines → StreamParser events → StateManager → EventDispatcher.
+        # Per design.md §3.3: all in Thread 2 (Event Pipe) via
+        # generator yield.
+
         lb = LineBuffer()
-        sp = StreamingXmlParser()
+        parser = StreamParser()
+        state_mgr = StateManager(game_state=self.game_state)
+        state_mgr.set_outline(self._outline_nodes)
+        state_mgr.set_save_callback(
+            lambda node, summary: (
+                self._save_manager.save(self.to_save_dict(), node)
+                if self._save_manager else None
+            )
+        )
+        state_mgr.init_progress(
+            current_node=self.current_node,
+            goal=self.goal,
+        )
+        dispatcher = EventDispatcher()
+
         collected: list[str] = []
         ttft: float | None = None
         tokens: dict | None = None
@@ -746,10 +755,6 @@ class GameLoop:
                 return
 
             # ── Cancellation sentinel injected by cancel() ─────────
-            # When the user exits mid-game, request_stop_game_stream()
-            # calls cancel() which puts this sentinel into the queue.
-            # Exit immediately without yielding an error — the caller
-            # (run_loop) will see the stop signal and clean up.
             if chunk.get("__cancel__"):
                 self._active_queue = None
                 return
@@ -777,194 +782,110 @@ class GameLoop:
             yield {"type": "token", "text": delta}
 
             for line in lb.feed(delta):
-                for event in sp.feed_line(line):
-                    etype = event.type
+                for event in parser.feed_line(line):
+                    # ── All Events flow through StateManager ───────
+                    # Per design.md §4.1: every Phase 1 event type
+                    # passes through StateManager.
+                    for processed in state_mgr.process(event):
+                        ui_event = dispatcher.dispatch(processed)
+                        if ui_event:
+                            yield ui_event
 
-                    if etype == EventType.STORY_BEGIN:
-                        yield {"type": "story_begin"}
+                    # ── CHOICE_END: pause for player input ─────────
+                    if state_mgr.needs_input:
+                        key = yield dispatcher.dispatch_choice(
+                            state_mgr.choice_data
+                        )
+                        for evt in state_mgr.apply_choice(key):
+                            ui_event = dispatcher.dispatch(evt)
+                            if ui_event:
+                                yield ui_event
 
-                    elif etype == EventType.STORY_END:
-                        yield {"type": "story_end"}
-
-                    elif etype == EventType.BRIDGE:
-                        yield {"type": "bridge"}
-
-                    elif etype == EventType.SEGMENT:
-                        # Branch filter: bare segs always pass;
-                        # named-branch segs pass only when they
-                        # match current_branch (both pre- and
-                        # post-bridge per block-spec.md §3).
-                        if (event.branch_name
-                                and event.branch_name != current_branch):
-                            continue
-                        yield {
-                            "type": "segment",
-                            "text": event.text or "",
-                            "n": sp._seg_count,
-                            "position": event.position,
-                            "branch": event.branch_name,
-                        }
-
-                    elif etype == EventType.SET:
-                        if event.set_var == BRANCH_VAR_NAME:
-                            # Data-driven branch control — update
-                            # current_branch directly without going
-                            # through GameState (BRANCH is not a
-                            # registered state variable).
-                            if self.game_state.evaluate_condition(
-                                event.set_if, choice_dict
-                            ):
-                                current_branch = event.set_val or "main"
-                        else:
-                            change = self._handle_set_event(
-                                event, self.game_state, choice_dict,
-                                new_rejected,
-                            )
-                            if change is not None:
-                                yield {
-                                    "type": "state",
-                                    "vars": self.game_state.state_vars,
-                                    "changes": [change],
-                                }
-
-                    elif etype == EventType.CHOICE_END:
-                        if event.choice_data:
-                            # ── Evaluate option conditions (engine
-                            #    responsibility per exec-flow.md §4.6).
-                            #    Uses the same evaluator as <set> and
-                            #    <route>.  choice_dict is {} because no
-                            #    choice has been made yet this round.
-                            cd = event.choice_data
-                            branches = cd.get("branches", [])
-                            conditions = cd.get("conditions", {})
-                            enabled = [
-                                self.game_state.evaluate_condition(
-                                    conditions.get(b), {}
+                    # ── CHECKPOINT_END / self-closing CHECKPOINT ───
+                    # Per design.md §3.2: checkpoint processing
+                    # happens in StateManager.  Trigger when the
+                    # parser exits a checkpoint block (CHECKPOINT_END
+                    # event) or when a self-closing <checkpoint/>
+                    # appears (parser never entered _in_checkpoint).
+                    if event.type == EventType.CHECKPOINT_END:
+                        for cp_evt in state_mgr.process_checkpoint():
+                            saved = cp_evt.payload.get("save_filename")
+                            cp_node = cp_evt.payload.get("checkpoint_node")
+                            if saved:
+                                yield dispatcher.dispatch_save(
+                                    saved, cp_node
                                 )
-                                for b in branches
-                            ]
-                            # Fallback: all disabled → all enabled
-                            # (prevents game lockup).
-                            if enabled and not any(enabled):
-                                enabled = [True] * len(enabled)
-                            cd["enabled"] = enabled
-
-                            # ── Pause: yield options, await UI input ─
-                            key = yield {
-                                "type": "options",
-                                "choices": [cd],
-                            }
-                            # ── Resume: apply player's choice ───────
-                            if key is not None:
-                                try:
-                                    idx = int(key) - 1
-                                except (ValueError, TypeError):
-                                    continue
-                                branches = event.choice_data.get(
-                                    "branches", []
+                    elif (event.type == EventType.CHECKPOINT
+                          and not parser.in_checkpoint):
+                        # Self-closing <checkpoint/> — process now
+                        for cp_evt in state_mgr.process_checkpoint():
+                            saved = cp_evt.payload.get("save_filename")
+                            cp_node = cp_evt.payload.get("checkpoint_node")
+                            if saved:
+                                yield dispatcher.dispatch_save(
+                                    saved, cp_node
                                 )
-                                cid = event.choice_data.get("id", "")
-                                if 0 <= idx < len(branches):
-                                    branch = branches[idx]
-                                    if branch:
-                                        current_branch = branch
-                                    choice_dict[cid] = int(key)
-
-                    elif etype == EventType.CHECKPOINT:
-                        pending_cp["node"] = event.cp_node
-                        pending_cp["summary"] = event.cp_summary
-                        # Self-closing <checkpoint/>: _in_checkpoint
-                        # stays False → process immediately.
-                        if not sp._in_checkpoint:
-                            saved_file = self._handle_checkpoint(
-                                sp.routes,
-                                pending_cp["node"] or "",
-                                pending_cp["summary"] or "",
-                                choice_dict,
-                            )
-                            if saved_file:
-                                yield {
-                                    "type": "save",
-                                    "filename": saved_file,
-                                    "checkpoint_node": pending_cp["node"],
-                                }
-                            pending_cp["node"] = None
-
-                    elif etype == EventType.CHECKPOINT_END:
-                        if pending_cp["node"]:
-                            saved_file = self._handle_checkpoint(
-                                sp.routes,
-                                pending_cp["node"],
-                                pending_cp["summary"] or "",
-                                choice_dict,
-                            )
-                            if saved_file:
-                                yield {
-                                    "type": "save",
-                                    "filename": saved_file,
-                                    "checkpoint_node": pending_cp["node"],
-                                }
-                            pending_cp["node"] = None
 
         # ── Flush any remaining partial line ────────────────────────
-        # Feed through the parser so its internal accumulators
-        # (_segments, _bridge_text_items) are complete for
-        # get_result() in Phase 5.  Don't yield UI events — the
-        # stream has ended and a partial line is almost certainly
-        # truncated garbage.
+        # Route through the full pipeline so StateManager accumulates
+        # segments / checkpoint data.  Don't yield UI events — the
+        # stream has ended and a partial line is truncated garbage.
         remaining = lb.flush()
         if remaining:
-            sp.feed_line(remaining)
+            for event in parser.feed_line(remaining):
+                list(state_mgr.process(event))
 
         # ═══════════════════════════════════════════════════════════
         # Phase 5: </story> — pack, store, next-round launch
         # ═══════════════════════════════════════════════════════════
 
         response = "".join(collected)
-        parsed = sp.get_result()
-        no_choices = not parsed.choices  # True if last round had no <choice>
+        parsed = state_mgr.get_result(
+            bridge_found=parser.bridge_seen,
+            parser_format_errors=list(parser.format_errors),
+        )
+        no_choices = not parsed.choices
 
         # ── Format errors ───────────────────────────────────────────
-        # Merge errors from two independent sources:
-        #   1. sp.format_errors — post-bridge violations detected by
-        #      the streaming parser.
-        #   2. self._format_error — errors set during Phase 3 by
-        #      _handle_checkpoint (e.g. unknown node ID).
-        # Both must be fed back to the LLM in the next round's prompt.
-        format_errors: list[str] = list(sp.format_errors)
-        if self._format_error:
-            format_errors.append(self._format_error)
+        # StateManager.get_result() already merged parser format errors
+        # (post-bridge violations, unrecognized elements) into its own
+        # _format_errors.  NNN| line-number mismatches were routed to
+        # numbering_issues instead.
         self._format_error = (
-            "; ".join(format_errors) if format_errors else None
+            "; ".join(state_mgr.format_errors)
+            if state_mgr.format_errors else None
         )
 
-        # ── Persist per-round state ─────────────────────────────────
+        # ── Sync state from StateManager → GameLoop ─────────────────
+        current_branch = state_mgr.current_branch
         self._current_branch = current_branch
-        self._rejected_changes = new_rejected
+        self._rejected_changes = state_mgr.rejected_changes
+        self.current_node = state_mgr.current_node or self.current_node
+        self.goal = state_mgr.goal or self.goal
+        self.ending_flag = state_mgr.ending_flag
+        self._checkpoint_snapshots = state_mgr.checkpoint_snapshots
 
         # ── Store round in context manager ──────────────────────────
+        bridge_text = state_mgr.get_bridge_text(current_branch)
         is_first_round = self._context_mgr.round_count == 0
         if is_first_round:
             self._context_mgr.set_round1(
                 user_content, response,
-                bridge_text=sp.get_bridge_text(current_branch),
+                bridge_text=bridge_text,
             )
         else:
             self._context_mgr.add_round(
                 user_content,
                 response,
-                bridge_text=sp.get_bridge_text(current_branch),
+                bridge_text=bridge_text,
                 selected_branch=(
                     current_branch if current_branch != "main" else None
                 ),
             )
 
         self.last_parsed = parsed
-        self._last_bridge_text = sp.get_bridge_text(current_branch)
 
         # ── Ending: launch adventure log (concurrent per §5.2) ──────
-        # Same pattern as bridge pre-fetch: launch daemon thread, yield
-        # immediately, let the UI retrieve the result at its own pace.
         if self.ending_flag:
             def _fetch_adv() -> None:
                 try:
@@ -982,7 +903,7 @@ class GameLoop:
 
             yield {
                 "type": "ending",
-                "adventure_log": None,  # UI calls get_adventure_log() to retrieve
+                "adventure_log": None,
                 "final_state": self.game_state.state_vars,
                 "summary": parsed.checkpoint_summary,
             }
@@ -1011,9 +932,7 @@ class GameLoop:
             return
 
         # ── Build next-round prompt → launch background API ─────────
-        # Per exec-flow.md §4.7: assemble prompt at </story> so the
-        # next round's TTFT overlaps with UI displaying bridge_text.
-        bridge_text = self._context_mgr.get_last_bridge_text()
+        bridge_text_for_prompt = self._context_mgr.get_last_bridge_text()
 
         rn_context = self._prompter.build_round_n(
             outline_text=self.outline_text,
@@ -1021,7 +940,7 @@ class GameLoop:
             goal=self.goal or "",
             state_vars=self.game_state.state_vars,
             variables=self.variables,
-            bridge_text=bridge_text,
+            bridge_text=bridge_text_for_prompt,
             rejected_changes=(
                 self._rejected_changes if self._rejected_changes else None
             ),
@@ -1269,26 +1188,6 @@ class GameLoop:
             except Exception:
                 pass
 
-    def _get_selected_branch(self, choice_key: str | None) -> str | None:
-        """Determine the branch name from a player's choice key.
-
-        Maps choice_key (1-indexed string) to the branch name from
-        the last parsed output's choice options.
-        """
-        if choice_key is None or self.last_parsed is None:
-            return None
-        if not self.last_parsed.choices:
-            return None
-        try:
-            idx = int(choice_key) - 1
-        except ValueError:
-            return None
-        last_choice = self.last_parsed.choices[-1]
-        branches = last_choice.get("branches", [])
-        if 0 <= idx < len(branches):
-            return branches[idx]
-        return None
-
     # ── Options ───────────────────────────────────────────────────
 
     def get_available_options(self) -> list[dict]:
@@ -1355,158 +1254,6 @@ class GameLoop:
             })
         return normalized
 
-    def _build_node_goals(self) -> dict[str, str]:
-        """Build {node_id: goal_description} from _outline_nodes."""
-        return {
-            n["id"]: n.get("goal", "")
-            for n in self._outline_nodes
-            if n.get("goal")
-        }
-
-    # ── In-Round Handlers (stream_round helpers) ───────────────────
-
-    @staticmethod
-    def _handle_set_event(
-        event: "ParseEvent",
-        game_state: GameState,
-        choice_dict: dict[str, int],
-        rejected: list[str],
-    ) -> dict | None:
-        """Apply a SET event immediately during streaming parse.
-
-        Constructs a ``SetOperation`` from the event fields, delegates to
-        ``game_state.apply_set()`` for validation / condition evaluation /
-        application, and records any rejection reason.
-
-        Returns a state-change dict suitable for yielding as a
-        ``{"type": "state", ...}`` event, or ``None`` if the set was
-        skipped (condition not met).
-        """
-        set_op = SetOperation(
-            var=event.set_var or "",
-            op=event.set_op or "",
-            val=event.set_val or "",
-            condition=event.set_if,
-        )
-        result = game_state.apply_set(set_op, choice_dict)
-
-        # Condition not met → skip silently, no event.
-        if result.reason and result.reason.startswith("skipped:"):
-            return None
-
-        change = {
-            "var": set_op.var,
-            "op": set_op.op,
-            "val": set_op.val,
-            "accepted": result.accepted,
-            "reason": result.reason,
-        }
-        # Report genuine rejections and silent corrections (clamp, etc.)
-        # to the LLM in the next round, but NOT skipped conditions.
-        if result.reason:
-            rejected.append(result.reason)
-        return change
-
-    def _handle_checkpoint(
-        self,
-        routes: list,
-        cp_node: str,
-        cp_summary: str,
-        choice_dict: dict[str, int],
-    ) -> str | None:
-        """Process a checkpoint during streaming parse (Phase 3).
-
-        Called at ``</checkpoint>`` (or self-closing ``<checkpoint/>``).
-        Performs: ending detection (empty routes), route evaluation,
-        node advancement, checkpoint accumulation, and auto-save.
-
-        Args:
-            routes: Route list accumulated by the parser for this
-                    checkpoint (empty list = ending node).
-            cp_node: Node ID from the ``<checkpoint>`` element.
-            cp_summary: Summary text from the element.
-            choice_dict: Per-round player choice mapping.
-
-        Returns:
-            Auto-save filename if a save occurred, ``None`` otherwise.
-        """
-        # Validate node exists in outline
-        if self._outline_nodes:
-            valid_ids = {n.get("id", "") for n in self._outline_nodes}
-            if cp_node not in valid_ids:
-                if self._format_error:
-                    self._format_error += "; "
-                else:
-                    self._format_error = ""
-                self._format_error += f"Unknown checkpoint node: {cp_node}"
-                return None
-
-        # ── Ending detection ─────────────────────────────────────
-        # Consult the outline definition for this node.  An outline
-        # node with empty routes IS the ending; a node with routes
-        # is non-ending even if the LLM omitted <route> children
-        # (self-closing checkpoint on a single-path node).
-        outline_routes: list | None = None
-        for n in self._outline_nodes:
-            if n.get("id") == cp_node:
-                outline_routes = n.get("routes", [])
-                break
-
-        is_ending = (
-            outline_routes is not None and not outline_routes
-        ) if self._outline_nodes else not routes
-
-        if is_ending:
-            self.ending_flag = True
-
-        # ── Mark old node completed ──────────────────────────────
-        old_node = self.current_node
-        if old_node:
-            self._set_node_status(old_node, "completed")
-
-        # ── Mark checkpoint node completed, advance to target ────
-        # Track whether the checkpoint was successfully processed —
-        # only accumulate + auto-save when the node actually advanced.
-        node_advanced = False
-
-        if self.ending_flag:
-            self._set_node_status(cp_node, "completed")
-            self.current_node = cp_node
-            node_advanced = True
-        elif routes:
-            target = self._evaluate_routes(choice_dict, routes=routes)
-            if target:
-                self._set_node_status(cp_node, "completed")
-                self._set_node_status(target, "active")
-                self.current_node = target
-                self.goal = self._node_goals.get(target, self.goal or "")
-                node_advanced = True
-        elif outline_routes:
-            rt_routes = [
-                RouteTarget(condition=r.get("condition"), target=r.get("target", ""))
-                for r in outline_routes
-            ]
-            target = self._evaluate_routes(choice_dict, routes=rt_routes)
-            if target:
-                self._set_node_status(cp_node, "completed")
-                self._set_node_status(target, "active")
-                self.current_node = target
-                self.goal = self._node_goals.get(target, self.goal or "")
-                node_advanced = True
-        else:
-            target = self._next_outline_node()
-            if target:
-                self._set_node_status(cp_node, "completed")
-                self._set_node_status(target, "active")
-                self.current_node = target
-                self.goal = self._node_goals.get(target, self.goal or "")
-                node_advanced = True
-
-        # ── Accumulate checkpoint data + auto-save ───────────────
-        if node_advanced:
-            return self._accumulate_checkpoint(cp_node, cp_summary)
-        return None
-
     # ── Routes ────────────────────────────────────────────────────
 
     def evaluate_routes(self, choice_dict: dict[str, int]) -> str | None:
@@ -1559,14 +1306,6 @@ class GameLoop:
         # Fallback 2: no routes → next node in outline sequence.
         return self._next_outline_node()
 
-    def _set_node_status(self, node_id: str, status: str) -> None:
-        """Set status on a node in _outline_nodes."""
-        for node in self._outline_nodes:
-            nid = node.get("id") or node.get("node_id", "")
-            if nid == node_id:
-                node["status"] = status
-                return
-
     def _next_outline_node(self) -> str | None:
         """Return the next node in outline sequence after current_node.
 
@@ -1578,43 +1317,6 @@ class GameLoop:
             nid = node.get("id", "")
             if nid == self.current_node and i + 1 < len(self._outline_nodes):
                 return self._outline_nodes[i + 1].get("id")
-        return None
-
-    def _accumulate_checkpoint(self, cp_node: str, cp_summary: str) -> str | None:
-        """Accumulate checkpoint data and trigger auto-save.
-
-        Called by ``_handle_checkpoint`` during streaming parse
-        (Phase 3) for every checkpoint — ending or non-ending.
-
-        Side effects on: ``_outline_nodes`` (summary field),
-        ``_checkpoint_snapshots``, ``_save_manager``.
-
-        Returns:
-            The saved filename if auto-save succeeded, ``None`` otherwise
-            (no save manager configured, or save failed).
-        """
-        cp_title = cp_node
-        if cp_summary:
-            for node in self._outline_nodes:
-                if node.get("id") == cp_node:
-                    node["summary"] = cp_summary
-                    cp_title = node.get("title", cp_node)
-                    break
-        else:
-            for node in self._outline_nodes:
-                if node.get("id") == cp_node:
-                    cp_title = node.get("title", cp_node)
-                    break
-
-        self._checkpoint_snapshots[cp_node] = copy.deepcopy(
-            self.game_state.state_vars
-        )
-
-        if self._save_manager is not None:
-            try:
-                return self._save_manager.save(self.to_save_dict(), cp_title)
-            except Exception:
-                pass
         return None
 
     # ── Adventure Log ─────────────────────────────────────────────

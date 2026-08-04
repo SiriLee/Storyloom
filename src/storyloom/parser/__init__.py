@@ -1,24 +1,24 @@
 """XML output parser package."""
 
-from storyloom.parser.streaming_parser import (
+from storyloom.parser.stream_parser import (
+    Event,
     EventType,
     LineBuffer,
     ParsedOutput,
     ParseError,
-    ParseEvent,
     RouteTarget,
     Segment,
     SetOperation,
-    StreamingXmlParser,
+    StreamParser,
 )
 __all__ = [
+    "Event",
     "EventType",
     "LineBuffer",
-    "ParseError",
-    "ParseEvent",
     "ParsedOutput",
+    "ParseError",
     "RouteTarget",
     "Segment",
     "SetOperation",
-    "StreamingXmlParser",
+    "StreamParser",
 ]
