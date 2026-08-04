@@ -282,15 +282,16 @@ LLM 输出使用 XML 格式，根元素为 `<story>`。程序通过 `StreamingXm
 
 **bridge_text 提取**：
 
+程序处理到 `<bridge/>` 后，提取叙事文本作为 bridge_text，注入下一轮 Round N 消息：
+
 ```
-程序处理到 <bridge/> 后：
-  1. 记录 bridge 之后至 </story> 的全部内容
-  2. 提取其中 <seg> 和 <branch> 内的 <seg> 的文本节点
-  3. 合并为纯文本（去除 XML 标签）
-  4. 作为下一轮 Round N 消息的 bridge_text 字段
+1. 扫描 bridge 之后至 </story> 的全部内容
+2. 提取直接 <seg> 的文本节点（裸 seg，不在任何 <branch> 内）
+3. 对 <branch>，仅提取 name 匹配 current_branch 的，取其内部 <seg> 文本节点
+4. 合并为纯文本（去除 XML 标签）
 ```
 
-**多分支场景**：bridge 之后多个 `<branch>` 分别对应各选项后果叙事。`current_branch` 决定展示哪个分支的内容。未选中的分支不展示、不注入下一轮。
+> 未命中 `current_branch` 的 `<branch>` 不提取、不注入下一轮。
 
 **结局轮**：当 `<checkpoint>` 无 `<route>` 子元素时（routes 为空 = 结局节点），`<bridge/>` 仍是必选项。程序检测到 `ending_flag`，提交冒险日志 Prompt（独立 LLM 调用）。
 
