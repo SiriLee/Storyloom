@@ -107,7 +107,7 @@ graph TD
     StateMng -. "trigger (pre-fetch)" .-> LLM
 ```
 
-> Task Pool 是独立线程池，不在数据流路径上——它从 Task Queue 取出 Task 执行 `process`，完成后原地标记 `completed=True`。EventDispatcher 从同一 Task Queue 读取并按 `completed` 标记决定等待或消费。
+> Task Pool 是独立线程池，不在数据流路径上——它接收 Task 引用，执行 `process`，完成后原地标记 `completed=True`（Task 始终在队列中）。EventDispatcher 从同一 Task Queue 读取并按 `completed` 标记决定等待或消费。
 
 实线（`──`）：流式数据——跨线程经队列，同线程经 generator yield
 虚线（`-.`）：单次触发信号或控制反馈
@@ -274,7 +274,7 @@ consume_event(event):
 
 ### 5.4 E. 素材匹配 LLM（新增）
 
-SCENE/SEG 程序匹配失败后触发。输入：目标名称 + 名册条目（local_name + local_description）。输出：一个 local_name（强制选择，必须返回结果）。无"思考"模式——快速选择。不同素材类型使用不同 Prompt。
+SCENE/SEG 程序匹配失败后触发。输入：目标名称 + 名册条目（local_name + local_description）。输出：一个 local_name（强制选择，必须返回结果）。不同素材类型使用不同 Prompt。
 
 > 与 F（素材生成 AI）中 LLM 选择的区别：
 > - 匹配是**强制选择**（必返回结果），选择允许返回 NULL
@@ -283,7 +283,7 @@ SCENE/SEG 程序匹配失败后触发。输入：目标名称 + 名册条目（l
 
 ### 5.5 F. 素材生成 AI（新增）
 
-DECLARE 触发。两阶段：LLM 选择（名册 + 素材库截取，轻度"思考"，返回 Asset.id 或 NULL）→ 若 NULL 则 AI 图像生成（一次一张，延迟优先）。完成后通过 `set_target` 填充占位条目。
+DECLARE 触发。两阶段：LLM 选择（名册 + 素材库截取，返回 Asset.id 或 NULL）→ 若 NULL 则 AI 图像生成（一次一张，延迟优先）。完成后通过 `set_target` 填充占位条目。
 
 > LLM 选择包含名册——防止 LLM 在不同轮次对同一实体使用不同名称而无法复用已有素材。需排除当前 DECLARE 自身在名册中的占位条目。匹配策略：名册中名称匹配优先于描述；素材库中描述匹配优先于名称。
 
