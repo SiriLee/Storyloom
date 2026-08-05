@@ -124,9 +124,6 @@ class TestGameSessionLifecycle:
         import json
         import os
         import tempfile
-        from storyloom.core.session import GameSession
-        from storyloom.core.save_manager import SaveManager
-
         data = dict(SAMPLE_RESULT)
         with tempfile.TemporaryDirectory() as root:
             session = GameSession(api_client=Mock(), saves_dir=root)
