@@ -65,8 +65,7 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 
 | Command | Purpose |
 |---------|---------|
-| `pytest --ignore=tests/test_api_client.py` | Run all unit tests (skip API-dependent) |
-| `pytest` | Run full test suite (requires API key) |
+| `pytest` | Run all unit tests |
 | `python -m storyloom` | Run the application |
 | `bash scripts/build.sh` | Build standalone binary + pip wheel |
 
