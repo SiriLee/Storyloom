@@ -3,5 +3,10 @@
   "language": "en",
   "api_key": "your-api-key-here",
   "api_base_url": "https://api.deepseek.com",
-  "api_model": "deepseek-v4-pro"
+  "api_model": "deepseek-v4-pro",
+  "game_mode": "text",
+  "img_api_key": "",
+  "img_api_base_url": "",
+  "img_api_model": "flux-2-pro",
+  "img_remove_bg": "auto"
 }
