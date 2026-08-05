@@ -127,7 +127,14 @@ def get_dimensions(raw: bytes, fmt: str) -> tuple[int, int]:
 # ═══════════════════════════════════════════════════════════════════
 
 _HAS_REMBG: bool | None = None
-"""Module-level cache: None = unchecked, True = available, False = unavailable."""
+"""Module-level cache: None = unchecked, True = available, False = unavailable.
+
+Thread safety: relies on CPython GIL for atomic reads/writes of this
+reference. The check-then-import in `_check_rembg` may trigger redundant
+imports under contention, but Python's import system is internally
+locked so no corruption occurs. Not safe under free-threaded Python
+without explicit locking.
+"""
 
 
 def _check_rembg() -> bool:
@@ -212,22 +219,20 @@ def maybe_remove_background(
       - ALWAYS: force removal regardless of alpha
       - NEVER:  return result unchanged
 
-    When rembg is unavailable, all policies degrade to NEVER
-    (original image returned unmodified).
+    Delegates availability checking to :func:`remove_background` — if
+    rembg is unavailable, it returns None and we fall back to the
+    original image.
     """
     if policy == RemoveBgPolicy.NEVER:
         return result
     if policy == RemoveBgPolicy.AUTO and result.has_alpha:
         return result
 
-    # Policy is AUTO (no alpha) or ALWAYS — need rembg
-    if not _check_rembg():
-        return result  # degrade: return original
-
+    # Policy is AUTO (no alpha) or ALWAYS
     t0 = time.perf_counter()
     new_bytes = remove_background(result.bytes, result.format)
     if new_bytes is None:
-        return result  # fall back to original
+        return result  # rembg unavailable or failed — return original
 
     elapsed = time.perf_counter() - t0
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -158,7 +159,9 @@ class ImgApiClient:
     def __init__(self, config: "UserConfig | None" = None):
         from storyloom.user_config import UserConfig
         self._cfg = config if config is not None else UserConfig()
-        self._client: httpx.Client | None = None
+        # Thread-local httpx.Client: default transport is not thread-safe,
+        # and Task Pool (7.4+) will call generate() from multiple threads.
+        self._local = threading.local()
 
     # ── lazy config accessors ───────────────────────────────────────
 
@@ -210,16 +213,20 @@ class ImgApiClient:
     # ── HTTP client ──────────────────────────────────────────────────
 
     def _get_client(self) -> httpx.Client:
-        """Return the shared httpx.Client, creating it on first use."""
-        if self._client is None:
-            self._client = httpx.Client(
+        """Return a per-thread httpx.Client (thread-safe for Task Pool).
+
+        httpx default transport is NOT thread-safe. Each thread gets its
+        own Client instance via threading.local().
+        """
+        if not hasattr(self._local, "client"):
+            self._local.client = httpx.Client(
                 timeout=httpx.Timeout(
                     IMAGE_GEN_TIMEOUT_SEC,
                     connect=30.0,
                 ),
                 follow_redirects=True,
             )
-        return self._client
+        return self._local.client
 
     # ── size resolution ─────────────────────────────────────────────
 
@@ -398,10 +405,18 @@ class ImgApiClient:
         )
 
     def close(self) -> None:
-        """Close the underlying HTTP client connection pool."""
-        if self._client is not None:
-            self._client.close()
-            self._client = None
+        """Close this thread's HTTP client connection pool.
+
+        Note: only closes the current thread's client. Other threads'
+        clients remain active until their threads exit.
+        """
+        if hasattr(self._local, "client"):
+            self._local.client.close()
+            del self._local.client
 
     def __del__(self) -> None:
-        self.close()
+        if hasattr(self, "_local") and hasattr(self._local, "client"):
+            try:
+                self._local.client.close()
+            except Exception:
+                pass
