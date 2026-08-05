@@ -21,12 +21,11 @@ from __future__ import annotations
 import struct
 import time
 
-from storyloom.io.img_api_client import ImageResult, RemoveBgPolicy
+from storyloom.io._types import ImageResult, RemoveBgPolicy
 
 # NOTE: img_api_client.py imports from this module at function level
-# (lazy imports inside generate()). Keep module-level imports in this
-# file restricted to pure data types from img_api_client to avoid
-# circular import issues.
+# (lazy imports inside generate()). The shared types live in _types.py
+# so neither module depends on the other at import time.
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -151,7 +150,6 @@ from storyloom.config import (
     BG_REMOVAL_MODEL_SHA256,
     BG_REMOVAL_MODEL_URL,
 )
-from storyloom.io.img_api_client import ImageResult, RemoveBgPolicy
 
 # ── Model file management ──────────────────────────────────────────
 

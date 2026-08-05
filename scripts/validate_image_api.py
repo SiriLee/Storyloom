@@ -57,16 +57,14 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+from storyloom.io._types import ImageResult, ImageSize, RemoveBgPolicy
 from storyloom.io.img_api_client import (
     MODEL_PRESETS,
     ImageApiError,
-    ImageResult,
-    ImageSize,
     ImgApiClient,
-    RemoveBgPolicy,
 )
 from storyloom.io.img_utils import (
-    _check_model,
+    check_model,
     detect_alpha,
     detect_format,
     get_dimensions,
@@ -210,7 +208,7 @@ def main() -> None:
     print(f"Preset:           {label}")
     print(f"Portrait size:    {p_size}")
     print(f"Background size:  {b_size}")
-    print(f"Model available:  {_check_model()}")
+    print(f"Model available:  {check_model()}")
     print(f"Output:           {OUTPUT_DIR}")
 
     # Wall-clock for all tests

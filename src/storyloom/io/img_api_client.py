@@ -29,6 +29,7 @@ from storyloom.config import (
     IMAGE_DOWNLOAD_TIMEOUT_SEC,
     IMAGE_GEN_TIMEOUT_SEC,
 )
+from storyloom.io._types import ImageResult, ImageSize, RemoveBgPolicy
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -43,19 +44,6 @@ class ImageApiError(Exception):
     removal, etc.).
     """
     pass
-
-
-class RemoveBgPolicy(Enum):
-    """Background removal policy for image generation."""
-    AUTO = "auto"        # Remove bg only if image has no alpha channel
-    ALWAYS = "always"    # Force removal regardless of alpha
-    NEVER = "never"      # Skip removal entirely
-
-
-class ImageSize(Enum):
-    """Image size presets for different asset types."""
-    PORTRAIT = "portrait"        # Character portrait — square
-    BACKGROUND = "background"    # Scene background — 16:9
 
 
 @dataclass
@@ -75,28 +63,6 @@ class ImageModelPreset:
     default_sizes: dict[str, str] = field(default_factory=dict)
     supports_reference: bool = True
     extra_body: dict = field(default_factory=dict)
-
-
-@dataclass
-class ImageResult:
-    """Result from ImgApiClient.generate().
-
-    Attributes:
-        bytes: Raw image data.
-        format: Detected format — "png", "webp", or "jpeg".
-        has_alpha: True if the image has an alpha channel (RGBA / VP8X-alpha).
-        width: Image width in pixels (0 if unknown).
-        height: Image height in pixels (0 if unknown).
-        url: Original response URL (may expire).
-        elapsed_ms: Generation wall-clock time in milliseconds.
-    """
-    bytes: bytes
-    format: str
-    has_alpha: bool
-    width: int
-    height: int
-    url: str
-    elapsed_ms: float
 
 
 # ═══════════════════════════════════════════════════════════════════

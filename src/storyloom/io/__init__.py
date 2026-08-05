@@ -1,14 +1,12 @@
 """I/O layer — API clients for LLM and image generation."""
 
+from storyloom.io._types import ImageResult, ImageSize, RemoveBgPolicy
 from storyloom.io.api_client import ApiClient, ApiError, ApiResult
 from storyloom.io.img_api_client import (
     ImageApiError,
     ImageModelPreset,
-    ImageResult,
-    ImageSize,
     ImgApiClient,
     MODEL_PRESETS,
-    RemoveBgPolicy,
 )
 from storyloom.io.img_utils import (
     check_model,
