@@ -167,6 +167,11 @@ class TestUserConfigImageFields:
         with pytest.raises(ValueError, match="game_mode"):
             cfg.game_mode = "invalid"
 
+    def test_img_remove_bg_setter_rejects_invalid(self):
+        cfg = UserConfig()
+        with pytest.raises(ValueError, match="img_remove_bg"):
+            cfg.img_remove_bg = "sometimes"
+
     def test_img_fields_setters(self):
         cfg = UserConfig()
         cfg.img_api_key = "sk-img-test"

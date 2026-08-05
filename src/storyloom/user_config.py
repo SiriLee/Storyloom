@@ -126,6 +126,11 @@ class UserConfig:
 
     @img_remove_bg.setter
     def img_remove_bg(self, value: str) -> None:
+        if value not in ("auto", "always", "never"):
+            raise ValueError(
+                f"img_remove_bg must be 'auto', 'always', or 'never', "
+                f"got {value!r}"
+            )
         self._img_remove_bg = value
 
     # ── Persistence ─────────────────────────────────────────────────

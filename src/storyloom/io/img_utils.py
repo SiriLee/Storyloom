@@ -18,9 +18,14 @@ Usage::
 from __future__ import annotations
 
 import struct
-from typing import Literal
+import time
 
 from storyloom.io.img_api_client import ImageResult, RemoveBgPolicy
+
+# NOTE: img_api_client.py imports from this module at function level
+# (lazy imports inside generate()). Keep module-level imports in this
+# file restricted to pure data types from img_api_client to avoid
+# circular import issues.
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -112,7 +117,7 @@ def get_dimensions(raw: bytes, fmt: str) -> tuple[int, int]:
                 if length < 2:
                     break
                 pos += 2 + length
-    except Exception:
+    except (struct.error, IndexError, ValueError):
         pass
     return 0, 0
 
@@ -191,9 +196,7 @@ def remove_background(raw: bytes, fmt: str) -> bytes | None:
         buf = BytesIO()
         result.save(buf, format="PNG")
         return buf.getvalue()
-    except ImportError:
-        return None
-    except Exception:
+    except (ImportError, ValueError, OSError):
         return None
 
 
@@ -220,12 +223,12 @@ def maybe_remove_background(
     if not _check_rembg():
         return result  # degrade: return original
 
-    t0 = __import__("time").perf_counter()
+    t0 = time.perf_counter()
     new_bytes = remove_background(result.bytes, result.format)
     if new_bytes is None:
         return result  # fall back to original
 
-    elapsed = __import__("time").perf_counter() - t0
+    elapsed = time.perf_counter() - t0
 
     return ImageResult(
         bytes=new_bytes,

@@ -14,15 +14,19 @@ Usage::
 from __future__ import annotations
 
 import base64
+import json
 import os
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Literal
 
 import httpx
 
-from storyloom.config import DEFAULT_IMG_BASE_URL, DEFAULT_IMG_MODEL
+from storyloom.config import (
+    DEFAULT_IMG_BASE_URL,
+    DEFAULT_IMG_MODEL,
+    IMAGE_GEN_TIMEOUT_SEC,
+)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -97,6 +101,9 @@ class ImageResult:
 # Model presets
 # ═══════════════════════════════════════════════════════════════════
 
+# Treat this dict as read-only. Runtime mutation of preset fields
+# (default_sizes, extra_body) would affect all concurrent requests.
+# For dynamic model registration, create a new preset dict instead.
 MODEL_PRESETS: dict[str, ImageModelPreset] = {
     "flux-2-pro": ImageModelPreset(
         label="FLUX.2 Pro",
@@ -206,7 +213,7 @@ class ImgApiClient:
         if self._client is None:
             self._client = httpx.Client(
                 timeout=httpx.Timeout(
-                    None,  # no read timeout — image gen is slow
+                    IMAGE_GEN_TIMEOUT_SEC,
                     connect=30.0,
                 ),
                 follow_redirects=True,
@@ -345,22 +352,21 @@ class ImgApiClient:
         )
 
         # ── Background removal ────────────────────────────────────
-        if policy != RemoveBgPolicy.NEVER:
-            from storyloom.io.img_utils import _check_rembg
-            if not _check_rembg():
-                # Degrade: skip removal (one-time log would be ideal,
-                # but for now just silently skip)
-                return result
-
+        # maybe_remove_background handles its own rembg availability
+        # check and degrades gracefully (returns original on unavailable).
         from storyloom.io.img_utils import maybe_remove_background
-        return maybe_remove_background(result, policy)
+        result = maybe_remove_background(result, policy)
+
+        # NOTE: Image bytes are returned in memory. The caller
+        # (Task.process, 7.4+) is responsible for saving to
+        # media/{type}/{id}.{ext} and registering with AssetLibrary.
+        return result
 
     # ── error handling ────────────────────────────────────────────────
 
     @staticmethod
     def _handle_http_error(response: httpx.Response) -> None:
         """Convert HTTP error response to ImageApiError."""
-        import json
         try:
             detail = response.json()
             msg = detail.get("error", {}).get(
