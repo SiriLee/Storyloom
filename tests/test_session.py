@@ -118,3 +118,33 @@ class TestGameSessionLifecycle:
             session = GameSession(api_client=Mock(), saves_dir=root)
             with pytest.raises(FileNotFoundError):
                 session.load_game("no_such_game", "_init.json")
+
+    def test_init_json_writes_default_text_mode(self):
+        """_build_init_dict defaults to 'text' mode when game_mode not passed."""
+        import json
+        import os
+        import tempfile
+        from storyloom.core.session import GameSession
+        from storyloom.core.save_manager import SaveManager
+
+        data = dict(SAMPLE_RESULT)
+        with tempfile.TemporaryDirectory() as root:
+            session = GameSession(api_client=Mock(), saves_dir=root)
+            gl, game_id = session.start_game(data)
+            init_path = os.path.join(root, game_id, "_init.json")
+            saved = json.loads(open(init_path).read())
+            assert saved["config"]["mode"] == "text"
+
+    def test_init_json_writes_graph_mode_when_passed(self):
+        """_build_init_dict writes 'graph' when game_mode='graph' is passed."""
+        import json
+        import os
+        import tempfile
+
+        data = dict(SAMPLE_RESULT)
+        with tempfile.TemporaryDirectory() as root:
+            session = GameSession(api_client=Mock(), saves_dir=root)
+            gl, game_id = session.start_game(data, game_mode="graph")
+            init_path = os.path.join(root, game_id, "_init.json")
+            saved = json.loads(open(init_path).read())
+            assert saved["config"]["mode"] == "graph"

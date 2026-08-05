@@ -108,6 +108,51 @@ class TestConfig:
         res = client.post("/api/config", json={"language": "fr"})
         assert res.status_code == 400
 
+    # ── Image API & game mode fields (7.3) ──
+
+    def test_get_config_returns_image_fields(self, client):
+        res = client.get("/api/config")
+        assert res.status_code == 200
+        data = res.json()
+        assert "game_mode" in data
+        assert data["game_mode"] == "text"
+        assert "img_api_key" in data
+        assert "img_api_base_url" in data
+        assert "img_api_model" in data
+        assert "img_remove_bg" in data
+        assert data["img_remove_bg"] == "auto"
+
+    def test_update_config_game_mode_valid(self, client):
+        res = client.post("/api/config", json={"game_mode": "graph"})
+        assert res.status_code == 200
+        # Verify it persisted
+        data = client.get("/api/config").json()
+        assert data["game_mode"] == "graph"
+        # Restore default
+        client.post("/api/config", json={"game_mode": "text"})
+
+    def test_update_config_game_mode_rejects_invalid(self, client):
+        res = client.post("/api/config", json={"game_mode": "invalid"})
+        assert res.status_code == 400
+
+    def test_update_img_fields_success(self, client):
+        res = client.post("/api/config", json={
+            "img_api_key": "sk-img-test",
+            "img_api_base_url": "https://img.example.com",
+            "img_api_model": "custom-model",
+            "img_remove_bg": "always",
+        })
+        assert res.status_code == 200
+        data = client.get("/api/config").json()
+        assert "****" in data["img_api_key"]
+        assert data["img_api_base_url"] == "https://img.example.com"
+        assert data["img_api_model"] == "custom-model"
+        assert data["img_remove_bg"] == "always"
+
+    def test_update_img_remove_bg_rejects_invalid(self, client):
+        res = client.post("/api/config", json={"img_remove_bg": "sometimes"})
+        assert res.status_code == 400
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Co-create: start

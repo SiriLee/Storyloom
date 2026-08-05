@@ -49,7 +49,7 @@ class GameSession:
     def new_co_create(self) -> CoCreateFlow:
         return CoCreateFlow(self._api_client)
 
-    def start_game(self, data: dict) -> tuple[GameLoop, str]:
+    def start_game(self, data: dict, game_mode: str = "text") -> tuple[GameLoop, str]:
         """Create a new game from co-creation result dict.
 
         1. Create per-game directory under ``saves/``.
@@ -60,6 +60,8 @@ class GameSession:
             data: Dict returned by ``CoCreateFlow.generate()`` — keys:
                 ``story_config``, ``characters``, ``locations``,
                 ``variables``, ``outline``, ``outline_text``.
+            game_mode: ``"text"`` or ``"graph"`` — written to
+                ``_init.json`` ``config.mode``.  Default ``"text"``.
 
         Returns:
             ``(GameLoop, game_id)`` — UI uses *game_id* for subsequent
@@ -70,7 +72,7 @@ class GameSession:
             self._saves_root, title
         )
 
-        init_data = self._build_init_dict(data, created_at)
+        init_data = self._build_init_dict(data, created_at, game_mode=game_mode)
         SaveManager(game_dir).save(init_data)  # cp_title=None → _init.json
 
         return self.load_game(game_id, "_init.json"), game_id
@@ -171,7 +173,7 @@ class GameSession:
     # ── Helpers ───────────────────────────────────────────────────
 
     @staticmethod
-    def _build_init_dict(data: dict, created_at: str) -> dict:
+    def _build_init_dict(data: dict, created_at: str, game_mode: str = "text") -> dict:
         """Build ``_init.json`` save dict directly from co-creation result.
 
         No ``GameLoop`` involvement — pure data assembly.
@@ -179,6 +181,7 @@ class GameSession:
         ``from_save_dict()`` can consume it identically.
 
         *data* is the dict returned by ``CoCreateFlow.generate()``.
+        *game_mode* is written to ``config.mode`` (``"text"`` or ``"graph"``).
         """
         sc = copy.deepcopy(data["story_config"])
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -219,7 +222,7 @@ class GameSession:
             },
             "config": {
                 "temperature": None,
-                "mode": "text",
+                "mode": game_mode,
             },
             "story_config": sc,
             "characters": copy.deepcopy(data.get("characters", [])),

@@ -108,19 +108,48 @@ const SETTINGS = [
         label: "Model",
         placeholder: "deepseek-v4-pro",
     },
+    /* ── Image API Configuration (7.3) ── */
+    {
+        key: "img_api_base_url",
+        type: "text",
+        label: "Image API URL",
+        placeholder: "https://api.apiyi.com/v1",
+    },
+    {
+        key: "img_api_key",
+        type: "password",
+        label: "Image API Key",
+        placeholder: "sk-...",
+    },
+    {
+        key: "img_api_model",
+        type: "text",
+        label: "Image Model",
+        placeholder: "flux-2-pro",
+    },
+    {
+        key: "img_remove_bg",
+        type: "select",
+        label: "Background Removal",
+        options: [
+            { value: "auto", label: "Auto" },
+            { value: "always", label: "Always" },
+            { value: "never", label: "Never" },
+        ],
+    },
 ];
 
 /** Get the current value of a setting by key.
  *  Reads from localStorage first (instant); server is the
  *  authoritative source loaded via initConfig() at startup.
- *  For api_key: returns the real key if set, otherwise falls
- *  back to the server-provided masked display hint.            */
+ *  For api_key / img_api_key: returns the real key if set, otherwise
+ *  falls back to the server-provided masked display hint.            */
 function getSetting(key) {
     if (key === "lang") return GameState.lang;
     const val = localStorage.getItem(SETTINGS_STORE + key);
     if (val) return val;
-    if (key === "api_key") {
-        return localStorage.getItem(SETTINGS_STORE + "api_key_display") || "";
+    if (key === "api_key" || key === "img_api_key") {
+        return localStorage.getItem(SETTINGS_STORE + key + "_display") || "";
     }
     return "";
 }
@@ -132,8 +161,8 @@ function applySetting(key, value) {
     localStorage.setItem(SETTINGS_STORE + key, value);
     /* Once the user has typed a real key, the masked display hint
        is no longer needed. */
-    if (key === "api_key" && value && !value.includes("****")) {
-        localStorage.removeItem(SETTINGS_STORE + "api_key_display");
+    if ((key === "api_key" || key === "img_api_key") && value && !value.includes("****")) {
+        localStorage.removeItem(SETTINGS_STORE + key + "_display");
     }
     if (key === "lang") GameState.setLang(value);
     saveConfig();
@@ -143,14 +172,19 @@ function applySetting(key, value) {
 /** Push current settings to server → UserConfig.save(). */
 async function saveConfig() {
     const key = getSetting("api_key");
+    const imgKey = getSetting("img_api_key");
     const body = {
         language: getSetting("lang"),
         api_base_url: getSetting("api_base_url"),
         api_model: getSetting("api_model"),
+        img_api_base_url: getSetting("img_api_base_url"),
+        img_api_model: getSetting("img_api_model"),
+        img_remove_bg: getSetting("img_remove_bg"),
     };
     /* Only send api_key if the user typed a real one — an empty or
        masked value means "keep the existing key on disk". */
     if (key && !key.includes("****")) body.api_key = key;
+    if (imgKey && !imgKey.includes("****")) body.img_api_key = imgKey;
 
     try { await API.post("/api/config", body); } catch (err) {
         console.warn("saveConfig: server unreachable, values in localStorage only", err);
@@ -178,6 +212,18 @@ async function initConfig() {
         }
         if (data.api_model) {
             localStorage.setItem(SETTINGS_STORE + "api_model", data.api_model);
+        }
+        if (data.img_api_key) {
+            localStorage.setItem(SETTINGS_STORE + "img_api_key_display", data.img_api_key);
+        }
+        if (data.img_api_base_url) {
+            localStorage.setItem(SETTINGS_STORE + "img_api_base_url", data.img_api_base_url);
+        }
+        if (data.img_api_model) {
+            localStorage.setItem(SETTINGS_STORE + "img_api_model", data.img_api_model);
+        }
+        if (data.img_remove_bg) {
+            localStorage.setItem(SETTINGS_STORE + "img_remove_bg", data.img_remove_bg);
         }
     } catch (err) {
         console.warn("initConfig: server unreachable, using localStorage", err);

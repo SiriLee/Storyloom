@@ -101,20 +101,25 @@ async def health():
 
 @app.get("/api/config")
 async def get_config():
-    """Return current config.  api_key is masked — only first 4 and
-       last 4 characters are shown."""
-    key = cfg.api_key
-    if len(key) > 8:
-        masked = key[:4] + "****" + key[-4:]
-    elif key:
-        masked = "****"
-    else:
-        masked = ""
+    """Return current config.  api_key and img_api_key are masked —
+       only first 4 and last 4 characters are shown."""
+    def _mask(k: str) -> str:
+        if len(k) > 8:
+            return k[:4] + "****" + k[-4:]
+        elif k:
+            return "****"
+        return ""
+
     return {
         "language": cfg.language,
-        "api_key": masked,
+        "api_key": _mask(cfg.api_key),
         "api_base_url": cfg.api_base_url,
         "api_model": cfg.api_model,
+        "game_mode": cfg.game_mode,
+        "img_api_key": _mask(cfg.img_api_key),
+        "img_api_base_url": cfg.img_api_base_url or "https://api.apiyi.com/v1",
+        "img_api_model": cfg.img_api_model,
+        "img_remove_bg": cfg.img_remove_bg,
     }
 
 
@@ -123,6 +128,11 @@ class ConfigUpdate(BaseModel):
     api_key: str | None = None
     api_base_url: str | None = None
     api_model: str | None = None
+    game_mode: str | None = None
+    img_api_key: str | None = None
+    img_api_base_url: str | None = None
+    img_api_model: str | None = None
+    img_remove_bg: str | None = None
 
 
 @app.post("/api/config")
@@ -143,6 +153,27 @@ async def update_config(body: ConfigUpdate):
         cfg.api_base_url = body.api_base_url
     if body.api_model is not None:
         cfg.api_model = body.api_model
+    if body.game_mode is not None:
+        if body.game_mode not in ("text", "graph"):
+            raise HTTPException(
+                400,
+                f"game_mode must be 'text' or 'graph', got {body.game_mode!r}",
+            )
+        cfg.game_mode = body.game_mode
+    if body.img_api_key is not None:
+        cfg.img_api_key = body.img_api_key
+    if body.img_api_base_url is not None:
+        cfg.img_api_base_url = body.img_api_base_url
+    if body.img_api_model is not None:
+        cfg.img_api_model = body.img_api_model
+    if body.img_remove_bg is not None:
+        if body.img_remove_bg not in ("auto", "always", "never"):
+            raise HTTPException(
+                400,
+                f"img_remove_bg must be 'auto', 'always', or 'never', "
+                f"got {body.img_remove_bg!r}",
+            )
+        cfg.img_remove_bg = body.img_remove_bg
     cfg.save()
     return {"status": "ok"}
 
@@ -234,7 +265,7 @@ def co_create_generate():
     # Create save file immediately — the save is the canonical source
     # of truth for story_config.  GameLoop is loaded but not started
     # (Round 1 prompt is deferred to POST /api/game/{game_id}/start).
-    gl, game_id = _game_session.start_game(result)
+    gl, game_id = _game_session.start_game(result, game_mode=cfg.game_mode)
     sessions.store_game(game_id, gl)
     sessions.remove_co_create()  # co-create is done — game is now live
 
@@ -259,7 +290,7 @@ def co_create_retry_generate():
     except RuntimeError as e:
         raise HTTPException(400, str(e))
 
-    gl, game_id = _game_session.start_game(result)
+    gl, game_id = _game_session.start_game(result, game_mode=cfg.game_mode)
     sessions.store_game(game_id, gl)
     sessions.remove_co_create()
 
