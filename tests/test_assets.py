@@ -364,10 +364,11 @@ class TestAssetItem:
         assert decoded["target"] == "abc123"
 
     def test_to_dict_null_is_json_null(self):
-        """None target serializes as JSON null."""
+        """None target serializes as JSON null (§2.3, D36)."""
         item = AssetItem("Villain", target=None)
         encoded = json.dumps(item.to_dict(), ensure_ascii=False)
-        assert "null" in encoded
+        decoded = json.loads(encoded)
+        assert decoded["target"] is None
 
     def test_from_dict_preserves_unicode(self):
         """from_dict handles Unicode names and descriptions."""
@@ -406,12 +407,6 @@ def media_dir():
     """Temp directory for persistence tests."""
     with tempfile.TemporaryDirectory() as d:
         yield d
-
-
-def _make_asset(lib, atype=AssetType.CHAR_PORTRAIT, name="Hero",
-                desc="Brave.", asset_id=None):
-    """Helper: add an asset and return it."""
-    return lib.add(atype, name, desc, asset_id=asset_id)
 
 
 # ── Init ────────────────────────────────────────────────────────────
@@ -703,6 +698,26 @@ class TestAssetLibrarySorted:
         assert len(result) == 1
         assert result[0].name == "Hero"
 
+    def test_large_dataset_uses_heap(self, lib):
+        """Large dataset (1000+ assets, small top_n) returns correct top (D51)."""
+        N = 1000
+        assets = []
+        for i in range(N):
+            a = lib.add(AssetType.CHAR_PORTRAIT, f"Char_{i:04d}")
+            assets.append(a)
+        # Give the last 5 assets higher use_count
+        for a in assets[-5:]:
+            lib.increase_usage(a.asset_type, a.id)
+            lib.increase_usage(a.asset_type, a.id)
+
+        result = lib.get_sorted_by_usage(AssetType.CHAR_PORTRAIT, 3)
+        assert len(result) == 3
+        # All top 3 should have use_count >= 2 (the bumped ones)
+        for r in result:
+            assert r.use_count >= 2, f"Expected top results to have use_count>=2, got {r.use_count}"
+        # They should be the 5 latest (highest serial) among the bumped group
+        assert result[0].use_count >= result[1].use_count >= result[2].use_count
+
 
 # ── Clean ───────────────────────────────────────────────────────────
 
@@ -981,6 +996,43 @@ class TestAssetLibraryThreadSafety:
         assert len(errors) == 0, f"Thread errors: {errors}"
         assert len(lib) == 101  # 1 initial + 50*2 writers
 
+    def test_concurrent_save_during_write(self, media_dir):
+        """save() called during concurrent add doesn't crash or corrupt."""
+        lib = AssetLibrary(media_dir)
+        errors = []
+        N = 100
+        barrier = threading.Barrier(3)
+
+        def writer():
+            barrier.wait()
+            try:
+                for i in range(N):
+                    lib.add(AssetType.CHAR_PORTRAIT, f"Writer_{i}")
+            except Exception as e:
+                errors.append(("writer", e))
+
+        def saver():
+            barrier.wait()
+            try:
+                for _ in range(20):
+                    lib.save()
+            except Exception as e:
+                errors.append(("saver", e))
+
+        t1 = threading.Thread(target=writer)
+        t2 = threading.Thread(target=writer)
+        t3 = threading.Thread(target=saver)
+        for t in [t1, t2, t3]:
+            t.start()
+        for t in [t1, t2, t3]:
+            t.join()
+
+        assert len(errors) == 0, f"Thread errors: {errors}"
+        # Final save should succeed and produce valid JSON
+        lib.save()
+        loaded = AssetLibrary.load(media_dir)
+        assert len(loaded) == N * 2  # all writes finished before final save
+
 
 # ═══════════════════════════════════════════════════════════════════
 # GameAssetRoster
@@ -1111,6 +1163,15 @@ class TestRosterSetTarget:
         """set_target on a nonexistent entry raises ValueError."""
         with pytest.raises(ValueError, match="not found"):
             roster.set_target(AssetType.CHAR_PORTRAIT, "NoSuch", "any_id")
+
+    def test_set_target_same_target_noop(self, roster, roster_lib):
+        """set_target to the same target is a no-op (no use_count change)."""
+        asset = roster_lib.add(AssetType.CHAR_PORTRAIT, "Asset")
+        roster.add(AssetType.CHAR_PORTRAIT, "Hero", target=asset.id)
+        assert asset.use_count == 1
+        # Setting to the same target should not change use_count
+        roster.set_target(AssetType.CHAR_PORTRAIT, "Hero", asset.id)
+        assert asset.use_count == 1
 
 
 # ── Remove ──────────────────────────────────────────────────────────
@@ -1348,6 +1409,22 @@ class TestRosterPersistence:
         loaded = GameAssetRoster.load(filepath, roster_lib, game_id="test-game")
         assert loaded._library is roster_lib
 
+    def test_load_game_id_from_file_wins(self, roster, roster_lib, tmp_path):
+        """When file exists, game_id from file takes precedence over parameter."""
+        roster.add(AssetType.CHAR_PORTRAIT, "Hero")
+        filepath = str(tmp_path / "_asset_roster.json")
+        roster.save(filepath)
+
+        # Pass a different game_id — the file's game_id should win
+        loaded = GameAssetRoster.load(filepath, roster_lib, game_id="wrong-game")
+        assert loaded.game_id == "test-game"  # from file, not parameter
+
+    def test_load_game_id_fallback_when_no_file(self, roster_lib, tmp_path):
+        """When file doesn't exist, parameter game_id is used."""
+        filepath = str(tmp_path / "nonexistent.json")
+        loaded = GameAssetRoster.load(filepath, roster_lib, game_id="fallback-game")
+        assert loaded.game_id == "fallback-game"
+
 
 # ── Thread Safety ───────────────────────────────────────────────────
 
@@ -1388,3 +1465,35 @@ class TestRosterThreadSafety:
 
         assert len(errors) == 0, f"Thread errors: {errors}"
         assert len(roster) == 100  # 50 * 2 adders
+
+    def test_concurrent_set_target_no_use_count_leak(self, roster, roster_lib):
+        """Concurrent set_target on the same entry doesn't leak use_count."""
+        asset_a = roster_lib.add(AssetType.CHAR_PORTRAIT, "AssetA")
+        asset_b = roster_lib.add(AssetType.CHAR_PORTRAIT, "AssetB")
+        roster.add(AssetType.CHAR_PORTRAIT, "Hero", target=asset_a.id)
+
+        errors = []
+        N = 200
+        barrier = threading.Barrier(2)
+
+        def flipper(target_id):
+            barrier.wait()
+            try:
+                for _ in range(N):
+                    roster.set_target(AssetType.CHAR_PORTRAIT, "Hero", target_id)
+            except Exception as e:
+                errors.append(("flipper", e))
+
+        t1 = threading.Thread(target=flipper, args=(asset_a.id,))
+        t2 = threading.Thread(target=flipper, args=(asset_b.id,))
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert len(errors) == 0, f"Thread errors: {errors}"
+        # Final use_count of a + b should be exactly 1 (one of them is the final target)
+        # Total = a.use_count + b.use_count = 1 (exactly one active reference)
+        assert asset_a.use_count + asset_b.use_count == 1, (
+            f"use_count leak: a={asset_a.use_count}, b={asset_b.use_count}"
+        )
