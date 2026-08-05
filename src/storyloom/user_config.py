@@ -22,7 +22,7 @@ class UserConfig:
     """User preferences backed by a JSON file."""
 
     _DEFAULTS = {
-        "version": 1,
+        "version": 2,
         "language": "en",
         "api_key": "",
         "api_base_url": "https://api.deepseek.com",

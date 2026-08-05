@@ -105,7 +105,7 @@ class TestUserConfigSave:
         cfg.save()
         data = json.loads((tmp_path / "config.json").read_text())
         assert "api_key" in data
-        assert data["version"] == 1
+        assert data["version"] == 2
         # No .tmp file should remain
         tmps = list(tmp_path.glob("*.tmp"))
         assert len(tmps) == 0
@@ -235,8 +235,8 @@ class TestUserConfigImageFields:
         assert data["img_api_base_url"] == ""
         assert data["img_api_model"] == "flux-2-pro"
         assert data["img_remove_bg"] == "auto"
-        # Version unchanged
-        assert data["version"] == 1
+        # Version matches current schema
+        assert data["version"] == 2
 
     # ── Property isolation ──
 
