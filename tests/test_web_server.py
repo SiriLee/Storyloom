@@ -120,7 +120,7 @@ class TestConfig:
         assert "img_api_base_url" in data
         assert "img_api_model" in data
         assert "img_remove_bg" in data
-        assert data["img_remove_bg"] == "auto"
+        assert data["img_remove_bg"] == "never"
 
     def test_update_config_game_mode_valid(self, client):
         res = client.post("/api/config", json={"game_mode": "graph"})

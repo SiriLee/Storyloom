@@ -351,15 +351,13 @@
             overlay.className = "game-modal-overlay";
             overlay.innerHTML = `
                 <div class="game-modal rembg-modal">
-                    <h3 style="color:var(--text-accent); font-family:var(--font-mono);
-                               font-weight:normal; margin-bottom:0.8rem;">
+                    <h3 class="rembg-modal-title">
                         ${esc(_("Background Removal Setup"))}
                     </h3>
-                    <p class="game-modal-text" style="font-size:0.95rem; margin-bottom:1rem;">
+                    <p class="rembg-modal-body">
                         ${esc(_("Background removal requires downloading a model (~176 MB). This is a one-time download."))}
                     </p>
-                    <p class="rembg-status text-muted" style="font-size:0.85rem; margin-bottom:1rem;
-                              min-height:1.3em;"></p>
+                    <p class="rembg-modal-status text-muted"></p>
                     <div class="game-modal-actions">
                         <button class="game-modal-btn" id="rembg-cancel">${esc(_("Cancel"))}</button>
                         <button class="game-modal-btn accent" id="rembg-download">
@@ -372,7 +370,7 @@
 
             const cancelBtn  = document.getElementById("rembg-cancel");
             const dlBtn      = document.getElementById("rembg-download");
-            const statusEl   = overlay.querySelector(".rembg-status");
+            const statusEl   = overlay.querySelector(".rembg-modal-status");
 
             function cleanup() {
                 overlay.remove();
@@ -476,7 +474,7 @@
                     <div class="setting-row">
                         <span class="setting-label">${label}</span>
                         <select id="setting-${def.key}">${def.options.map(opt =>
-                            `<option value="${esc(opt.value)}" ${current === opt.value ? "selected" : ""}>${esc(opt.label)}</option>`
+                            `<option value="${esc(opt.value)}" ${current === opt.value ? "selected" : ""}>${esc(_(opt.label))}</option>`
                         ).join("")}</select>
                     </div>`;
             }

@@ -94,6 +94,15 @@ msgstr "正在安裝..."
 msgid "Done"
 msgstr "完成"
 
+msgid "Auto"
+msgstr "自動"
+
+msgid "Always"
+msgstr "總是"
+
+msgid "Never"
+msgstr "從不"
+
 # ── Web UI: credits ──
 
 msgid "Engine & System Architecture"

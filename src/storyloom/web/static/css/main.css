@@ -1628,6 +1628,28 @@ button.accent:hover, .btn-accent:hover {
 
 .rembg-modal {
     min-width: 400px;
+    text-align: center;
+}
+
+.rembg-modal-title {
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    font-weight: normal;
+    color: var(--text-accent);
+    margin-bottom: 0.8rem;
+}
+
+.rembg-modal-body {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+
+.rembg-modal-status {
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+    min-height: 1.3em;
 }
 
 /* ── In-game Settings Overlay ───────────────────────────────────── */

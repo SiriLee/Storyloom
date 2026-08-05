@@ -132,9 +132,9 @@ const SETTINGS = [
         type: "select",
         label: "Background Removal",
         options: [
+            { value: "never", label: "Never" },
             { value: "auto", label: "Auto" },
             { value: "always", label: "Always" },
-            { value: "never", label: "Never" },
         ],
     },
 ];
