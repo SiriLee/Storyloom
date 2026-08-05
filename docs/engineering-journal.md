@@ -124,6 +124,41 @@
 3. **验证脚本重写**（commit `55f4d56`）：`scripts/validate_image_api.py` 改用生产 `ImgApiClient` 替代临时 httpx 调用——验证脚本即文档
 4. **公开 API 重命名**（commit `c908df6`）：`_check_model` → `check_model`——该函数在 `io/__init__.py` 中导出，应为公开 API
 
+### 背景移除模型精简：u2net（168 MB）→ u2netp（4.4 MB）内嵌
+
+**背景**：背景移除使用 u2net.onnx（168 MB），运行时从 GitHub Releases 惰性下载——用户首次启用时需要 SSE 进度条等待下载完成。打包分发面临两难：168 MB 太大不适合内嵌（PyInstaller 二进制 23 MB → 191 MB），下载流程又增加 UX 摩擦。同时 `download_model()`、SSE 下载端点、下载模态框等约 240 行代码完全服务于这个惰性下载流程。
+
+u2netp 是 U²-Net 的轻量变体（rembg 默认模型），4.4 MB，质量在 320×320 预处理分辨率下与 u2net 无差异。
+
+**决策**（commit `b4e8b90`）：
+
+1. **模型替换**：`u2net.onnx`（168 MB）→ `u2netp.onnx`（4.4 MB），SHA256 验证通过，推理速度 ~28% 更快
+2. **内嵌分发**：模型作为 package data 打入 wheel + PyInstaller 二进制——用户首次启用背景移除时零等待、零下载
+3. **setup.py build hook**：新增 `_download_model()`，纯 stdlib（`urllib.request` + `hashlib`），幂等（SHA256 匹配则跳过），网络失败 WARNING 不中断安装。三个 cmdclass（`build_py` / `develop` / `editable_wheel`）各加一行调用——`pip install -e .` 一步到位
+4. **`_model_dir()` 路径重构**：插入包内嵌路径为优先级 2（`Path(__file__).parent.parent / "models"`），同时覆盖 wheel、PyInstaller（`sys._MEIPASS`）、dev source tree 三种场景
+5. **移除运行时下载**：删除 `download_model()` 函数、SSE 端点 `/api/config/bg-removal-install`、下载模态框 `_showRembgInstallModal()`、3 个下载相关 i18n key
+6. **删除的常量**：`BG_REMOVAL_DOWNLOAD_TIMEOUT_SEC`（仅 `download_model()` 使用）、`BG_REMOVAL_MODEL_URL`（移入 setup.py hook 就地硬编码）
+
+**净变更**：14 files，+142/-401 lines。614 tests pass。
+
+**依据**：
+- commit: `b4e8b90`
+- `src/storyloom/io/img_utils.py`：`_model_dir()` 包路径优先 + `check_model()` 保留
+- `setup.py`：`_download_model()` — 与 `_compile_mo_files()` 平行的 stdlib-only hook
+- `src/storyloom/config.py`：仅保留 `BG_REMOVAL_MODEL_FILENAME` + `BG_REMOVAL_MODEL_SHA256`（`check_model()` 运行时使用）
+- 模型来源：`https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx`
+
+### 图像 IO 模块循环依赖消除
+
+**背景**：`img_api_client.py` ↔ `img_utils.py` 存在模块级循环依赖——`img_utils` 从 `img_api_client` import `ImageResult` / `RemoveBgPolicy`，`img_api_client` 在 `generate()` 方法内惰性 import `img_utils`（`detect_format` / `maybe_remove_background`）。虽未触发 `ImportError`（惰性 import 绕过了问题），但这意味着两者的依赖方向取决于运行时调用顺序——任何人在 `img_api_client` 模块级加 `from img_utils import ...` 即崩溃。根本原因是 `ImageResult` / `RemoveBgPolicy` / `ImageSize` 属于共享类型，不属于任何一方。
+
+**决策**（commit `19aaa2b`）：提取共享类型（`ImageResult`、`RemoveBgPolicy`、`ImageSize`）到独立模块 `io/_types.py`——零依赖的纯数据层。形成干净 DAG：`_types ← img_utils` + `_types ← img_api_client`，两者永不在模块级交叉 import。
+
+**依据**：
+- commit: `19aaa2b`（+60/-50 lines, 5 files）
+- 新增文件：`src/storyloom/io/_types.py`（55 行）
+- Acyclic Dependencies Principle（Bob Martin）：包的依赖图必须无环
+
 ---
 
 ## 2026-08-04（周二）——下午：管线重构与 v1.3.0
