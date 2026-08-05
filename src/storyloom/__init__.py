@@ -11,14 +11,20 @@ from storyloom.core.save_manager import SaveManager
 from storyloom.core.session import GameSession
 from storyloom.user_config import UserConfig
 
+from storyloom.assets import Asset, AssetItem, AssetLibrary, AssetType, GameAssetRoster
 from storyloom.parser import ParsedOutput, ParseError, Segment
 
 __all__ = [
     "ApiClient",
     "ApiError",
     "ApiResult",
+    "Asset",
+    "AssetItem",
+    "AssetLibrary",
+    "AssetType",
     "ContextManager",
     "DEFAULT_MODEL",
+    "GameAssetRoster",
     "GameLoop",
     "GameSession",
     "GameState",
