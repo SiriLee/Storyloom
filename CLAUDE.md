@@ -6,7 +6,7 @@
 
 Storyloom is an AI-powered interactive text fiction game engine. The LLM is the narrative brain; the program is the flow manager + context steward. It is a **single Python application** (not client-server) — the core engine is UI-agnostic via generator-based event streaming.
 
-**Status (2026-07-21):** Phase 1 core engine implemented (game loop, co-creation, save system, ending detection, i18n). Web interface (FastAPI + SSE) — main menu, co-create chat, game view, adventure log, settings. Packaging: standalone binary (PyInstaller) + pip wheel. Version 1.0.0.
+**Status (2026-08-04):** Phase 1 complete — pipeline refactored for Phase 2 (StreamParser + StateManager + EventDispatcher architecture). Web interface (FastAPI + SSE). Packaging: standalone binary (PyInstaller) + pip wheel. Version 1.3.0.
 
 **Key directories:**
 
@@ -36,13 +36,15 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | `docs/api/session.md` | GameSession integration API |
 | `docs/superpowers/` | Archived design specs & implementation plans |
 | **Code** | |
-| `src/storyloom/core/game_loop.py` | Game loop, GameState, ending detection, serialization |
+| `src/storyloom/core/game_loop.py` | Game loop, GameState, ending detection, serialization — pipeline orchestrator |
+| `src/storyloom/core/state_manager.py` | StateManager — SET/CHECKPOINT/BRANCH/CHOICE_END processing, data accumulation |
+| `src/storyloom/core/event_dispatcher.py` | EventDispatcher — Event → UI dict conversion, Phase 2 Task alignment entry point |
 | `src/storyloom/core/context_manager.py` | Messages array, sliding window, compression |
 | `src/storyloom/core/prompt_builder.py` | Round 1 / Round N prompt content builder |
 | `src/storyloom/core/co_create.py` | Co-creation flow (Q&A → story_config → outline) |
 | `src/storyloom/core/save_manager.py` | Atomic JSON save/load/delete/list |
 | `src/storyloom/core/session.py` | `GameSession` lifecycle coordinator |
-| `src/storyloom/parser/streaming_parser.py` | Line-by-line XML parser, data types, LineBuffer |
+| `src/storyloom/parser/stream_parser.py` | StreamParser, Event, EventType, LineBuffer, shared data types |
 | `src/storyloom/io/api_client.py` | OpenAI-compatible API client |
 | `src/storyloom/web/` | Web UI (FastAPI + SSE + SPA) |
 | `src/storyloom/dev_cli/` | Dev CLI — `DevObserver`, deque-buffered display |
@@ -51,8 +53,11 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | `src/storyloom/i18n.py` | gettext i18n (zh-CN, zh-TW, en) |
 | `scripts/build.sh` | PyInstaller + wheel packaging |
 | `pyproject.toml` | Project metadata, dependencies, entry points |
-| `tests/test_*.py` | pytest unit tests (mock, no API) |
+| `tests/test_stream_parser.py` | StreamParser unit tests — tag → Event, position tracking, edge cases |
+| `tests/test_state_manager.py` | StateManager unit tests — SET, branch filter, choice, checkpoint, bridge |
+| `tests/test_game_loop.py` | GameLoop & GameState unit tests |
 | `tests/test_web_server.py` | Web server integration tests |
+| `tests/test_*.py` | Other pytest unit tests (mock, no API) |
 
 **Test structure:** `tests/test_*.py` = pytest unit tests (mock, no API). `tests/prompt_lab/` = ad-hoc prompt design tools (require API key).
 

@@ -6,7 +6,7 @@
 
 Storyloom turns a large language model into a game master. You and the AI collaboratively build a story world, define characters and game mechanics, then play through a branching narrative where your choices shape the outcome. The engine handles state management, context window stewardship, and real-time streaming — the LLM focuses on telling a great story.
 
-**Status (2026-07-21):** Phase 1 core engine complete. Version 1.0.0. Playable via dev CLI or web UI (FastAPI + SSE single-page app). Standalone binary + pip wheel packaging via `scripts/build.sh`.
+**Status (2026-08-04):** Phase 1 complete. Version 1.3.0 — pipeline refactored for Phase 2 graph mode. Playable via dev CLI or web UI (FastAPI + SSE single-page app). Standalone binary + pip wheel.
 
 ## Highlights
 
@@ -61,18 +61,20 @@ Requires `build` + `pyinstaller` (installed automatically by the script).
 Storyloom is a **single Python application** — not a client-server system. The core engine is UI-agnostic, exposing a generator-based event stream consumed by any presentation layer through `GameSession`.
 
 ```
-┌─────────────────────────────────────────────────┐
-│              Storyloom Core Engine              │
-│  ┌──────────┐  ┌───────────┐  ┌──────────────┐  │
-│  │GameLoop  │  │ContextMgr │  │StreamXmlPrs  │  │
-│  └──────────┘  └───────────┘  └──────────────┘  │
-│  ┌──────────┐  ┌───────────┐  ┌──────────────┐  │
-│  │PromptBldr│  │CoCreate   │  │SaveManager   │  │
-│  └──────────┘  └───────────┘  └──────────────┘  │
-│  ┌──────────┐  ┌───────────┐                    │
-│  │ApiClient │  │UserConfig │                    │
-│  └──────────┘  └───────────┘                    │
-└─────────────────────┬───────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│               Storyloom Core Engine              │
+│  ┌──────────┐  ┌───────────┐  ┌───────────────┐ │
+│  │GameLoop  │  │ContextMgr │  │  Event Pipe   │ │
+│  │(orchestr-│  │(messages) │  │ StreamParser  │ │
+│  │ ator)    │  └───────────┘  │     →         │ │
+│  └──────────┘                 │ StateManager  │ │
+│  ┌──────────┐  ┌───────────┐  │     →         │ │
+│  │PromptBldr│  │CoCreate   │  │EventDispatcher│ │
+│  └──────────┘  └───────────┘  └───────────────┘ │
+│  ┌──────────┐  ┌───────────┐  ┌───────────────┐ │
+│  │ApiClient │  │SaveManager│  │  UserConfig   │ │
+│  └──────────┘  └───────────┘  └───────────────┘ │
+└─────────────────────┬────────────────────────────┘
                       │ GameSession (public API)
               ┌───────┴────────┐
               ▼                ▼
@@ -89,7 +91,11 @@ Player reads text ──→ makes choice ──→ engine sends prompt ──→
                                                                        │
                     ┌──────────────────────────────────────────────────┘
                     ▼
-            StreamingXmlParser (line-by-line)
+         StreamParser (line → Event)
+                    │
+         StateManager (state logic, branch filter, choice pause)
+                    │
+         EventDispatcher (Event → UI dict)
                     │
        ┌────────────┼────────────┬────────────┐
        ▼            ▼            ▼            ▼
@@ -100,7 +106,7 @@ Player reads text ──→ makes choice ──→ engine sends prompt ──→
 
 The `<bridge/>` element triggers the next API call mid-paragraph, hiding LLM latency behind the current text display.
 
-The engine is organized into `storyloom.core` (game loop, context management, prompt building, co-creation, save system), `storyloom.parser` (XML parsing), `storyloom.io` (API client), and `storyloom.user_config` (config management). The UI layer — `storyloom.web` (FastAPI + SSE + SPA) and `storyloom.dev_cli` (terminal) — imports from `storyloom.core` via `GameSession`. See `CLAUDE.md` for the complete file ownership map.
+The engine is organized into `storyloom.core` (game loop, state manager, event dispatcher, context management, prompt building, co-creation, save system), `storyloom.parser` (streaming XML parser, Event types, shared data types), `storyloom.io` (API client), and `storyloom.user_config` (config management). The UI layer — `storyloom.web` (FastAPI + SSE + SPA) and `storyloom.dev_cli` (terminal) — imports from `storyloom.core` via `GameSession`. See `CLAUDE.md` for the complete file ownership map.
 
 ## Documentation
 
@@ -147,11 +153,11 @@ and [`docs/api/co-create.md`](./docs/api/co-create.md) for the co-creation API r
 - [x] Phase 1 core engine — game loop, co-creation, saving, ending detection, i18n
 - [x] Bridge pre-fetch for seamless narration
 - [x] Conversation-based context with sliding window + compression
-- [x] Streaming XML parser with line-by-line output
+- [x] Streaming Event pipeline — StreamParser → StateManager → EventDispatcher
 - [x] UserConfig — centralized config management
 - [x] Web UI (FastAPI + SSE) — main menu, co-create chat, game view, adventure log, settings, credits
 - [x] Packaging — standalone binary (PyInstaller) + pip wheel via `scripts/build.sh`
-- [ ] Phase 2 — image mode support (static backgrounds + character sprites), co-creation presets + partial real-time generation, vector memory for characters/locations
+- [ ] Phase 2 — image mode (static backgrounds + character sprites), TaskGenerator + Task Pool, asset pipeline, graph-mode UI
 - [ ] Phase 3 — full image mode, visual quality on par with mainstream visual novel games, cloud sync, TTS, script export
 
 ## License
