@@ -6,7 +6,6 @@ These are in-memory value objects; serialization is via to_dict/from_dict.
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -87,7 +86,8 @@ class Asset:
         return self.asset_type is other.asset_type and self.id == other.id
 
     def __hash__(self) -> int:
-        """Hash by identity; Asset is intended to be stored in sets/dicts."""
+        """Hash by identity (``asset_type``, ``id``) — these fields are
+        set once at construction and must not be mutated afterwards."""
         return hash((self.asset_type, self.id))
 
 
@@ -142,5 +142,6 @@ class AssetItem:
         return self.local_name == other.local_name
 
     def __hash__(self) -> int:
-        """Hash by local_name."""
+        """Hash by ``local_name`` — set once at construction, must not be
+        mutated afterwards."""
         return hash(self.local_name)

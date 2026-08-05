@@ -141,7 +141,8 @@ class GameAssetRoster:
     def save(self, filepath: str) -> None:
         """Write the roster to *filepath*.  Atomic: ``.tmp`` + ``os.replace``.
         (D16)."""
-        data = self._to_save_dict()
+        with self._lock:
+            data = self._to_save_dict()
         tmp_path = filepath + ".tmp"
         os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
         with open(tmp_path, "w", encoding="utf-8") as f:
@@ -178,11 +179,23 @@ class GameAssetRoster:
                 f"(expected {cls.VERSION})"
             )
 
-        file_game_id = data.get("game_id", game_id)
+        file_game_id = data.get("game_id")
+        if file_game_id is None:
+            file_game_id = game_id
+        elif file_game_id != game_id:
+            raise ValueError(
+                f"game_id mismatch: file has '{file_game_id}', "
+                f"expected '{game_id}'"
+            )
         roster = cls(file_game_id, library)
         items_data = data.get("items", {})
         for type_str, type_items in items_data.items():
-            atype = AssetType(type_str)
+            try:
+                atype = AssetType(type_str)
+            except ValueError:
+                # Unknown asset type — forward compatibility: skip,
+                # don't crash.  Future versions may add new types.  (§2.1)
+                continue
             roster._items[atype] = {}
             for local_name, item_data in type_items.items():
                 roster._items[atype][local_name] = AssetItem.from_dict(

@@ -489,6 +489,16 @@ class TestAssetLibraryAdd:
         a = lib.add(AssetType.CHAR_PORTRAIT, "Hero")
         assert a.description == ""
 
+    def test_add_rejects_path_traversal_id(self, lib):
+        """asset_id with path separators raises ValueError."""
+        with pytest.raises(ValueError, match="asset_id"):
+            lib.add(AssetType.CHAR_PORTRAIT, "Evil", asset_id="../etc/passwd")
+
+    def test_add_rejects_weird_chars_in_id(self, lib):
+        """asset_id with special characters raises ValueError."""
+        with pytest.raises(ValueError, match="asset_id"):
+            lib.add(AssetType.CHAR_PORTRAIT, "Weird", asset_id="hello world")
+
 
 # ── Get ─────────────────────────────────────────────────────────────
 
@@ -908,6 +918,29 @@ class TestAssetLibraryPersistence:
             f.write("not json {{{")
         with pytest.raises(ValueError, match="corrupt"):
             AssetLibrary.load(media_dir)
+
+    def test_load_skips_unknown_type(self, media_dir):
+        """Unknown AssetType in JSON is skipped, not crashed (§2.1 forward compat)."""
+        import json
+        bad_path = os.path.join(media_dir, "_asset_lib.json")
+        # Write a file with a known type and an unknown (future) type
+        with open(bad_path, "w") as f:
+            json.dump({
+                "version": 1,
+                "items": {
+                    "char_portrait": {
+                        "abc": {"name": "Hero", "description": "", "use_count": 0, "serial": 0}
+                    },
+                    "bgm": {  # Future type — should be silently skipped
+                        "song1": {"name": "Theme", "description": "", "use_count": 0, "serial": 1}
+                    }
+                }
+            }, f)
+        lib = AssetLibrary.load(media_dir)
+        # Known type loaded
+        assert lib.get(AssetType.CHAR_PORTRAIT, "abc") is not None
+        # Unknown type silently skipped — no crash
+        assert len(lib) == 1
 
 
 # ── Thread Safety ───────────────────────────────────────────────────
@@ -1409,15 +1442,24 @@ class TestRosterPersistence:
         loaded = GameAssetRoster.load(filepath, roster_lib, game_id="test-game")
         assert loaded._library is roster_lib
 
-    def test_load_game_id_from_file_wins(self, roster, roster_lib, tmp_path):
-        """When file exists, game_id from file takes precedence over parameter."""
+    def test_load_game_id_mismatch_raises(self, roster, roster_lib, tmp_path):
+        """When file game_id ≠ parameter game_id, raises ValueError."""
         roster.add(AssetType.CHAR_PORTRAIT, "Hero")
         filepath = str(tmp_path / "_asset_roster.json")
         roster.save(filepath)
 
-        # Pass a different game_id — the file's game_id should win
-        loaded = GameAssetRoster.load(filepath, roster_lib, game_id="wrong-game")
-        assert loaded.game_id == "test-game"  # from file, not parameter
+        # Pass a different game_id — should raise, not silently swap
+        with pytest.raises(ValueError, match="game_id mismatch"):
+            GameAssetRoster.load(filepath, roster_lib, game_id="wrong-game")
+
+    def test_load_game_id_match_succeeds(self, roster, roster_lib, tmp_path):
+        """When file game_id == parameter game_id, loads successfully."""
+        roster.add(AssetType.CHAR_PORTRAIT, "Hero")
+        filepath = str(tmp_path / "_asset_roster.json")
+        roster.save(filepath)
+
+        loaded = GameAssetRoster.load(filepath, roster_lib, game_id="test-game")
+        assert loaded.game_id == "test-game"
 
     def test_load_game_id_fallback_when_no_file(self, roster_lib, tmp_path):
         """When file doesn't exist, parameter game_id is used."""

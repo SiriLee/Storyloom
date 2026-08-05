@@ -8,10 +8,14 @@ from __future__ import annotations
 import heapq
 import json
 import os
+import re
 import threading
 import uuid
 
 from storyloom.assets._types import Asset, AssetType
+
+# asset_id must be a filesystem-safe identifier — no path separators.
+_SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9_.-]+$")
 
 
 class AssetLibrary:
@@ -50,6 +54,10 @@ class AssetLibrary:
         """
         if asset_id is None:
             asset_id = uuid.uuid4().hex
+        elif not _SAFE_ID_RE.match(asset_id):
+            raise ValueError(
+                f"asset_id must match {_SAFE_ID_RE.pattern!r}, got {asset_id!r}"
+            )
 
         with self._lock:
             type_items = self._items.setdefault(asset_type, {})
@@ -201,7 +209,8 @@ class AssetLibrary:
     def save(self) -> None:
         """Write the library to ``media_dir/_asset_lib.json``.  Atomic:
         writes to a ``.tmp`` file then ``os.replace``.  (D16)."""
-        data = self._to_save_dict()
+        with self._lock:
+            data = self._to_save_dict()
         filepath = os.path.join(self.media_dir, "_asset_lib.json")
         tmp_path = filepath + ".tmp"
         os.makedirs(self.media_dir, exist_ok=True)
@@ -237,7 +246,12 @@ class AssetLibrary:
         max_serial = -1
         items_data = data.get("items", {})
         for type_str, type_items in items_data.items():
-            atype = AssetType(type_str)
+            try:
+                atype = AssetType(type_str)
+            except ValueError:
+                # Unknown asset type — forward compatibility: skip,
+                # don't crash.  Future versions may add new types.  (§2.1)
+                continue
             lib._items[atype] = {}
             for asset_id, asset_data in type_items.items():
                 asset = Asset.from_dict(asset_data, asset_type=atype, asset_id=asset_id)
@@ -245,6 +259,8 @@ class AssetLibrary:
                 if asset.serial > max_serial:
                     max_serial = asset.serial
 
+        # New instance not yet shared — _serial_counter write is safe
+        # without the lock.
         lib._serial_counter = max_serial + 1
         return lib
 
