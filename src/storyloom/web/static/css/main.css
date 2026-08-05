@@ -1652,6 +1652,36 @@ button.accent:hover, .btn-accent:hover {
     min-height: 1.3em;
 }
 
+/* ── Progress bar (inside rembg modal) ─────────────────────────── */
+
+.rembg-progress-wrap {
+    margin-bottom: 1rem;
+}
+
+.rembg-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.4rem;
+}
+
+.rembg-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--text-accent);
+    border-radius: 4px;
+    transition: width 0.2s ease;
+}
+
+.rembg-progress-text {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
 /* ── In-game Settings Overlay ───────────────────────────────────── */
 
 .game-settings-overlay {

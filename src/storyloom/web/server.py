@@ -204,14 +204,67 @@ async def config_bg_removal_status():
     return {"available": _check_model()}
 
 
-@app.post("/api/config/bg-removal-install")
+@app.get("/api/config/bg-removal-install")
 async def config_bg_removal_install():
-    """Download the U²-Net model for background removal (~168 MB)."""
+    """Download the U²-Net model for background removal (~168 MB).
+
+    Uses SSE to report download progress to the client.
+    Each event has ``type`` and ``data`` JSON fields:
+
+    - ``progress``: ``{received, total}`` — bytes downloaded so far
+    - ``done``:     ``{ok, message?}``   — download completed
+    - ``error``:    ``{message}``        — download failed
+    """
     from storyloom.io.img_utils import download_model
-    success, message = download_model()
-    if success:
-        return {"ok": True, "message": message}
-    return {"ok": False, "error": message}
+
+    async def event_stream():
+        queue: asyncio.Queue = asyncio.Queue()
+
+        def _progress(received: int, total: int):
+            """Called by download_model on each chunk."""
+            try:
+                loop = asyncio.get_event_loop()
+                loop.call_soon_threadsafe(
+                    queue.put_nowait,
+                    {"event": "progress", "data": json.dumps(
+                        {"received": received, "total": total}
+                    )},
+                )
+            except Exception:
+                pass
+
+        # Run the blocking download in a thread so the event loop stays free.
+        import concurrent.futures
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(download_model, _progress)
+
+        # Wait for the download to finish or fail.
+        while not future.done():
+            try:
+                msg = await asyncio.wait_for(queue.get(), timeout=0.5)
+                yield f"event: {msg['event']}\ndata: {msg['data']}\n\n"
+            except asyncio.TimeoutError:
+                # Send a keepalive comment so the connection stays open.
+                yield ": keepalive\n\n"
+
+        # Drain any remaining progress events.
+        while not queue.empty():
+            msg = queue.get_nowait()
+            yield f"event: {msg['event']}\ndata: {msg['data']}\n\n"
+
+        success, detail = future.result()
+        if success:
+            yield f"event: done\ndata: {json.dumps({'ok': True, 'message': detail})}\n\n"
+        else:
+            yield f"event: error\ndata: {json.dumps({'message': detail})}\n\n"
+
+        executor.shutdown(wait=False)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════

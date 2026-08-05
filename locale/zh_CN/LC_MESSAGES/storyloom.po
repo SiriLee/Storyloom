@@ -85,6 +85,9 @@ msgstr "背景移除设置"
 msgid "Background removal requires downloading a model (~176 MB). This is a one-time download."
 msgstr "背景移除需要下载一个模型（约 176 MB）。这是一次性下载。"
 
+msgid "Connection lost"
+msgstr "连接断开"
+
 msgid "Download"
 msgstr "下载"
 

@@ -357,7 +357,13 @@
                     <p class="rembg-modal-body">
                         ${esc(_("Background removal requires downloading a model (~176 MB). This is a one-time download."))}
                     </p>
-                    <p class="rembg-modal-status text-muted"></p>
+                    <div class="rembg-progress-wrap hidden" id="rembg-progress-wrap">
+                        <div class="rembg-progress-bar">
+                            <div class="rembg-progress-fill" id="rembg-progress-fill"></div>
+                        </div>
+                        <p class="rembg-progress-text text-muted" id="rembg-progress-text"></p>
+                    </div>
+                    <p class="rembg-modal-status text-muted" id="rembg-modal-status"></p>
                     <div class="game-modal-actions">
                         <button class="game-modal-btn" id="rembg-cancel">${esc(_("Cancel"))}</button>
                         <button class="game-modal-btn accent" id="rembg-download">
@@ -368,12 +374,21 @@
             `;
             document.body.appendChild(overlay);
 
-            const cancelBtn  = document.getElementById("rembg-cancel");
-            const dlBtn      = document.getElementById("rembg-download");
-            const statusEl   = overlay.querySelector(".rembg-modal-status");
+            const cancelBtn   = document.getElementById("rembg-cancel");
+            const dlBtn       = document.getElementById("rembg-download");
+            const statusEl    = document.getElementById("rembg-modal-status");
+            const progWrap    = document.getElementById("rembg-progress-wrap");
+            const progFill    = document.getElementById("rembg-progress-fill");
+            const progText    = document.getElementById("rembg-progress-text");
+            let eventSource   = null;
 
             function cleanup() {
+                if (eventSource) { eventSource.close(); eventSource = null; }
                 overlay.remove();
+            }
+
+            function formatMB(bytes) {
+                return (bytes / 1048576).toFixed(1) + " MB";
             }
 
             cancelBtn.addEventListener("click", () => {
@@ -381,42 +396,66 @@
                 resolve(false);
             });
 
-            dlBtn.addEventListener("click", async () => {
+            dlBtn.addEventListener("click", () => {
                 dlBtn.disabled = true;
                 cancelBtn.disabled = true;
                 dlBtn.textContent = esc(_("Installing..."));
+                progWrap.classList.remove("hidden");
                 statusEl.textContent = "";
 
-                try {
-                    const res = await API.post("/api/config/bg-removal-install");
-                    if (res.ok) {
-                        statusEl.textContent = "✓ " + esc(res.message || "OK");
-                        statusEl.style.color = "var(--text-accent)";
-                        dlBtn.textContent = esc(_("Done"));
-                        dlBtn.addEventListener("click", () => {
-                            cleanup();
-                            resolve(true);
-                        }, { once: true });
-                        /* Also allow clicking Cancel to proceed (now means "Continue"). */
-                        cancelBtn.textContent = esc(_("Continue"));
-                        cancelBtn.addEventListener("click", () => {
-                            cleanup();
-                            resolve(true);
-                        }, { once: true });
-                        cancelBtn.disabled = false;
-                    } else {
-                        statusEl.textContent = "✗ " + esc(res.error || _("Unknown error"));
-                        statusEl.style.color = "var(--text-error)";
-                        dlBtn.textContent = esc(_("Retry"));
-                        dlBtn.disabled = false;
-                        cancelBtn.textContent = esc(_("Cancel"));
-                        cancelBtn.disabled = false;
-                    }
-                } catch (err) {
-                    statusEl.textContent = "✗ " + esc(err.message || _("Unknown error"));
+                eventSource = new EventSource("/api/config/bg-removal-install");
+
+                eventSource.addEventListener("progress", (e) => {
+                    const d = JSON.parse(e.data);
+                    const pct = d.total ? Math.round(d.received / d.total * 100) : 0;
+                    progFill.style.width = pct + "%";
+                    progText.textContent = formatMB(d.received)
+                        + (d.total ? " / " + formatMB(d.total) : "");
+                });
+
+                eventSource.addEventListener("done", (e) => {
+                    eventSource.close();
+                    const d = JSON.parse(e.data);
+                    progFill.style.width = "100%";
+                    statusEl.textContent = "✓ " + esc(d.message || "OK");
+                    statusEl.style.color = "var(--text-accent)";
+                    dlBtn.textContent = esc(_("Done"));
+                    dlBtn.addEventListener("click", () => {
+                        cleanup();
+                        resolve(true);
+                    }, { once: true });
+                    cancelBtn.textContent = esc(_("Continue"));
+                    cancelBtn.addEventListener("click", () => {
+                        cleanup();
+                        resolve(true);
+                    }, { once: true });
+                    cancelBtn.disabled = false;
+                });
+
+                eventSource.addEventListener("error", (e) => {
+                    /* Server-sent error event (download failed). */
+                    eventSource.close();
+                    let msg = _("Unknown error");
+                    try {
+                        if (e.data) msg = JSON.parse(e.data).message || msg;
+                    } catch (_) {}
+                    _showRembgError(msg);
+                });
+
+                /* Native EventSource error (network / connection drop). */
+                eventSource.onerror = () => {
+                    if (eventSource.readyState !== EventSource.CLOSED) return;
+                    eventSource.close();
+                    _showRembgError(_("Connection lost"));
+                };
+
+                function _showRembgError(msg) {
+                    statusEl.textContent = "✗ " + esc(msg);
                     statusEl.style.color = "var(--text-error)";
+                    progWrap.classList.add("hidden");
                     dlBtn.textContent = esc(_("Retry"));
                     dlBtn.disabled = false;
+                    cancelBtn.textContent = esc(_("Cancel"));
                     cancelBtn.disabled = false;
                 }
             });
