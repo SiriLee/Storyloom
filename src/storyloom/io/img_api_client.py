@@ -25,6 +25,7 @@ import httpx
 from storyloom.config import (
     DEFAULT_IMG_BASE_URL,
     DEFAULT_IMG_MODEL,
+    IMAGE_DOWNLOAD_TIMEOUT_SEC,
     IMAGE_GEN_TIMEOUT_SEC,
 )
 
@@ -306,7 +307,12 @@ class ImgApiClient:
         if resp.status_code != 200:
             self._handle_http_error(resp)
 
-        data = resp.json()
+        try:
+            data = resp.json()
+        except ValueError as e:
+            raise ImageApiError(
+                f"Invalid JSON in API response: {e}"
+            ) from e
         img = data.get("data", [{}])[0]
         url = img.get("url", "")
         b64 = img.get("b64_json", "")
@@ -315,7 +321,9 @@ class ImgApiClient:
         raw: bytes | None = None
         if url:
             try:
-                dl = self._get_client().get(url)
+                dl = self._get_client().get(
+                    url, timeout=IMAGE_DOWNLOAD_TIMEOUT_SEC,
+                )
             except httpx.RequestError as e:
                 raise ImageApiError(f"Image download failed: {e}") from e
             if dl.status_code != 200:
@@ -372,7 +380,7 @@ class ImgApiClient:
             msg = detail.get("error", {}).get(
                 "message", str(response.status_code)
             )
-        except Exception:
+        except (ValueError, KeyError, TypeError):
             snippet = response.text[:500] if response.text else "(empty body)"
             msg = f"Non-JSON response: {snippet}"
         raise ImageApiError(f"HTTP {response.status_code}: {msg}")

@@ -196,7 +196,8 @@ def remove_background(raw: bytes, fmt: str) -> bytes | None:
         buf = BytesIO()
         result.save(buf, format="PNG")
         return buf.getvalue()
-    except (ImportError, ValueError, OSError):
+    except (ImportError, ValueError, OSError, RuntimeError):
+        # RuntimeError: onnxruntime model/inference failures
         return None
 
 
