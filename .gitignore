@@ -6,6 +6,7 @@ CLAUDE.local.md
 
 # Temp
 temp/
+models/
 
 # Claude Code internal (worktrees, session transcripts)
 .claude/

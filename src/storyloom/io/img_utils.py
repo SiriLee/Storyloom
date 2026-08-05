@@ -3,7 +3,7 @@
 Format/alpha/dimension detection are pure byte-level operations with
 no external dependencies.  Background removal uses onnxruntime for
 direct inference — the model (~168 MB) is downloaded on-demand and
-cached in ``~/.storyloom/models/``.
+cached alongside the application.
 
 Usage::
 
@@ -128,7 +128,7 @@ def get_dimensions(raw: bytes, fmt: str) -> tuple[int, int]:
 # ═══════════════════════════════════════════════════════════════════
 #
 # The model (u2net.onnx, ~168 MB) is downloaded on-demand to
-# ``~/.storyloom/models/`` when the user first enables background
+# ``<app>/models/`` when the user first enables background
 # removal.  Once cached, inference runs in-process via onnxruntime
 # with zero external dependencies.
 #
@@ -137,6 +137,7 @@ def get_dimensions(raw: bytes, fmt: str) -> tuple[int, int]:
 
 import hashlib
 import os
+import sys
 import tempfile as _tempfile_mod
 import time
 from pathlib import Path
@@ -162,13 +163,24 @@ _onnx_session: "ort.InferenceSession | None" = None
 def _model_dir() -> Path:
     """Directory where the background-removal model is stored.
 
-    Respects ``STORYLOOM_MODEL_DIR`` env var; defaults to
-    ``~/.storyloom/models/``.
+    Resolution order:
+      1. ``STORYLOOM_MODEL_DIR`` env var (explicit override)
+      2. ``STORYLOOM_APP_DIR`` / "models" (alongside config.json)
+      3. PyInstaller: "models/" next to the executable
+      4. Fallback: "models/" in the current directory
+
+    This keeps the model self-contained within the program directory —
+    deleting the program folder removes everything, no residue.
     """
     env = os.environ.get("STORYLOOM_MODEL_DIR")
     if env:
         return Path(env)
-    return Path.home() / ".storyloom" / "models"
+    app_dir = os.environ.get("STORYLOOM_APP_DIR")
+    if app_dir:
+        return Path(app_dir) / "models"
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent / "models"
+    return Path.cwd() / "models"
 
 
 def _model_path() -> Path:

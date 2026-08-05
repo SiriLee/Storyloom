@@ -60,7 +60,8 @@ IMAGE_GEN_TIMEOUT_SEC = 300     # image generation can take minutes
 IMAGE_DOWNLOAD_TIMEOUT_SEC = 60
 
 # ── Background removal model ──────────────────────────────────
-# Model is downloaded on-demand to ~/.storyloom/models/
+# Model is downloaded on-demand alongside config.json; see
+# img_utils._model_dir() for the resolution order.
 BG_REMOVAL_MODEL_URL = (
     "https://github.com/SiriLee/Storyloom/releases/download/"
     "models-v1/u2net.onnx"
