@@ -463,7 +463,7 @@ button.accent:hover, .btn-accent:hover {
 
 .settings-form {
     width: 100%;
-    max-width: 640px;
+    max-width: 700px;
     margin-top: var(--space-2xl);
 }
 
@@ -472,20 +472,20 @@ button.accent:hover, .btn-accent:hover {
     justify-content: space-between;
     align-items: center;
     margin-bottom: var(--space-xl);
-    gap: var(--space-lg);
+    gap: var(--space-xl);
 }
 
 .settings-form .setting-label {
     color: var(--text-secondary);
     font-size: var(--font-md);
     flex-shrink: 0;
-    min-width: 90px;
+    min-width: 130px;
 }
 
 /* Wide text/password inputs for API URLs and keys */
 .settings-form .setting-input {
     flex: 1;
-    max-width: 420px;
+    max-width: 480px;
     padding: 0.55rem 0.8rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
@@ -504,7 +504,7 @@ button.accent:hover, .btn-accent:hover {
 /* Read-only display value + edit button */
 .settings-form .setting-val {
     flex: 1;
-    max-width: 420px;
+    max-width: 480px;
     font-family: var(--font-mono);
     font-size: 0.9rem;
     color: var(--text-primary);

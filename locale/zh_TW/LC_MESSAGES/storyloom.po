@@ -67,6 +67,18 @@ msgstr "API 金鑰"
 msgid "Model"
 msgstr "模型"
 
+msgid "Image API URL"
+msgstr "圖像 API 位址"
+
+msgid "Image API Key"
+msgstr "圖像 API 金鑰"
+
+msgid "Image Model"
+msgstr "圖像模型"
+
+msgid "Background Removal"
+msgstr "背景移除"
+
 # ── Web UI: credits ──
 
 msgid "Engine & System Architecture"
