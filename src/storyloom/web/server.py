@@ -200,8 +200,8 @@ async def config_migrate():
 @app.get("/api/config/bg-removal-status")
 async def config_bg_removal_status():
     """Check whether the background-removal model is downloaded."""
-    from storyloom.io.img_utils import _check_model
-    return {"available": _check_model()}
+    from storyloom.io.img_utils import check_model
+    return {"available": check_model()}
 
 
 @app.get("/api/config/bg-removal-install")

@@ -188,7 +188,7 @@ def _model_path() -> Path:
     return _model_dir() / BG_REMOVAL_MODEL_FILENAME
 
 
-def _check_model() -> bool:
+def check_model() -> bool:
     """Return True if the model file exists with the expected SHA256."""
     path = _model_path()
     if not path.exists():
@@ -324,7 +324,7 @@ def remove_background(raw: bytes, fmt: str) -> bytes | None:
         PNG RGBA bytes with background removed, or ``None`` if the
         model is unavailable or inference fails.
     """
-    if not _check_model():
+    if not check_model():
         return None
 
     try:

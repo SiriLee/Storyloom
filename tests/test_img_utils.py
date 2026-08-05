@@ -197,18 +197,18 @@ class TestGetDimensions:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# _check_model
+# check_model
 # ═══════════════════════════════════════════════════════════════════
 
 class TestCheckModel:
-    """_check_model — file existence + SHA256 verification."""
+    """check_model — file existence + SHA256 verification."""
 
     def test_returns_false_when_file_missing(self):
         """No model file → False."""
         from storyloom.io import img_utils
         with patch.object(img_utils, "_model_path") as mock_path:
             mock_path.return_value = Path("/nonexistent/model.onnx")
-            assert img_utils._check_model() is False
+            assert img_utils.check_model() is False
 
     def test_returns_true_when_sha256_matches(self, tmp_path):
         """File with correct SHA256 → True."""
@@ -221,7 +221,7 @@ class TestCheckModel:
         with patch.object(img_utils, "_model_path") as mock_path:
             with patch.object(img_utils, "BG_REMOVAL_MODEL_SHA256", expected):
                 mock_path.return_value = model
-                assert img_utils._check_model() is True
+                assert img_utils.check_model() is True
 
     def test_returns_false_when_sha256_mismatches(self, tmp_path):
         """File with wrong hash → False."""
@@ -230,7 +230,7 @@ class TestCheckModel:
         model.write_bytes(b"corrupt-data")
         with patch.object(img_utils, "_model_path") as mock_path:
             mock_path.return_value = model
-            assert img_utils._check_model() is False
+            assert img_utils.check_model() is False
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -322,7 +322,7 @@ class TestRemoveBackground:
     def test_returns_none_when_model_unavailable(self):
         """When model file missing, return None without error."""
         from storyloom.io import img_utils
-        with patch.object(img_utils, "_check_model", return_value=False):
+        with patch.object(img_utils, "check_model", return_value=False):
             result = img_utils.remove_background(_rgba_png(), "png")
             assert result is None
 
@@ -338,7 +338,7 @@ class TestRemoveBackground:
         mock_session.get_inputs.return_value = [MagicMock(name="input")]
         mock_session.run.return_value = [pred]
 
-        with patch.object(img_utils, "_check_model", return_value=True):
+        with patch.object(img_utils, "check_model", return_value=True):
             with patch.object(img_utils, "_get_session", return_value=mock_session):
                 result = img_utils.remove_background(_rgb_png(), "png")
                 assert isinstance(result, bytes)

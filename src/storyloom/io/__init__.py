@@ -11,7 +11,7 @@ from storyloom.io.img_api_client import (
     RemoveBgPolicy,
 )
 from storyloom.io.img_utils import (
-    _check_model,
+    check_model,
     detect_alpha,
     detect_format,
     download_model,
@@ -31,7 +31,7 @@ __all__ = [
     "ImgApiClient",
     "MODEL_PRESETS",
     "RemoveBgPolicy",
-    "_check_model",
+    "check_model",
     "detect_alpha",
     "detect_format",
     "download_model",
