@@ -339,7 +339,15 @@ class ImgApiClient:
                 )
             raw = dl.content
         elif b64:
-            raw = base64.b64decode(b64)
+            try:
+                raw = base64.b64decode(b64)
+            except Exception as e:
+                # base64.b64decode raises binascii.Error (Exception subclass,
+                # not ValueError) for corrupt data. Convert to ImageApiError
+                # so callers have a uniform exception type.
+                raise ImageApiError(
+                    f"Invalid base64 image data: {e}"
+                ) from e
 
         if not raw:
             raise ImageApiError(

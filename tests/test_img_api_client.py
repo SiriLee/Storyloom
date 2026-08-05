@@ -29,12 +29,6 @@ def cfg():
     return c
 
 
-@pytest.fixture
-def mock_http():
-    """Mock httpx.Client."""
-    return MagicMock(spec=httpx.Client)
-
-
 # ═══════════════════════════════════════════════════════════════════
 # Data types
 # ═══════════════════════════════════════════════════════════════════
