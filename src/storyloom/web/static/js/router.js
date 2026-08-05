@@ -519,7 +519,8 @@
             }
 
             /* text / password: display + edit button (✎ → ✓ / ✕) */
-            const displayVal = def.key === "api_key"
+            const isKeyField = def.key === "api_key" || def.key === "img_api_key";
+            const displayVal = isKeyField
                 ? maskKey(current)
                 : (current || esc(def.placeholder || ""));
             const displayCls = (!current && def.key !== "api_key") ? "setting-val muted" : "setting-val";
@@ -609,7 +610,7 @@
                     /* Save */
                     applySetting(def.key, inputEl.value);
                     const newVal = getSetting(def.key);
-                    if (def.key === "api_key") {
+                    if (def.key === "api_key" || def.key === "img_api_key") {
                         displayEl.textContent = maskKey(newVal);
                     } else {
                         displayEl.textContent = newVal || def.placeholder || "";
