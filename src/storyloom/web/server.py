@@ -197,6 +197,23 @@ async def config_migrate():
     return {"status": "ok"}
 
 
+@app.get("/api/config/bg-removal-status")
+async def config_bg_removal_status():
+    """Check whether the background-removal model is downloaded."""
+    from storyloom.io.img_utils import _check_model
+    return {"available": _check_model()}
+
+
+@app.post("/api/config/bg-removal-install")
+async def config_bg_removal_install():
+    """Download the U²-Net model for background removal (~168 MB)."""
+    from storyloom.io.img_utils import download_model
+    success, message = download_model()
+    if success:
+        return {"ok": True, "message": message}
+    return {"ok": False, "error": message}
+
+
 # ═══════════════════════════════════════════════════════════════════
 # Co-Create — Q&A phase before story generation
 # ═══════════════════════════════════════════════════════════════════

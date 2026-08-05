@@ -1,4 +1,4 @@
-"""Tests for img_utils — format/alpha detection, dimensions, rembg helpers.
+"""Tests for img_utils — format/alpha detection, dimensions, background removal.
 
 TDD: these tests define the contract before implementation exists.
 """
@@ -197,125 +197,119 @@ class TestGetDimensions:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# _check_rembg
+# _check_model
 # ═══════════════════════════════════════════════════════════════════
 
-class TestCheckRembg:
-    """_check_rembg — lazy import detection (module-level cache)."""
+class TestCheckModel:
+    """_check_model — file existence + SHA256 verification."""
 
-    def test_cache_is_none_initially(self):
-        """After import, cache starts as None before first call."""
+    def test_returns_false_when_file_missing(self):
+        """No model file → False."""
         from storyloom.io import img_utils
-        img_utils._HAS_REMBG = None
-        assert img_utils._HAS_REMBG is None
+        with patch.object(img_utils, "_model_path") as mock_path:
+            mock_path.return_value = Path("/nonexistent/model.onnx")
+            assert img_utils._check_model() is False
 
-    def test_sets_cache_to_true_when_importable(self):
-        """When rembg can be imported, cache is set to True."""
+    def test_returns_true_when_sha256_matches(self, tmp_path):
+        """File with correct SHA256 → True."""
         from storyloom.io import img_utils
-        img_utils._HAS_REMBG = None
-        with patch.dict("sys.modules", {"rembg": MagicMock()}):
-            # Force fresh check
-            img_utils._HAS_REMBG = None
-            import sys
-            sys.modules["rembg"] = MagicMock()
-            try:
-                result = img_utils._check_rembg()
-                assert result is True
-                assert img_utils._HAS_REMBG is True
-            finally:
-                img_utils._HAS_REMBG = None
-                sys.modules.pop("rembg", None)
+        import hashlib
+        content = b"fake-model-bytes-for-testing"
+        expected = hashlib.sha256(content).hexdigest()
+        model = tmp_path / "u2net.onnx"
+        model.write_bytes(content)
+        with patch.object(img_utils, "_model_path") as mock_path:
+            with patch.object(img_utils, "BG_REMOVAL_MODEL_SHA256", expected):
+                mock_path.return_value = model
+                assert img_utils._check_model() is True
 
-    def test_import_error_returns_false(self):
-        """When rembg is not importable, _check_rembg returns False."""
+    def test_returns_false_when_sha256_mismatches(self, tmp_path):
+        """File with wrong hash → False."""
         from storyloom.io import img_utils
-        # Simulate ImportError via a callable side_effect — only fail for 'rembg'
-        original_import = __import__
-
-        def selective_import(name, *args, **kwargs):
-            if name == "rembg":
-                raise ImportError("No module named 'rembg'")
-            return original_import(name, *args, **kwargs)
-
-        img_utils._HAS_REMBG = None
-        try:
-            with patch("builtins.__import__", side_effect=selective_import):
-                assert img_utils._check_rembg() is False
-                assert img_utils._HAS_REMBG is False
-        finally:
-            img_utils._HAS_REMBG = None
-
-    def test_cached_result(self):
-        """Second call returns cached result without re-importing."""
-        from storyloom.io import img_utils
-        img_utils._HAS_REMBG = True
-        assert img_utils._check_rembg() is True
-        img_utils._HAS_REMBG = None  # restore
+        model = tmp_path / "u2net.onnx"
+        model.write_bytes(b"corrupt-data")
+        with patch.object(img_utils, "_model_path") as mock_path:
+            mock_path.return_value = model
+            assert img_utils._check_model() is False
 
 
 # ═══════════════════════════════════════════════════════════════════
-# install_rembg
+# download_model
 # ═══════════════════════════════════════════════════════════════════
 
-class TestInstallRembg:
-    """install_rembg — subprocess pip install + cache invalidation."""
+class TestDownloadModel:
+    """download_model — streaming HTTP download with SHA256 verification."""
 
-    def test_already_installed_skips_pip(self):
-        """When already installed, return (True, ...) without subprocess."""
-        from storyloom.io import img_utils
-        img_utils._HAS_REMBG = True
-        try:
-            success, msg = img_utils.install_rembg()
-            assert success is True
-            assert "already" in msg.lower()
-        finally:
-            img_utils._HAS_REMBG = None
+    @pytest.fixture
+    def model_data(self):
+        """Byte content with a known SHA256."""
+        return b"valid-model-content" * 100
 
-    def test_pip_success(self):
-        """Successful pip install returns (True, ...) and sets _HAS_REMBG."""
-        from storyloom.io import img_utils
-        img_utils._HAS_REMBG = False
-        try:
-            with patch("subprocess.run") as mock_run:
-                mock_run.return_value = MagicMock(
-                    returncode=0, stdout="", stderr="",
-                )
-                success, msg = img_utils.install_rembg()
-                assert success is True
-                # Verify pip was called with expected args
-                call_args = mock_run.call_args[0][0]
-                cmd_str = " ".join(call_args)
-                assert "pip" in cmd_str
-                assert "install" in cmd_str
-                assert "rembg" in cmd_str
-        finally:
-            img_utils._HAS_REMBG = None
+    @pytest.fixture
+    def expected_sha256(self, model_data):
+        import hashlib
+        return hashlib.sha256(model_data).hexdigest()
 
-    def test_pip_failure(self):
-        """Failed pip install returns (False, ...)."""
+    def test_download_success(self, tmp_path, model_data, expected_sha256):
+        """Successful download with correct checksum → (True, ...)."""
         from storyloom.io import img_utils
-        img_utils._HAS_REMBG = False
-        try:
-            with patch("subprocess.run") as mock_run:
-                mock_run.return_value = MagicMock(
-                    returncode=1, stdout="", stderr="package not found",
-                )
-                success, msg = img_utils.install_rembg()
-                assert success is False
-                assert "pip" in msg.lower() or "package" in msg.lower()
-        finally:
-            img_utils._HAS_REMBG = None
+        import hashlib
 
-    def test_subprocess_error(self):
-        """subprocess exception returns (False, ...)."""
+        with patch.object(img_utils, "_model_path") as mock_path:
+            with patch.object(img_utils, "BG_REMOVAL_MODEL_SHA256", expected_sha256):
+                out = tmp_path / "u2net.onnx"
+                mock_path.return_value = out
+                with patch("storyloom.io.img_utils.httpx.stream") as mock_stream:
+                    mock_resp = MagicMock()
+                    mock_resp.status_code = 200
+                    mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+                    mock_resp.__exit__ = MagicMock(return_value=False)
+                    mock_resp.headers = {"content-length": str(len(model_data))}
+                    mock_resp.iter_bytes.return_value = [model_data]
+                    mock_stream.return_value = mock_resp
+
+                    ok, msg = img_utils.download_model()
+                    assert ok is True
+                    assert out.exists()
+
+    def test_download_http_error(self, tmp_path):
+        """HTTP 404 → (False, ...), temp file cleaned up."""
         from storyloom.io import img_utils
-        img_utils._HAS_REMBG = False
-        try:
-            with patch("subprocess.run", side_effect=OSError("no pip")):
-                success, msg = img_utils.install_rembg()
-                assert success is False
-        finally:
-            img_utils._HAS_REMBG = None
+
+        out = tmp_path / "u2net.onnx"
+        with patch.object(img_utils, "_model_dir", return_value=tmp_path):
+            with patch.object(img_utils, "_model_path", return_value=out):
+                with patch("storyloom.io.img_utils.httpx.stream") as mock_stream:
+                    mock_resp = MagicMock()
+                    mock_resp.status_code = 404
+                    mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+                    mock_resp.__exit__ = MagicMock(return_value=False)
+                    mock_stream.return_value = mock_resp
+
+                    ok, msg = img_utils.download_model()
+                    assert ok is False
+                    assert "404" in msg
+
+    def test_download_checksum_mismatch(self, tmp_path, model_data):
+        """Hash mismatch → (False, ...), downloaded file deleted."""
+        from storyloom.io import img_utils
+
+        out = tmp_path / "u2net.onnx"
+        with patch.object(img_utils, "_model_dir", return_value=tmp_path):
+            with patch.object(img_utils, "_model_path", return_value=out):
+                with patch.object(img_utils, "BG_REMOVAL_MODEL_SHA256", "deadbeef"):
+                    with patch("storyloom.io.img_utils.httpx.stream") as mock_stream:
+                        mock_resp = MagicMock()
+                        mock_resp.status_code = 200
+                        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+                        mock_resp.__exit__ = MagicMock(return_value=False)
+                        mock_resp.headers = {"content-length": str(len(model_data))}
+                        mock_resp.iter_bytes.return_value = [model_data]
+                        mock_stream.return_value = mock_resp
+
+                        ok, msg = img_utils.download_model()
+                        assert ok is False
+                        assert "checksum" in msg.lower()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -323,33 +317,32 @@ class TestInstallRembg:
 # ═══════════════════════════════════════════════════════════════════
 
 class TestRemoveBackground:
-    """remove_background — rembg integration (degraded when unavailable)."""
+    """remove_background — onnxruntime inference (degraded gracefully)."""
 
-    def test_returns_none_when_rembg_unavailable(self):
-        """When rembg not installed, return None without error."""
+    def test_returns_none_when_model_unavailable(self):
+        """When model file missing, return None without error."""
         from storyloom.io import img_utils
-        img_utils._HAS_REMBG = False
-        try:
+        with patch.object(img_utils, "_check_model", return_value=False):
             result = img_utils.remove_background(_rgba_png(), "png")
             assert result is None
-        finally:
-            img_utils._HAS_REMBG = None
 
-    def test_returns_bytes_when_rembg_available(self):
-        """When rembg is available, returns processed bytes."""
+    def test_returns_bytes_when_available(self, monkeypatch):
+        """When everything works, returns PNG RGBA bytes."""
         from storyloom.io import img_utils
-        img_utils._HAS_REMBG = True
-        try:
-            with patch("rembg.remove") as mock_remove:
-                from io import BytesIO
-                from PIL import Image
-                img = Image.new("RGBA", (1, 1), (255, 0, 0, 128))
-                mock_remove.return_value = img
-                result = img_utils.remove_background(_rgba_png(), "png")
+        import numpy as np
+
+        # ONNX output: (batch=1, channel=1, H=320, W=320)
+        pred = np.ones((1, 1, 320, 320), dtype=np.float32) * 0.8
+
+        mock_session = MagicMock()
+        mock_session.get_inputs.return_value = [MagicMock(name="input")]
+        mock_session.run.return_value = [pred]
+
+        with patch.object(img_utils, "_check_model", return_value=True):
+            with patch.object(img_utils, "_get_session", return_value=mock_session):
+                result = img_utils.remove_background(_rgb_png(), "png")
                 assert isinstance(result, bytes)
                 assert len(result) > 0
-        finally:
-            img_utils._HAS_REMBG = None
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -395,16 +388,13 @@ class TestMaybeRemoveBackground:
             bytes=_rgb_png(), format="png", has_alpha=False,
             width=1, height=1, url="", elapsed_ms=100.0,
         )
-        img_utils._HAS_REMBG = True
-        try:
-            with patch("rembg.remove") as mock_remove:
-                from PIL import Image
-                mock_remove.return_value = Image.new("RGBA", (1, 1))
-                result = img_utils.maybe_remove_background(r, RemoveBgPolicy.AUTO)
-                assert result.has_alpha is True
-                assert result.format == "png"
-        finally:
-            img_utils._HAS_REMBG = None
+        with patch.object(img_utils, "remove_background") as mock_remove:
+            mock_remove.return_value = b"rgba-bytes"
+            result = img_utils.maybe_remove_background(r, RemoveBgPolicy.AUTO)
+            assert mock_remove.called
+            assert result.has_alpha is True
+            assert result.format == "png"
+            assert result.bytes == b"rgba-bytes"
 
     def test_policy_always_forces_removal(self):
         from storyloom.io import img_utils
@@ -413,27 +403,19 @@ class TestMaybeRemoveBackground:
             bytes=_rgba_png(), format="png", has_alpha=True,
             width=1, height=1, url="", elapsed_ms=100.0,
         )
-        img_utils._HAS_REMBG = True
-        try:
-            with patch("rembg.remove") as mock_remove:
-                from PIL import Image
-                mock_remove.return_value = Image.new("RGBA", (1, 1))
-                result = img_utils.maybe_remove_background(r, RemoveBgPolicy.ALWAYS)
-                assert mock_remove.called
-        finally:
-            img_utils._HAS_REMBG = None
+        with patch.object(img_utils, "remove_background") as mock_remove:
+            mock_remove.return_value = b"rgba-bytes"
+            result = img_utils.maybe_remove_background(r, RemoveBgPolicy.ALWAYS)
+            assert mock_remove.called
 
-    def test_degrade_when_rembg_unavailable(self):
-        """When rembg unavailable, returns original regardless of policy."""
+    def test_degrade_when_remove_background_fails(self):
+        """When remove_background returns None, return original."""
         from storyloom.io import img_utils
         from storyloom.io.img_api_client import ImageResult, RemoveBgPolicy
         r = ImageResult(
             bytes=_rgb_png(), format="png", has_alpha=False,
             width=1, height=1, url="", elapsed_ms=100.0,
         )
-        img_utils._HAS_REMBG = False
-        try:
+        with patch.object(img_utils, "remove_background", return_value=None):
             result = img_utils.maybe_remove_background(r, RemoveBgPolicy.AUTO)
-            assert result is r  # unchanged — no rembg available
-        finally:
-            img_utils._HAS_REMBG = None
+            assert result is r  # unchanged — degrade gracefully

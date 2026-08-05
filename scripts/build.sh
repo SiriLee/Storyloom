@@ -48,6 +48,8 @@ $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
     --add-data "src/storyloom/core/lang_meta:storyloom/core/lang_meta" \
     --hidden-import uvicorn.loops.auto \
     --hidden-import uvicorn.protocols.http.auto \
+    --hidden-import onnxruntime \
+    --hidden-import numpy \
     src/storyloom/web/__main__.py
 
 # 4. Assemble release directory

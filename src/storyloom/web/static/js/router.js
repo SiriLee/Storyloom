@@ -342,6 +342,89 @@
         return key.slice(0, 4) + "****" + key.slice(-4);
     }
 
+    /** Show rembg install confirmation modal.
+     *  Returns a Promise that resolves to true if the user completed
+     *  installation, or false if they cancelled. */
+    function _showRembgInstallModal() {
+        return new Promise((resolve) => {
+            const overlay = document.createElement("div");
+            overlay.className = "game-modal-overlay";
+            overlay.innerHTML = `
+                <div class="game-modal rembg-modal">
+                    <h3 style="color:var(--text-accent); font-family:var(--font-mono);
+                               font-weight:normal; margin-bottom:0.8rem;">
+                        ${esc(_("Background Removal Setup"))}
+                    </h3>
+                    <p class="game-modal-text" style="font-size:0.95rem; margin-bottom:1rem;">
+                        ${esc(_("Background removal requires downloading a model (~176 MB). This is a one-time download."))}
+                    </p>
+                    <p class="rembg-status text-muted" style="font-size:0.85rem; margin-bottom:1rem;
+                              min-height:1.3em;"></p>
+                    <div class="game-modal-actions">
+                        <button class="game-modal-btn" id="rembg-cancel">${esc(_("Cancel"))}</button>
+                        <button class="game-modal-btn accent" id="rembg-download">
+                            ${esc(_("Download"))}
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            const cancelBtn  = document.getElementById("rembg-cancel");
+            const dlBtn      = document.getElementById("rembg-download");
+            const statusEl   = overlay.querySelector(".rembg-status");
+
+            function cleanup() {
+                overlay.remove();
+            }
+
+            cancelBtn.addEventListener("click", () => {
+                cleanup();
+                resolve(false);
+            });
+
+            dlBtn.addEventListener("click", async () => {
+                dlBtn.disabled = true;
+                cancelBtn.disabled = true;
+                dlBtn.textContent = esc(_("Installing..."));
+                statusEl.textContent = "";
+
+                try {
+                    const res = await API.post("/api/config/bg-removal-install");
+                    if (res.ok) {
+                        statusEl.textContent = "✓ " + esc(res.message || "OK");
+                        statusEl.style.color = "var(--text-accent)";
+                        dlBtn.textContent = esc(_("Done"));
+                        dlBtn.addEventListener("click", () => {
+                            cleanup();
+                            resolve(true);
+                        }, { once: true });
+                        /* Also allow clicking Cancel to proceed (now means "Continue"). */
+                        cancelBtn.textContent = esc(_("Continue"));
+                        cancelBtn.addEventListener("click", () => {
+                            cleanup();
+                            resolve(true);
+                        }, { once: true });
+                        cancelBtn.disabled = false;
+                    } else {
+                        statusEl.textContent = "✗ " + esc(res.error || _("Unknown error"));
+                        statusEl.style.color = "var(--text-error)";
+                        dlBtn.textContent = esc(_("Retry"));
+                        dlBtn.disabled = false;
+                        cancelBtn.textContent = esc(_("Cancel"));
+                        cancelBtn.disabled = false;
+                    }
+                } catch (err) {
+                    statusEl.textContent = "✗ " + esc(err.message || _("Unknown error"));
+                    statusEl.style.color = "var(--text-error)";
+                    dlBtn.textContent = esc(_("Retry"));
+                    dlBtn.disabled = false;
+                    cancelBtn.disabled = false;
+                }
+            });
+        });
+    }
+
     /* ═══════════════════════════════════════════════════════════════
        View: Co-Create (#co-create)
        ──────────────────────────────────────────────────────────────
@@ -442,7 +525,24 @@
             if (def.type === "select") {
                 const el = document.getElementById(`setting-${def.key}`);
                 if (!el) return;
-                el.addEventListener("change", () => {
+                el.addEventListener("change", async () => {
+                    /* ── Background Removal: check rembg availability ── */
+                    if (def.key === "img_remove_bg" && el.value !== "never") {
+                        try {
+                            const status = await API.get("/api/config/bg-removal-status");
+                            if (!status.available) {
+                                const ok = await _showRembgInstallModal();
+                                if (!ok) {
+                                    /* User cancelled — revert to previous value. */
+                                    el.value = getSetting("img_remove_bg") || "auto";
+                                    return;
+                                }
+                            }
+                        } catch (_) {
+                            /* API unreachable — apply anyway (server-side
+                               rembg check is best-effort). */
+                        }
+                    }
                     const needsRerender = applySetting(def.key, el.value);
                     if (needsRerender) {
                         renderSettings();

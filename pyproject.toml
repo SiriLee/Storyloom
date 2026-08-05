@@ -13,6 +13,9 @@ dependencies = [
     "uvicorn[standard]>=0.34.0",
 ]
 
+[project.optional-dependencies]
+bg = ["onnxruntime>=1.18", "numpy>=1.24", "pillow>=10.0"]
+
 [project.scripts]
 storyloom-web = "storyloom.web.server:main"
 

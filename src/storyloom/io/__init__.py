@@ -11,11 +11,11 @@ from storyloom.io.img_api_client import (
     RemoveBgPolicy,
 )
 from storyloom.io.img_utils import (
-    _check_rembg,
+    _check_model,
     detect_alpha,
     detect_format,
+    download_model,
     get_dimensions,
-    install_rembg,
     maybe_remove_background,
     remove_background,
 )
@@ -31,11 +31,11 @@ __all__ = [
     "ImgApiClient",
     "MODEL_PRESETS",
     "RemoveBgPolicy",
-    "_check_rembg",
+    "_check_model",
     "detect_alpha",
     "detect_format",
+    "download_model",
     "get_dimensions",
-    "install_rembg",
     "maybe_remove_background",
     "remove_background",
 ]

@@ -375,8 +375,8 @@ class ImgApiClient:
         )
 
         # ── Background removal ────────────────────────────────────
-        # maybe_remove_background handles its own rembg availability
-        # check and degrades gracefully (returns original on unavailable).
+        # maybe_remove_background degrades gracefully when model is
+        # unavailable (returns the original image unchanged).
         from storyloom.io.img_utils import maybe_remove_background
         result = maybe_remove_background(result, policy)
 

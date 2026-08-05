@@ -1624,6 +1624,12 @@ button.accent:hover, .btn-accent:hover {
     box-shadow: var(--shadow-glow-lg);
 }
 
+/* ── rembg install modal ────────────────────────────────────────── */
+
+.rembg-modal {
+    min-width: 400px;
+}
+
 /* ── In-game Settings Overlay ───────────────────────────────────── */
 
 .game-settings-overlay {

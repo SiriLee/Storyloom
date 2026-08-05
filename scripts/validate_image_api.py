@@ -66,7 +66,7 @@ from storyloom.io.img_api_client import (
     RemoveBgPolicy,
 )
 from storyloom.io.img_utils import (
-    _check_rembg,
+    _check_model,
     detect_alpha,
     detect_format,
     get_dimensions,
@@ -210,7 +210,7 @@ def main() -> None:
     print(f"Preset:           {label}")
     print(f"Portrait size:    {p_size}")
     print(f"Background size:  {b_size}")
-    print(f"rembg available:  {_check_rembg()}")
+    print(f"Model available:  {_check_model()}")
     print(f"Output:           {OUTPUT_DIR}")
 
     # Wall-clock for all tests

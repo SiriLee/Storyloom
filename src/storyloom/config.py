@@ -58,3 +58,15 @@ DEFAULT_IMG_MODEL = "flux-2-pro"
 DEFAULT_IMG_BASE_URL = "https://api.apiyi.com/v1"
 IMAGE_GEN_TIMEOUT_SEC = 300     # image generation can take minutes
 IMAGE_DOWNLOAD_TIMEOUT_SEC = 60
+
+# ── Background removal model ──────────────────────────────────
+# Model is downloaded on-demand to ~/.storyloom/models/
+BG_REMOVAL_MODEL_URL = (
+    "https://github.com/SiriLee/Storyloom/releases/download/"
+    "models-v1/u2net.onnx"
+)
+BG_REMOVAL_MODEL_FILENAME = "u2net.onnx"
+BG_REMOVAL_MODEL_SHA256 = (
+    "8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491"
+)
+BG_REMOVAL_DOWNLOAD_TIMEOUT_SEC = 600  # 168 MB model
