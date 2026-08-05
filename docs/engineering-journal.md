@@ -6,6 +6,126 @@
 
 ---
 
+## 2026-08-05（周三）
+
+> **概述**：§7.2 素材数据库 + §7.3 图像 API 双模块落地——从 spec 到完整实现 + 测试 + code review 四轮硬化。同步完成配置版本迁移（v1→v2）、背景去除（onnxruntime 直推替代 rembg/pip）、Web 设置页扩展。共 28 commits，+5454/-61 lines，39 files。
+
+### §7.2 素材数据库——AssetLibrary + GameAssetRoster
+
+**背景**：`graph-mode-spec/design.md` §2 定义了三层素材数据模型——`Asset`（物理文件 + 元数据）、`AssetLibrary`（全局注册表，跨存档复用）、`GameAssetRoster`（单局游戏 local_name → asset_id 映射）。§7.2 标记为与 §7.3（图像 API）可并行实现的独立模块。需要先于 §7.4（Task stub）到位。
+
+**决策**（commits `48b2a12` → `2c35483` → `92287c6` → `be9ea67`）：
+
+1. **数据类型**（`assets/_types.py`，148 行）：
+   - `AssetType` 枚举：`CHAR_PORTRAIT` / `BACKGROUND`，value 为 media/ 子目录名（D2），每类型携带 `default_extension`（D3）
+   - `Asset` dataclass：6 字段（asset_type, id, name, description, use_count, serial），相等性仅由 (asset_type, id) 决定——可变字段（use_count, serial）不参与（D49）
+   - `AssetItem` dataclass：3 字段（local_name, local_description, target），相等性仅由 local_name 决定（D49）。`target=None` 表示占位符——素材尚未生成（D36）
+   - 序列化遵循 D5 设计：asset_type/id/local_name 为结构键（外层 dict key），不存入内层 dict
+
+2. **AssetLibrary**（`assets/_library.py`，306 行）：
+   - 全局注册表，线程安全（所有公开方法持 `self._lock`），单例语义——应用级唯一实例
+   - CRUD：`add()`（缺省 uuid4().hex 生成 asset_id，D4）、`get()`（D46）、`remove()`（use_count>0 时拒绝，D25）
+   - 引用计数：`increase_usage()` / `decrease_usage()`——与 GameAssetRoster 协调（D20），`set_target` 重排操作顺序确保异常安全（先增新后减旧，commit `be9ea67`）
+   - 查询：`list_all()`（全类型 flat list）、`list_by_type()`（返回副本）、`get_sorted_by_usage()`（`heapq.nlargest`，O(n log k)，D10/D51）
+   - 清理：`clean(keep_count)`——use_count>0 的资产永不删除，use_count==0 的按 (use_count, serial) 升序淘汰（D45）。当活跃资产已超 keep_count 时仍会清空所有闲置资产（docs 明确此行为）
+   - 持久化：`save()` / `load()` 原子写入（`.tmp` + `os.replace`，D16/D41），版本校验（D42），未知 AssetType 跳过（前向兼容 §2.1）
+
+3. **GameAssetRoster**（`assets/_roster.py`，247 行）：
+   - 单局映射表，线程安全，注入 AssetLibrary 实例以协调引用计数（D20）
+   - CRUD：`add()`（target 非 None 时自动 `library.increase_usage`，D38）、`set_target()`（异常安全——先增新后减旧，None↔real 过渡）、`remove()` / `clear()`（自动 `decrease_usage`，D48）
+   - `lookup()`：精确字符串匹配——无模糊搜索（D9），返回 AssetItem 或 None
+   - 持久化：`save(filepath)` / `load(filepath, library, game_id)`——原子写入 + 版本校验 + game_id 交叉验证
+
+4. **测试**（`test_assets.py`，1541 行）：覆盖所有 CRUD 操作、引用计数协调（add/remove/set_target/clear 后 library.use_count 验证）、并发安全（多线程 add + increase + decrease）、序列化往返、边界条件（重复 add 报错、remove 不存在的 key、use_count>0 拒绝删除、decrease 低于 0 拒绝）
+
+**依据**：
+- commits: `48b2a12`（实现）、`2c35483`（测试硬化）、`92287c6`（review 修复）、`be9ea67`（set_target 异常安全 + clean docs）
+- `docs/graph-mode-spec/design.md`：§2.2（AssetLibrary）、§2.3（GameAssetRoster）、§9（持久化格式）
+- 新建文件：`src/storyloom/assets/__init__.py`、`_types.py`、`_library.py`、`_roster.py`
+
+### §7.3 图像 API 客户端——ImgApiClient + img_utils
+
+**背景**：`graph-mode-spec/design.md` §7.3 要求实现图像生成 API 客户端——与 LLM API 客户端平行设计（UserConfig 读取 + os.environ 覆盖），支持多模型预设，为 §7.4 Task Pool 的图像生成任务提供底层能力。同时 `design-draft.md` §E 提出背景去除需求——最初考虑 rembg（pip 依赖 + ~1GB PyTorch 重量级），后决策为 onnxruntime 直推。
+
+**决策**（commits `c22d88c` → `3e81d08` → 四轮 review → `19aaa2b`）：
+
+1. **ImgApiClient**（`io/img_api_client.py`，397 行）：
+   - OpenAI-compatible `/images/generations` 端点——httpx 同步客户端，`generate(prompt, size, image_urls?, remove_bg?)` → `ImageResult`
+   - 配置链路：`IMAGE_API_KEY` env → `img_api_key` config → `LLM_API_KEY` env → `api_key` config（key fallback）；同理 `IMAGE_BASE_URL` / img_api_base_url / DEFAULT_IMG_BASE_URL
+   - 线程安全（commit `1338ddb`）：`threading.local()` 每线程独立 `httpx.Client`——httpx 默认 transport 非线程安全，Task Pool（§7.4）将在多线程调用 `generate()`
+   - 模型预设（`MODEL_PRESETS` dict）：FLUX.2 Pro（1024² / 1280×720）、Seedream 5.0 Lite（2048² / 2560×1440）、Nano Banana Lite（1024² / 1024²），各带 `default_sizes` + `supports_reference` + `extra_body`
+   - 尺寸解析：`_resolve_size(ImageSize)` → 查模型预设 → 缺省 fallback（1024² / 1280×720）
+   - 错误处理：`ImageApiError`（与 `ApiError` 区分——图像错误降级处理，不中止叙事流）；HTTP 错误解析 JSON error message（commit `fbc54f1`）；base64 解码异常包装为 ImageApiError（commit `ceb6b24`，`binascii.Error` 非 ValueError 子类）；连接错误、下载失败、空响应统一处理
+   - key masking（commit `282bc35`）：API key 显示与 LLM key 同策略——前 4 + `****` + 后 4
+
+2. **img_utils——零依赖图像检测**（`io/img_utils.py`，412 行）：
+   - `detect_format()`：magic bytes 检测——RIFF+WEBP / JFIF / PNG，纯 bytes 操作无外部依赖
+   - `detect_alpha()`：PNG color type 6（RGBA）/ 4（grayscale+alpha）；WebP VP8X flags bit 4
+   - `get_dimensions()`：PNG（struct，IHDR offset）、WebP（VP8X canvas_width-1）、JPEG（SOF marker 扫描，限 64KB 防恶意文件）
+   - 全函数纯 bytes → Python 类型，无 IO/网络——安全用于热路径
+
+3. **背景去除——onnxruntime 直推替代 rembg**（commit `60566bc`）：
+   - **核心决策**：不使用 rembg（pip install ≈ 1GB PyTorch + 复杂的依赖树）→ 直接 onnxruntime inference。U²-Net ONNX 模型（~168 MB）从 GitHub Releases 按需下载，缓存在 `<app>/models/` 目录
+   - `check_model()`：SHA256 校验确保文件完整性（commit `6800083`）
+   - `download_model(on_progress)`：httpx stream GET → 分块写入 `.tmp` → SHA256 验证 → `os.replace` 原子替换。支持进度回调（commit `9f9802b` 的 SSE 进度条依赖此接口）
+   - 模型目录解析：`STORYLOOM_MODEL_DIR` env → `STORYLOOM_APP_DIR/models/` → PyInstaller `sys.executable` 旁 → `cwd/models/`。自包含设计——删除程序目录即清除所有残留（commit `6800083`）
+   - `remove_background(raw, fmt)`：PIL 解码 → 320² 预处理（规范化 + NCHW）→ onnxruntime 推理 → mask 双线性上采样至原始尺寸 → RGBA 合成 → PNG 字节输出。任何失败返回 None（优雅降级）
+   - `maybe_remove_background(result, policy)`：AUTO（无 alpha 才去背）/ ALWAYS（强制）/ NEVER（跳过）。策略默认值设为 NEVER（commit `4c5d38f`）——去背是可选优化，不应默认触发下载
+   - `_get_session()` 模块级缓存 + lazy import onnxruntime——不配置去背的用户永远不会触发 onnxruntime import
+
+4. **共享类型提取**（commit `19aaa2b`，`io/_types.py`，55 行）：
+   - `ImageResult` dataclass、`ImageSize` enum、`RemoveBgPolicy` enum 从各模块抽到共享层
+   - 依赖 DAG：`_types.py` ← `img_utils.py` + `img_api_client.py`——两模块互不 import（lazy import 打破循环），结构上不可能形成循环
+
+5. **四轮 code review 硬化**：
+   - Round 1（`0e3d636` → `60140e8`）：测试矩阵扩展（grayscale-alpha PNG、VP8X lossy WebP）、`ImageApiError` 统一使用、`ValueError` on missing key
+   - Round 2（`fbc54f1`）：HTTP 错误体非 JSON 时安全截断（500 字符）、download 超时独立于 gen 超时
+   - Round 3（`1338ddb`）：`threading.local()` 替代共享 `httpx.Client`——Task Pool 多线程安全；`MODEL_PRESETS` 标注为 read-only
+   - Round 4（`ceb6b24`）：`base64.b64decode` 的 `binascii.Error`（Exception 子类非 ValueError）统一包装为 `ImageApiError`；删除测试中未使用的 mock fixture
+
+**依据**：
+- commits: `c22d88c`（验证脚本）、`3e81d08`（API client 实现）、`0e3d636`+`60140e8`+`fbc54f1`+`1338ddb`+`ceb6b24`（四轮 review）、`60566bc`（onnxruntime 去背）、`19aaa2b`（类型提取）
+- `docs/graph-mode-spec/design.md`：§7.3（image API）、§7.2（可并行）
+- `docs/graph-mode-spec/design-draft.md`：§E（背景去除需求来源）
+- 新建文件：`src/storyloom/io/img_api_client.py`、`img_utils.py`、`_types.py`；`scripts/validate_image_api.py`
+- 测试：`tests/test_img_api_client.py`（438 行）、`tests/test_img_utils.py`（421 行）
+
+### 配置版本迁移——UserConfig v1→v2 + Web UI
+
+**背景**：§7.3 引入 5 个新配置字段（`game_mode`、`img_api_key`、`img_api_base_url`、`img_api_model`、`img_remove_bg`），`UserConfig._DEFAULTS.version: 1→2`。旧用户的 `config.json`（v1 schema，无 image 字段）启动时需平滑处理——不能静默失败，也不能强制丢失旧设置。
+
+**决策**（commits `c3d5511` → `d8b5607`，5 commits）：
+
+1. **UserConfig 新增 5 个属性**：`game_mode`（"text"/"graph"）、`img_api_key`、`img_api_base_url`、`img_api_model`、`img_remove_bg`（"auto"/"always"/"never"），均带 setter 校验。key masking 统一应用于 img_api_key（commit `282bc35`）
+
+2. **版本迁移策略**：`_load()` 检测 `version != DEFAULTS["version"]` → 设置 `_needs_migration = True`。旧值仍在内存中（如 language 供 i18n 使用），但 API 返回 `needs_migration: true` 触发前端确认弹窗。用户确认后 `reset_to_defaults()` 清空所有字段为出厂默认并保存——简单、安全、无字段级迁移逻辑
+
+3. **Web API 扩展**：
+   - `GET /api/config` 返回全部 9 个字段（含 masked keys）
+   - `POST /api/config` 支持 4 个新字段更新
+   - `GET /api/config/version-status` ——检查是否需要迁移（`needs_migration` + `current_version` + `expected_version`）
+   - `POST /api/config/migrate` ——用户确认后重置为默认值，切换 i18n
+   - `GET /api/config/bg-removal-status` ——检查 onnx 模型是否已下载（`check_model()`）
+   - `GET /api/config/bg-removal-install` ——SSE 流式下载进度（progress→done/error），`run_in_executor` + `asyncio.Queue` 桥接同步下载与异步事件循环
+
+4. **Web 前端设置页**：新增 Image API 设置区（4 字段 + 背景去除 select + 模型下载按钮+进度条）、game_mode select。CSS 设置面板宽度放宽（640→700px，label 90→130px，input 420→480px，行间距 lg→xl）
+
+5. **config.example.json 同步**：补充 `img_api_base_url` 默认值（apyi）、`game_mode`、image API 字段；`config.py` 新增 `DEFAULT_IMG_BASE_URL` 常量供 server.py 使用
+
+**依据**：
+- commits: `c3d5511`（Web UI + session）、`d5d2f5b`（config.example.json）、`5d00176`（version bump）、`e38e265`（default URL）、`d8b5607`（migration flow）、`f4625f5`（i18n labels + CSS）、`282bc35`（key masking）
+- `src/storyloom/user_config.py`（+101 lines）、`src/storyloom/web/server.py`（+146 lines）
+- `src/storyloom/config.py`（+19 lines，DEFAULT_IMG_BASE_URL + 背景去除常量）
+
+### 杂项修复与重构
+
+1. **移除死引用**（commit `c244b53`）：`test_session.py` 删除未使用的 `SaveManager` import
+2. **测试命令清理**（commit `73bda21`）：移除 `--ignore=tests/test_api_client.py`（该文件已不存在，`ApiClient` 测试在 `tests/test_stream_parser.py` 中）
+3. **验证脚本重写**（commit `55f4d56`）：`scripts/validate_image_api.py` 改用生产 `ImgApiClient` 替代临时 httpx 调用——验证脚本即文档
+4. **公开 API 重命名**（commit `c908df6`）：`_check_model` → `check_model`——该函数在 `io/__init__.py` 中导出，应为公开 API
+
+---
+
 ## 2026-08-04（周二）——下午：管线重构与 v1.3.0
 
 > **概述**：Phase 1 管线核心重构——`StreamingXmlParser` 拆分为 `StreamParser` + `StateManager` + `EventDispatcher` 三组件架构，为 Phase 2 图形模式管线扩展铺路。伴随 3 个 bug 修复 + 1 个前端修复 + v1.3.0 发布。
