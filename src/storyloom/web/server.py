@@ -46,7 +46,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from storyloom.config import SUPPORTED_LANGUAGES
+from storyloom.config import DEFAULT_IMG_BASE_URL, SUPPORTED_LANGUAGES
 from storyloom.core.co_create import CoCreateError
 from storyloom.core.save_manager import SaveManager
 from storyloom.core.session import GameSession
@@ -117,7 +117,7 @@ async def get_config():
         "api_model": cfg.api_model,
         "game_mode": cfg.game_mode,
         "img_api_key": _mask(cfg.img_api_key),
-        "img_api_base_url": cfg.img_api_base_url or "https://api.apiyi.com/v1",
+        "img_api_base_url": cfg.img_api_base_url or DEFAULT_IMG_BASE_URL,
         "img_api_model": cfg.img_api_model,
         "img_remove_bg": cfg.img_remove_bg,
     }
