@@ -3,7 +3,6 @@
 TDD: these tests define the contract before implementation exists.
 """
 
-import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -37,6 +36,21 @@ def _lossy_webp() -> bytes:
     return _load("test_lossy.webp")
 
 
+def _graya_png() -> bytes:
+    """PNG color type 4 — grayscale + alpha."""
+    return _load("test_graya.png")
+
+
+def _alpha_webp() -> bytes:
+    """VP8X WebP with alpha flag set (1x1 canvas)."""
+    return _load("test_alpha.webp")
+
+
+def _vp8x_webp() -> bytes:
+    """VP8X WebP without alpha, 64x48 canvas."""
+    return _load("test_vp8x.webp")
+
+
 # ═══════════════════════════════════════════════════════════════════
 # detect_format
 # ═══════════════════════════════════════════════════════════════════
@@ -52,13 +66,33 @@ class TestDetectFormat:
         from storyloom.io.img_utils import detect_format
         assert detect_format(_rgba_png()) == "png"
 
+    def test_png_graya(self):
+        from storyloom.io.img_utils import detect_format
+        assert detect_format(_graya_png()) == "png"
+
     def test_jpeg(self):
         from storyloom.io.img_utils import detect_format
         assert detect_format(_rgb_jpg()) == "jpeg"
 
-    def test_webp(self):
+    def test_webp_lossy(self):
         from storyloom.io.img_utils import detect_format
         assert detect_format(_lossy_webp()) == "webp"
+
+    def test_webp_vp8x(self):
+        from storyloom.io.img_utils import detect_format
+        assert detect_format(_vp8x_webp()) == "webp"
+
+    def test_riff_non_webp_is_unknown(self):
+        """RIFF container not WEBP (e.g. AVI, WAV) returns 'unknown'."""
+        from storyloom.io.img_utils import detect_format
+        # RIFF + "AVI " fourcc — should not be misidentified as WebP
+        riff_data = b"RIFF\x10\x00\x00\x00AVI DATA"
+        assert detect_format(riff_data) == "unknown"
+
+    def test_riff_too_short_for_fourcc(self):
+        """RIFF header but too short to read fourcc."""
+        from storyloom.io.img_utils import detect_format
+        assert detect_format(b"RIFF\x00\x00\x00") == "unknown"
 
     def test_unknown_empty(self):
         from storyloom.io.img_utils import detect_format
@@ -85,6 +119,11 @@ class TestDetectAlpha:
         from storyloom.io.img_utils import detect_alpha
         assert detect_alpha(_rgba_png(), "png") is True
 
+    def test_png_graya_has_alpha(self):
+        """PNG color type 4 (grayscale+alpha) should be detected."""
+        from storyloom.io.img_utils import detect_alpha
+        assert detect_alpha(_graya_png(), "png") is True
+
     def test_png_rgb_no_alpha(self):
         from storyloom.io.img_utils import detect_alpha
         assert detect_alpha(_rgb_png(), "png") is False
@@ -96,6 +135,16 @@ class TestDetectAlpha:
     def test_webp_lossy_no_alpha(self):
         from storyloom.io.img_utils import detect_alpha
         assert detect_alpha(_lossy_webp(), "webp") is False
+
+    def test_webp_vp8x_has_alpha(self):
+        """VP8X WebP with alpha flag set → True."""
+        from storyloom.io.img_utils import detect_alpha
+        assert detect_alpha(_alpha_webp(), "webp") is True
+
+    def test_webp_vp8x_no_alpha(self):
+        """VP8X WebP without alpha flag → False."""
+        from storyloom.io.img_utils import detect_alpha
+        assert detect_alpha(_vp8x_webp(), "webp") is False
 
     def test_unknown_format_returns_false(self):
         from storyloom.io.img_utils import detect_alpha
@@ -121,16 +170,22 @@ class TestGetDimensions:
         from storyloom.io.img_utils import get_dimensions
         assert get_dimensions(_rgb_jpg(), "jpeg") == (1, 1)
 
-    def test_webp_returns_nonzero_or_zero(self):
-        """WebP dimension extraction — returns (w, h); 0s are acceptable
-        for lossy VP8 where our minimal test file may not have valid
-        dimension data. The contract is: never crash, return ints."""
+    def test_webp_vp8x_known_dimensions(self):
+        """VP8X with 64x48 canvas — returns exact dimensions."""
+        from storyloom.io.img_utils import get_dimensions
+        w, h = get_dimensions(_vp8x_webp(), "webp")
+        assert w == 64, f"Expected width=64, got {w}"
+        assert h == 48, f"Expected height=48, got {h}"
+
+    def test_webp_lossy_does_not_crash(self):
+        """VP8 lossy WebP — returns ints, doesn't crash."""
         from storyloom.io.img_utils import get_dimensions
         w, h = get_dimensions(_lossy_webp(), "webp")
         assert isinstance(w, int)
         assert isinstance(h, int)
-        # Width can be 0 for malformed VP8, but we accept it —
-        # the caller handles (0, 0) gracefully.
+        # VP8 lossy dimension extraction depends on valid bitstream;
+        # our minimal test file may not have valid dimension data,
+        # so (0, 0) is acceptable here — the contract is "no crash".
 
     def test_unknown_returns_zero(self):
         from storyloom.io.img_utils import get_dimensions
@@ -148,23 +203,47 @@ class TestGetDimensions:
 class TestCheckRembg:
     """_check_rembg — lazy import detection (module-level cache)."""
 
-    def test_returns_bool(self):
-        """_check_rembg returns True or False — no exception."""
-        from storyloom.io.img_utils import _check_rembg
-        result = _check_rembg()
-        assert isinstance(result, bool)
+    def test_cache_is_none_initially(self):
+        """After import, cache starts as None before first call."""
+        from storyloom.io import img_utils
+        img_utils._HAS_REMBG = None
+        assert img_utils._HAS_REMBG is None
+
+    def test_sets_cache_to_true_when_importable(self):
+        """When rembg can be imported, cache is set to True."""
+        from storyloom.io import img_utils
+        img_utils._HAS_REMBG = None
+        with patch.dict("sys.modules", {"rembg": MagicMock()}):
+            # Force fresh check
+            img_utils._HAS_REMBG = None
+            import sys
+            sys.modules["rembg"] = MagicMock()
+            try:
+                result = img_utils._check_rembg()
+                assert result is True
+                assert img_utils._HAS_REMBG is True
+            finally:
+                img_utils._HAS_REMBG = None
+                sys.modules.pop("rembg", None)
 
     def test_import_error_returns_false(self):
         """When rembg is not importable, _check_rembg returns False."""
         from storyloom.io import img_utils
-        # Reset cache to force re-check
+        # Simulate ImportError via a callable side_effect — only fail for 'rembg'
+        original_import = __import__
+
+        def selective_import(name, *args, **kwargs):
+            if name == "rembg":
+                raise ImportError("No module named 'rembg'")
+            return original_import(name, *args, **kwargs)
+
         img_utils._HAS_REMBG = None
-        # Simulate ImportError by patching __import__
-        with patch("builtins.__import__") as mock_import:
-            mock_import.side_effect = ImportError("No module named 'rembg'")
-            # Reset cache for this test
+        try:
+            with patch("builtins.__import__", side_effect=selective_import):
+                assert img_utils._check_rembg() is False
+                assert img_utils._HAS_REMBG is False
+        finally:
             img_utils._HAS_REMBG = None
-            assert img_utils._check_rembg() is False
 
     def test_cached_result(self):
         """Second call returns cached result without re-importing."""

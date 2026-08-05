@@ -3,7 +3,6 @@
 TDD: these tests define the contract before implementation exists.
 """
 
-import json
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -210,9 +209,7 @@ class TestImgApiClientInit:
         from storyloom.io.img_api_client import ImgApiClient
         with patch("storyloom.io.img_api_client.httpx.Client"):
             client = ImgApiClient(c)
-        # Default base URL should be set (not empty)
-        assert client.base_url
-        assert not client.base_url.endswith("/")
+        assert client.base_url == "https://api.apiyi.com/v1"
 
     def test_uses_config_when_no_env(self, cfg, monkeypatch):
         monkeypatch.delenv("IMAGE_API_KEY", raising=False)

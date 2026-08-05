@@ -89,8 +89,9 @@ def get_dimensions(raw: bytes, fmt: str) -> tuple[int, int]:
             if len(raw) < 30:
                 return 0, 0
             if raw[12:16] == b"VP8X":
-                w = struct.unpack_from("<I", raw, 24)[0] & 0xFFFFFF
-                h = struct.unpack_from("<I", raw, 27)[0] & 0xFFFFFF
+                # VP8X stores canvas_width - 1 and canvas_height - 1
+                w = (struct.unpack_from("<I", raw, 24)[0] & 0xFFFFFF) + 1
+                h = (struct.unpack_from("<I", raw, 27)[0] & 0xFFFFFF) + 1
                 return w, h
             if raw[12:16] == b"VP8 ":
                 if len(raw) >= 30:
