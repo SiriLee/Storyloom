@@ -122,3 +122,130 @@ class TestUserConfigSave:
 def _write_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Image API & game mode fields (7.3)
+# ═══════════════════════════════════════════════════════════════════
+
+class TestUserConfigImageFields:
+    """New fields added in 7.3 for image API configuration."""
+
+    # ── Defaults ──
+
+    def test_game_mode_default(self):
+        cfg = UserConfig()
+        assert cfg.game_mode == "text"
+
+    def test_img_api_key_default(self):
+        cfg = UserConfig()
+        assert cfg.img_api_key == ""
+
+    def test_img_api_base_url_default(self):
+        cfg = UserConfig()
+        assert cfg.img_api_base_url == ""
+
+    def test_img_api_model_default(self):
+        cfg = UserConfig()
+        assert cfg.img_api_model == "flux-2-pro"
+
+    def test_img_remove_bg_default(self):
+        cfg = UserConfig()
+        assert cfg.img_remove_bg == "auto"
+
+    # ── Setters ──
+
+    def test_game_mode_setter_valid_values(self):
+        cfg = UserConfig()
+        cfg.game_mode = "text"
+        assert cfg.game_mode == "text"
+        cfg.game_mode = "graph"
+        assert cfg.game_mode == "graph"
+
+    def test_game_mode_setter_rejects_invalid(self):
+        cfg = UserConfig()
+        with pytest.raises(ValueError, match="game_mode"):
+            cfg.game_mode = "invalid"
+
+    def test_img_fields_setters(self):
+        cfg = UserConfig()
+        cfg.img_api_key = "sk-img-test"
+        cfg.img_api_base_url = "https://img.example.com"
+        cfg.img_api_model = "custom-model"
+        cfg.img_remove_bg = "always"
+        assert cfg.img_api_key == "sk-img-test"
+        assert cfg.img_api_base_url == "https://img.example.com"
+        assert cfg.img_api_model == "custom-model"
+        assert cfg.img_remove_bg == "always"
+
+    # ── Load backfill ──
+
+    def test_old_config_without_img_fields_gets_defaults(self, tmp_path):
+        """config.json without image fields → load + backfill defaults."""
+        _write_json(tmp_path / "config.json", {
+            "version": 1,
+            "language": "en",
+            "api_key": "sk-old",
+            "api_base_url": "https://old.example.com",
+            "api_model": "old-model",
+        })
+        cfg = UserConfig(tmp_path)
+        assert cfg.game_mode == "text"
+        assert cfg.img_api_key == ""
+        assert cfg.img_api_base_url == ""
+        assert cfg.img_api_model == "flux-2-pro"
+        assert cfg.img_remove_bg == "auto"
+        # Should have been re-saved with all fields
+        saved = json.loads((tmp_path / "config.json").read_text())
+        assert "game_mode" in saved
+        assert "img_api_key" in saved
+        assert saved["game_mode"] == "text"
+
+    # ── Save round-trip ──
+
+    def test_save_load_round_trip_img_fields(self, tmp_path):
+        cfg = UserConfig(tmp_path)
+        cfg.game_mode = "graph"
+        cfg.img_api_key = "sk-img-save"
+        cfg.img_api_base_url = "https://images.example.com"
+        cfg.img_api_model = "my-model"
+        cfg.img_remove_bg = "never"
+        cfg.save()
+
+        cfg2 = UserConfig(tmp_path)
+        assert cfg2.game_mode == "graph"
+        assert cfg2.img_api_key == "sk-img-save"
+        assert cfg2.img_api_base_url == "https://images.example.com"
+        assert cfg2.img_api_model == "my-model"
+        assert cfg2.img_remove_bg == "never"
+
+    def test_save_json_structure_includes_img_fields(self, tmp_path):
+        cfg = UserConfig(tmp_path)
+        cfg.game_mode = "graph"
+        cfg.img_api_key = "sk-test"
+        cfg.save()
+        data = json.loads((tmp_path / "config.json").read_text())
+        assert data["game_mode"] == "graph"
+        assert data["img_api_key"] == "sk-test"
+        assert data["img_api_base_url"] == ""
+        assert data["img_api_model"] == "flux-2-pro"
+        assert data["img_remove_bg"] == "auto"
+        # Version unchanged
+        assert data["version"] == 1
+
+    # ── Property isolation ──
+
+    def test_img_fields_dont_affect_llm_fields(self, tmp_path):
+        """Setting image fields should not change LLM fields."""
+        cfg = UserConfig(tmp_path)
+        cfg.api_key = "sk-llm"
+        cfg.api_model = "deepseek-v4-pro"
+        cfg.img_api_key = "sk-img"
+        cfg.img_api_model = "flux-2-pro"
+        cfg.save()
+
+        cfg2 = UserConfig(tmp_path)
+        assert cfg2.api_key == "sk-llm"
+        assert cfg2.api_model == "deepseek-v4-pro"
+        assert cfg2.img_api_key == "sk-img"
+        assert cfg2.img_api_model == "flux-2-pro"

@@ -52,3 +52,9 @@ OUTLINE_NODE_RANGES = {
 # ── API defaults ──────────────────────────────────────────────
 DEFAULT_MODEL = "deepseek-v4-pro"
 STREAM_STALL_TIMEOUT_SEC = 180
+
+# ── Image API defaults ───────────────────────────────────────
+DEFAULT_IMG_MODEL = "flux-2-pro"
+DEFAULT_IMG_BASE_URL = "https://api.apiyi.com/v1"
+IMAGE_GEN_TIMEOUT_SEC = 300     # image generation can take minutes
+IMAGE_DOWNLOAD_TIMEOUT_SEC = 60

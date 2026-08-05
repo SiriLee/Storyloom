@@ -219,6 +219,7 @@ class GameSession:
             },
             "config": {
                 "temperature": None,
+                "mode": "text",
             },
             "story_config": sc,
             "characters": copy.deepcopy(data.get("characters", [])),

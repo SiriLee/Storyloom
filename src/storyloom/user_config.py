@@ -27,6 +27,11 @@ class UserConfig:
         "api_key": "",
         "api_base_url": "https://api.deepseek.com",
         "api_model": "deepseek-v4-pro",
+        "game_mode": "text",
+        "img_api_key": "",
+        "img_api_base_url": "",
+        "img_api_model": "flux-2-pro",
+        "img_remove_bg": "auto",
     }
 
     def __init__(self, app_dir: str | Path | None = None):
@@ -36,6 +41,11 @@ class UserConfig:
         self._api_key: str = self._DEFAULTS["api_key"]
         self._api_base_url: str = self._DEFAULTS["api_base_url"]
         self._api_model: str = self._DEFAULTS["api_model"]
+        self._game_mode: str = self._DEFAULTS["game_mode"]
+        self._img_api_key: str = self._DEFAULTS["img_api_key"]
+        self._img_api_base_url: str = self._DEFAULTS["img_api_base_url"]
+        self._img_api_model: str = self._DEFAULTS["img_api_model"]
+        self._img_remove_bg: str = self._DEFAULTS["img_remove_bg"]
 
         if self._app_dir is not None:
             self._load()
@@ -74,6 +84,50 @@ class UserConfig:
     def api_model(self, value: str) -> None:
         self._api_model = value
 
+    @property
+    def game_mode(self) -> str:
+        return self._game_mode
+
+    @game_mode.setter
+    def game_mode(self, value: str) -> None:
+        if value not in ("text", "graph"):
+            raise ValueError(
+                f"game_mode must be 'text' or 'graph', got {value!r}"
+            )
+        self._game_mode = value
+
+    @property
+    def img_api_key(self) -> str:
+        return self._img_api_key
+
+    @img_api_key.setter
+    def img_api_key(self, value: str) -> None:
+        self._img_api_key = value
+
+    @property
+    def img_api_base_url(self) -> str:
+        return self._img_api_base_url
+
+    @img_api_base_url.setter
+    def img_api_base_url(self, value: str) -> None:
+        self._img_api_base_url = value
+
+    @property
+    def img_api_model(self) -> str:
+        return self._img_api_model
+
+    @img_api_model.setter
+    def img_api_model(self, value: str) -> None:
+        self._img_api_model = value
+
+    @property
+    def img_remove_bg(self) -> str:
+        return self._img_remove_bg
+
+    @img_remove_bg.setter
+    def img_remove_bg(self, value: str) -> None:
+        self._img_remove_bg = value
+
     # ── Persistence ─────────────────────────────────────────────────
 
     def _config_path(self) -> Path:
@@ -111,6 +165,11 @@ class UserConfig:
         self._api_base_url = data.get("api_base_url", self._DEFAULTS["api_base_url"])
         self._api_model = data.get("api_model", self._DEFAULTS["api_model"])
         self._version = data.get("version", self._DEFAULTS["version"])
+        self._game_mode = data.get("game_mode", self._DEFAULTS["game_mode"])
+        self._img_api_key = data.get("img_api_key", self._DEFAULTS["img_api_key"])
+        self._img_api_base_url = data.get("img_api_base_url", self._DEFAULTS["img_api_base_url"])
+        self._img_api_model = data.get("img_api_model", self._DEFAULTS["img_api_model"])
+        self._img_remove_bg = data.get("img_remove_bg", self._DEFAULTS["img_remove_bg"])
 
         # Backfill missing fields (auto-migration)
         needs_save = False
@@ -137,6 +196,11 @@ class UserConfig:
         self._api_key = self._DEFAULTS["api_key"]
         self._api_base_url = self._DEFAULTS["api_base_url"]
         self._api_model = self._DEFAULTS["api_model"]
+        self._game_mode = self._DEFAULTS["game_mode"]
+        self._img_api_key = self._DEFAULTS["img_api_key"]
+        self._img_api_base_url = self._DEFAULTS["img_api_base_url"]
+        self._img_api_model = self._DEFAULTS["img_api_model"]
+        self._img_remove_bg = self._DEFAULTS["img_remove_bg"]
 
     def save(self) -> None:
         """Atomically write current values to config.json.
@@ -158,6 +222,11 @@ class UserConfig:
             "api_key": self._api_key,
             "api_base_url": self._api_base_url,
             "api_model": self._api_model,
+            "game_mode": self._game_mode,
+            "img_api_key": self._img_api_key,
+            "img_api_base_url": self._img_api_base_url,
+            "img_api_model": self._img_api_model,
+            "img_remove_bg": self._img_remove_bg,
         }
 
         path.parent.mkdir(parents=True, exist_ok=True)
