@@ -169,7 +169,14 @@ class AssetLibrary:
 
         Assets with ``use_count > 0`` are **never** deleted.  Among
         ``use_count == 0`` assets, those with the **lowest** priority
-        (by ``(-use_count, -serial)``) are deleted first.  (D45).
+        (by ``(use_count, serial)`` ascending) are deleted first.  (D45).
+
+        .. note::
+
+            When ``use_count > 0`` assets alone already exceed *keep_count*,
+            **all** ``use_count == 0`` assets are deleted, and the final
+            total will still be above *keep_count*.  This is correct —
+            in-use assets cannot be removed.
 
         Returns the number of assets deleted.
         """

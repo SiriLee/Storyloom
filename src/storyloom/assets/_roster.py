@@ -77,8 +77,10 @@ class GameAssetRoster:
     ) -> None:
         """Update the target of an existing entry.
 
-        - Old target → ``library.decrease_usage``
-        - New target → ``library.increase_usage`` (if not ``None``)
+        Operations are ordered for exception safety:
+        1. Increase ``new_target`` first (if it fails, nothing has changed).
+        2. Decrease ``old_target``.
+        3. Update the reference.
 
         Handles placeholder transitions (``None`` ↔ real target).  (D20).
         """
@@ -89,10 +91,12 @@ class GameAssetRoster:
             if old_target == new_target:
                 return  # no-op
 
-            if old_target is not None:
-                self._library.decrease_usage(asset_type, old_target)
+            # Increase new before decreasing old — if increase fails,
+            # old is still correctly referenced and unchanged.
             if new_target is not None:
                 self._library.increase_usage(asset_type, new_target)
+            if old_target is not None:
+                self._library.decrease_usage(asset_type, old_target)
 
             item.target = new_target
 
