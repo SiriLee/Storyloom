@@ -178,6 +178,25 @@ async def update_config(body: ConfigUpdate):
     return {"status": "ok"}
 
 
+@app.get("/api/config/version-status")
+async def config_version_status():
+    """Check whether config.json needs migration to current schema version."""
+    return {
+        "needs_migration": cfg.needs_migration,
+        "current_version": cfg._version,
+        "expected_version": UserConfig._DEFAULTS["version"],
+    }
+
+
+@app.post("/api/config/migrate")
+async def config_migrate():
+    """Reset config.json to factory defaults after user confirms migration."""
+    cfg.reset_to_defaults()
+    # Re-init i18n with new (default) language after reset
+    switch_language(cfg.language)
+    return {"status": "ok"}
+
+
 # ═══════════════════════════════════════════════════════════════════
 # Co-Create — Q&A phase before story generation
 # ═══════════════════════════════════════════════════════════════════

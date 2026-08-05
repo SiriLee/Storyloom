@@ -114,6 +114,12 @@
        ═══════════════════════════════════════════════════════════════ */
 
     function renderMenu() {
+        // ── Config migration check (before normal menu) ────────────
+        if (GameState.needsMigration) {
+            _renderMigrationWarning();
+            return;
+        }
+
         // Best-effort stop any lingering game stream — catches
         // browser-back and manual hash changes that bypass the
         // per-view quit button.  Capture gameId before reset() clears it.
@@ -273,6 +279,62 @@
     }
 
     /* ── Shared Helpers ──────────────────────────────────────────── */
+
+    /** Render config migration warning when config.json version is outdated.
+     *  User must confirm reset or exit — normal menu is blocked. */
+    function _renderMigrationWarning() {
+        const ver = GameState.needsMigration;
+        app.innerHTML = `
+            <div class="menu-view">
+                <h1 class="menu-title">${esc(_("Storyloom"))}</h1>
+
+                <div class="migration-warning">
+                    <div class="migration-icon">&#9888;</div>
+                    <h2>${esc(_("Config Version Mismatch"))}</h2>
+                    <p class="migration-text">${esc(_(
+                        "Your configuration file is from an older version and needs to be reset. Please note down your API keys and other settings before continuing."
+                    ))}</p>
+                    <p class="text-muted" style="font-size:0.85rem">
+                        ${esc(_("Current version:"))} ${esc(String(ver.current_version))}
+                        &rarr; ${esc(_("Expected version:"))} ${esc(String(ver.expected_version))}
+                    </p>
+                    <div class="migration-actions">
+                        <button class="menu-btn danger" id="btn-migrate-exit">
+                            ${esc(_("Exit Application"))}
+                        </button>
+                        <button class="menu-btn accent" id="btn-migrate-confirm">
+                            ${esc(_("Reset and Continue"))}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById("btn-migrate-confirm").addEventListener("click", async () => {
+            try {
+                await API.post("/api/config/migrate");
+            } catch (_) { /* server may already be shutting down */ }
+            GameState.needsMigration = null;
+            // Reload: initConfig will now find version match
+            Router.dispatch();
+        });
+
+        document.getElementById("btn-migrate-exit").addEventListener("click", async () => {
+            // Show goodbye, then attempt server shutdown
+            app.innerHTML = `
+                <div class="menu-view">
+                    <h1 class="menu-title">${esc(_("Storyloom"))}</h1>
+                    <p style="font-size:1.3rem; color:var(--text-accent); margin-top:2rem">
+                        ${esc(_("Goodbye"))}
+                    </p>
+                    <p class="text-muted" style="margin-top:0.5rem">
+                        ${esc(_("You may close this tab."))}
+                    </p>
+                </div>
+            `;
+            try { await API.post("/api/exit"); } catch (_) { /* expected in dev */ }
+        });
+    }
 
     /** Mask an API key for display: "sk-9a70****3000". */
     function maskKey(key) {

@@ -55,7 +55,8 @@ class TestUserConfigLoad:
         assert (tmp_path / "config.json").exists()
 
     def test_partial_file_backfills_missing_fields(self, tmp_path):
-        _write_json(tmp_path / "config.json", {"version": 1, "language": "en"})
+        """v2 config with missing fields → backfill + re-save."""
+        _write_json(tmp_path / "config.json", {"version": 2, "language": "en"})
         cfg = UserConfig(tmp_path)
         assert cfg.language == "en"
         # Missing fields get defaults
@@ -186,9 +187,9 @@ class TestUserConfigImageFields:
     # ── Load backfill ──
 
     def test_old_config_without_img_fields_gets_defaults(self, tmp_path):
-        """config.json without image fields → load + backfill defaults."""
+        """v2 config without image fields → load + backfill defaults."""
         _write_json(tmp_path / "config.json", {
-            "version": 1,
+            "version": 2,
             "language": "en",
             "api_key": "sk-old",
             "api_base_url": "https://old.example.com",
@@ -237,6 +238,62 @@ class TestUserConfigImageFields:
         assert data["img_remove_bg"] == "auto"
         # Version matches current schema
         assert data["version"] == 2
+
+    # ── Version migration (7.3) ──
+
+    def test_version_mismatch_sets_needs_migration(self, tmp_path):
+        """v1 config → needs_migration is True, old values still loaded."""
+        _write_json(tmp_path / "config.json", {
+            "version": 1,
+            "language": "zh-CN",
+            "api_key": "sk-old-key",
+            "api_base_url": "https://old.example.com",
+            "api_model": "old-model",
+        })
+        cfg = UserConfig(tmp_path)
+        assert cfg.needs_migration is True
+        # Old values loaded in memory for this session
+        assert cfg.language == "zh-CN"
+        assert cfg.api_key == "sk-old-key"
+        # Missing fields get defaults
+        assert cfg.game_mode == "text"
+        # File NOT backfilled (version stays 1)
+        saved = json.loads((tmp_path / "config.json").read_text())
+        assert saved["version"] == 1
+        assert "game_mode" not in saved
+
+    def test_version_match_no_migration(self, tmp_path):
+        """v2 config → needs_migration is False, backfill works."""
+        _write_json(tmp_path / "config.json", {
+            "version": 2,
+            "language": "en",
+            "api_key": "sk-v2",
+            "api_base_url": "https://api.example.com",
+            "api_model": "gpt-4",
+        })
+        cfg = UserConfig(tmp_path)
+        assert cfg.needs_migration is False
+
+    def test_reset_to_defaults_clears_migration(self, tmp_path):
+        """After reset, needs_migration is False and version is 2."""
+        _write_json(tmp_path / "config.json", {
+            "version": 1,
+            "language": "zh-CN",
+            "api_key": "sk-old-key",
+        })
+        cfg = UserConfig(tmp_path)
+        assert cfg.needs_migration is True
+
+        cfg.reset_to_defaults()
+        assert cfg.needs_migration is False
+        assert cfg.language == "en"  # factory default
+        assert cfg.api_key == ""
+        assert cfg.game_mode == "text"
+
+        # Persisted with version 2
+        saved = json.loads((tmp_path / "config.json").read_text())
+        assert saved["version"] == 2
+        assert saved["game_mode"] == "text"
 
     # ── Property isolation ──
 

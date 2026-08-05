@@ -256,3 +256,21 @@ msgstr "未知錯誤"
 
 msgid "OK"
 msgstr "確定"
+
+msgid "Config Version Mismatch"
+msgstr "設定檔版本不符"
+
+msgid "Your configuration file is from an older version and needs to be reset. Please note down your API keys and other settings before continuing."
+msgstr "您的設定檔版本過舊，需要重置。請在繼續前記下您的 API 金鑰等重要設定。"
+
+msgid "Reset and Continue"
+msgstr "重置並繼續"
+
+msgid "Exit Application"
+msgstr "退出程式"
+
+msgid "Current version:"
+msgstr "目前版本："
+
+msgid "Expected version:"
+msgstr "期望版本："

@@ -46,6 +46,7 @@ class UserConfig:
         self._img_api_base_url: str = self._DEFAULTS["img_api_base_url"]
         self._img_api_model: str = self._DEFAULTS["img_api_model"]
         self._img_remove_bg: str = self._DEFAULTS["img_remove_bg"]
+        self._needs_migration: bool = False
 
         if self._app_dir is not None:
             self._load()
@@ -133,6 +134,21 @@ class UserConfig:
             )
         self._img_remove_bg = value
 
+    @property
+    def needs_migration(self) -> bool:
+        """True when ``config.json`` schema version doesn't match current."""
+        return self._needs_migration
+
+    def reset_to_defaults(self) -> None:
+        """Reset all fields to factory defaults and persist.
+
+        Call after user confirms migration from an older config version.
+        """
+        self._needs_migration = False
+        self._apply_defaults()
+        if self._app_dir is not None:
+            self._save_internal()
+
     # ── Persistence ─────────────────────────────────────────────────
 
     def _config_path(self) -> Path:
@@ -176,7 +192,14 @@ class UserConfig:
         self._img_api_model = data.get("img_api_model", self._DEFAULTS["img_api_model"])
         self._img_remove_bg = data.get("img_remove_bg", self._DEFAULTS["img_remove_bg"])
 
-        # Backfill missing fields (auto-migration)
+        # Version check — if schema version doesn't match, mark for
+        # migration instead of backfilling.  Old values are already
+        # loaded in memory for this session (e.g. language for i18n).
+        if self._version != self._DEFAULTS["version"]:
+            self._needs_migration = True
+            return
+
+        # Backfill missing fields (auto-migration, same-version only)
         needs_save = False
         for key in self._DEFAULTS:
             if key not in data:

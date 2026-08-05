@@ -195,6 +195,13 @@ async function saveConfig() {
  *  Populates localStorage + GameState.lang.  Call once on load. */
 async function initConfig() {
     try {
+        /* Check config version before loading — migration may be needed. */
+        const status = await API.get("/api/config/version-status");
+        if (status.needs_migration) {
+            GameState.needsMigration = status;
+            return;  // stop — renderMenu() will show migration UI
+        }
+
         const data = await API.get("/api/config");
         if (data.language) {
             GameState.setLang(data.language);

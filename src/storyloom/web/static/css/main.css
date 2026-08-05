@@ -1924,3 +1924,38 @@ button.accent:hover, .btn-accent:hover {
     text-align: center;
     padding: 3rem 0;
 }
+
+/* ── Config Migration Warning ──────────────────────────────────── */
+
+.migration-warning {
+    text-align: center;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+}
+
+.migration-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-accent);
+}
+
+.migration-warning h2 {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    color: var(--text-accent);
+}
+
+.migration-text {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 1.25rem;
+    color: var(--text-color);
+}
+
+.migration-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+}
