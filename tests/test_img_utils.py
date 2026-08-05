@@ -197,6 +197,43 @@ class TestGetDimensions:
 
 
 # ═══════════════════════════════════════════════════════════════════
+# _model_dir — bundled path priority
+# ═══════════════════════════════════════════════════════════════════
+
+class TestModelDir:
+    """_model_dir — bundled package path takes priority."""
+
+    def test_bundled_pkg_dir_has_priority(self, tmp_path):
+        """When <package>/models/ exists, return it before writable paths."""
+        from storyloom.io import img_utils
+
+        fake_pkg = tmp_path / "storyloom" / "io"
+        fake_pkg.mkdir(parents=True)
+        models = tmp_path / "storyloom" / "models"
+        models.mkdir()
+
+        with patch.object(img_utils, "__file__", str(fake_pkg / "img_utils.py")):
+            with patch.object(img_utils.os, "environ", {}):
+                result = img_utils._model_dir()
+                assert result == models, f"Expected {models}, got {result}"
+
+    def test_falls_back_when_no_bundled_dir(self, tmp_path):
+        """When <package>/models/ doesn't exist, fall back to writable paths."""
+        from storyloom.io import img_utils
+
+        fake_pkg = tmp_path / "storyloom" / "io"
+        fake_pkg.mkdir(parents=True)
+        # No models/ dir created
+
+        with patch.object(img_utils, "__file__", str(fake_pkg / "img_utils.py")):
+            with patch.object(img_utils.os, "environ", {
+                "STORYLOOM_APP_DIR": str(tmp_path / "app"),
+            }):
+                result = img_utils._model_dir()
+                assert result == tmp_path / "app" / "models"
+
+
+# ═══════════════════════════════════════════════════════════════════
 # check_model
 # ═══════════════════════════════════════════════════════════════════
 
@@ -231,85 +268,6 @@ class TestCheckModel:
         with patch.object(img_utils, "_model_path") as mock_path:
             mock_path.return_value = model
             assert img_utils.check_model() is False
-
-
-# ═══════════════════════════════════════════════════════════════════
-# download_model
-# ═══════════════════════════════════════════════════════════════════
-
-class TestDownloadModel:
-    """download_model — streaming HTTP download with SHA256 verification."""
-
-    @pytest.fixture
-    def model_data(self):
-        """Byte content with a known SHA256."""
-        return b"valid-model-content" * 100
-
-    @pytest.fixture
-    def expected_sha256(self, model_data):
-        import hashlib
-        return hashlib.sha256(model_data).hexdigest()
-
-    def test_download_success(self, tmp_path, model_data, expected_sha256):
-        """Successful download with correct checksum → (True, ...)."""
-        from storyloom.io import img_utils
-        import hashlib
-
-        with patch.object(img_utils, "_model_path") as mock_path:
-            with patch.object(img_utils, "BG_REMOVAL_MODEL_SHA256", expected_sha256):
-                out = tmp_path / "u2net.onnx"
-                mock_path.return_value = out
-                with patch("storyloom.io.img_utils.httpx.stream") as mock_stream:
-                    mock_resp = MagicMock()
-                    mock_resp.status_code = 200
-                    mock_resp.__enter__ = MagicMock(return_value=mock_resp)
-                    mock_resp.__exit__ = MagicMock(return_value=False)
-                    mock_resp.headers = {"content-length": str(len(model_data))}
-                    mock_resp.iter_bytes.return_value = [model_data]
-                    mock_stream.return_value = mock_resp
-
-                    ok, msg = img_utils.download_model()
-                    assert ok is True
-                    assert out.exists()
-
-    def test_download_http_error(self, tmp_path):
-        """HTTP 404 → (False, ...), temp file cleaned up."""
-        from storyloom.io import img_utils
-
-        out = tmp_path / "u2net.onnx"
-        with patch.object(img_utils, "_model_dir", return_value=tmp_path):
-            with patch.object(img_utils, "_model_path", return_value=out):
-                with patch("storyloom.io.img_utils.httpx.stream") as mock_stream:
-                    mock_resp = MagicMock()
-                    mock_resp.status_code = 404
-                    mock_resp.__enter__ = MagicMock(return_value=mock_resp)
-                    mock_resp.__exit__ = MagicMock(return_value=False)
-                    mock_stream.return_value = mock_resp
-
-                    ok, msg = img_utils.download_model()
-                    assert ok is False
-                    assert "404" in msg
-
-    def test_download_checksum_mismatch(self, tmp_path, model_data):
-        """Hash mismatch → (False, ...), downloaded file deleted."""
-        from storyloom.io import img_utils
-
-        out = tmp_path / "u2net.onnx"
-        with patch.object(img_utils, "_model_dir", return_value=tmp_path):
-            with patch.object(img_utils, "_model_path", return_value=out):
-                with patch.object(img_utils, "BG_REMOVAL_MODEL_SHA256", "deadbeef"):
-                    with patch("storyloom.io.img_utils.httpx.stream") as mock_stream:
-                        mock_resp = MagicMock()
-                        mock_resp.status_code = 200
-                        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
-                        mock_resp.__exit__ = MagicMock(return_value=False)
-                        mock_resp.headers = {"content-length": str(len(model_data))}
-                        mock_resp.iter_bytes.return_value = [model_data]
-                        mock_stream.return_value = mock_resp
-
-                        ok, msg = img_utils.download_model()
-                        assert ok is False
-                        assert "checksum" in msg.lower()
 
 
 # ═══════════════════════════════════════════════════════════════════

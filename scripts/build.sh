@@ -28,11 +28,12 @@ echo "=== Storyloom Web UI Build v${VERSION} ==="
 # 0. Clean previous build artifacts
 echo "[0/5] Cleaning previous builds..."
 rm -rf build/ dist/*.whl dist/*.tar.gz dist/storyloom-web*
+rm -f src/storyloom/models/*.onnx
 
 # 1. Install project + build tools (PyInstaller needs deps to discover imports)
 echo "[1/5] Installing project + build tools..."
-$PYTHON -m pip install -q -e . build pyinstaller wheel 2>/dev/null || \
-    $PYTHON -m pip install -q --break-system-packages -e . build pyinstaller wheel
+$PYTHON -m pip install -q -e ".[bg]" build pyinstaller wheel 2>/dev/null || \
+    $PYTHON -m pip install -q --break-system-packages -e ".[bg]" build pyinstaller wheel
 
 # 2. pip packages (wheel + sdist)
 #    i18n (.mo + frontend JS dict) compiled automatically by setup.py build hook
@@ -46,6 +47,7 @@ $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
     --add-data "locale:locale" \
     --add-data "src/storyloom/web/static:storyloom/web/static" \
     --add-data "src/storyloom/core/lang_meta:storyloom/core/lang_meta" \
+    --add-data "src/storyloom/models:storyloom/models" \
     --hidden-import uvicorn.loops.auto \
     --hidden-import uvicorn.protocols.http.auto \
     --hidden-import onnxruntime \

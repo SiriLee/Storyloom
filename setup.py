@@ -1,4 +1,4 @@
-"""Build hook — compile .po → .mo during ``pip install``.
+"""Build hook — compile .po → .mo + download ONNX model during ``pip install``.
 
 Users never need ``msgfmt`` or any manual step.  Everything happens
 automatically inside the build phase.
@@ -42,11 +42,79 @@ def _compile_mo_files() -> None:
     print(f"[i18n] generated {js_out}")
 
 
+def _download_model() -> None:
+    """Download u2netp.onnx (~4.4 MB) into ``src/storyloom/models/``.
+
+    Idempotent — skips if already cached with the correct SHA256.
+    Network failures are warned, not fatal (the install continues).
+    """
+    import hashlib
+    import importlib.util
+    import urllib.request
+
+    project_root = Path(__file__).resolve().parent
+
+    # Load config.py standalone to read filename+SHA256 (avoids storyloom
+    # __init__ import chain, same pattern as _compile_mo_files above).
+    spec = importlib.util.spec_from_file_location(
+        "storyloom.config",
+        str(project_root / "src" / "storyloom" / "config.py"),
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    sha256 = mod.BG_REMOVAL_MODEL_SHA256
+    filename = mod.BG_REMOVAL_MODEL_FILENAME
+
+    # URL is build-time only; kept here, not in production config.
+    url = (
+        "https://github.com/danielgatis/rembg/releases/download/"
+        "v0.0.0/u2netp.onnx"
+    )
+
+    target = project_root / "src" / "storyloom" / "models" / filename
+
+    # --- skip if already cached ---
+    if target.exists():
+        h = hashlib.sha256()
+        with open(target, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+        if h.hexdigest() == sha256:
+            print(f"[model] {filename} cached (SHA256 ok)")
+            return
+        print(f"[model] {filename} exists but SHA256 mismatch — re-downloading")
+
+    # --- download ---
+    target.parent.mkdir(parents=True, exist_ok=True)
+    print(f"[model] downloading {filename} (4.4 MB)...")
+    try:
+        urllib.request.urlretrieve(url, target)
+    except Exception as e:
+        print(f"[model] WARNING: download failed ({e})")
+        print(f"[model] run `pip install -e .` again or place {filename} manually")
+        return
+
+    # --- verify ---
+    h = hashlib.sha256()
+    with open(target, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    if h.hexdigest() != sha256:
+        target.unlink()
+        print(f"[model] WARNING: SHA256 mismatch — corrupt download removed")
+        print(f"[model] run `pip install -e .` again to retry")
+        return
+
+    print(f"[model] downloaded {target}")
+
+
 class build_py(_build_py):
-    """Custom build_py — compiles gettext catalogs + frontend JS dict."""
+    """Custom build_py — compiles gettext catalogs + frontend JS dict
+    + downloads the background-removal model."""
 
     def run(self) -> None:
         _compile_mo_files()
+        _download_model()
         super().run()
 
 
@@ -55,6 +123,7 @@ class develop(_develop):
 
     def run(self) -> None:
         _compile_mo_files()
+        _download_model()
         super().run()
 
 
@@ -63,6 +132,7 @@ class editable_wheel(_editable_wheel):
 
     def run(self) -> None:
         _compile_mo_files()
+        _download_model()
         super().run()
 
 

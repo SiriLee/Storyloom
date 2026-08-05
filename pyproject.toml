@@ -20,7 +20,7 @@ bg = ["onnxruntime>=1.18", "numpy>=1.24", "pillow>=10.0"]
 storyloom-web = "storyloom.web.server:main"
 
 [tool.setuptools.package-data]
-storyloom = ["web/static/**/*", "core/lang_meta/*.json"]
+storyloom = ["web/static/**/*", "core/lang_meta/*.json", "models/*.onnx"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

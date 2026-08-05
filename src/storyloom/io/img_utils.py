@@ -2,8 +2,7 @@
 
 Format/alpha/dimension detection are pure byte-level operations with
 no external dependencies.  Background removal uses onnxruntime for
-direct inference — the model (~168 MB) is downloaded on-demand and
-cached alongside the application.
+direct inference — the model (~4.4 MB) is bundled as package data.
 
 Usage::
 
@@ -12,7 +11,7 @@ Usage::
     fmt = detect_format(raw_bytes)       # "png" | "webp" | "jpeg" | "unknown"
     has_alpha = detect_alpha(raw_bytes, fmt)
 
-    # Background removal (model downloaded on-demand via download_model())
+    # Background removal (model bundled — no download needed)
     result_bytes = remove_background(raw_bytes, "png")
 """
 
@@ -126,29 +125,22 @@ def get_dimensions(raw: bytes, fmt: str) -> tuple[int, int]:
 # Background removal — direct onnxruntime inference (no rembg/pip needed)
 # ═══════════════════════════════════════════════════════════════════
 #
-# The model (u2net.onnx, ~168 MB) is downloaded on-demand to
-# ``<app>/models/`` when the user first enables background
-# removal.  Once cached, inference runs in-process via onnxruntime
-# with zero external dependencies.
+# The model (u2netp.onnx, ~4.4 MB) is bundled as package data in
+# ``src/storyloom/models/``.  It is downloaded at build time by the
+# setup.py hook (``pip install -e .`` / ``pip install .``) and shipped
+# in both the wheel and the PyInstaller binary.
 #
 # Model source: U²-Net (Xuebin Qin et al., 2020), ONNX export by rembg.
-# Hosted on:    GitHub Releases (models-v1 tag, Storyloom repo).
 
-import hashlib
 import os
 import sys
-import tempfile as _tempfile_mod
-import time
 from pathlib import Path
 
-import httpx
 import numpy as np
 
 from storyloom.config import (
-    BG_REMOVAL_DOWNLOAD_TIMEOUT_SEC,
     BG_REMOVAL_MODEL_FILENAME,
     BG_REMOVAL_MODEL_SHA256,
-    BG_REMOVAL_MODEL_URL,
 )
 
 # ── Model file management ──────────────────────────────────────────
@@ -163,16 +155,19 @@ def _model_dir() -> Path:
 
     Resolution order:
       1. ``STORYLOOM_MODEL_DIR`` env var (explicit override)
-      2. ``STORYLOOM_APP_DIR`` / "models" (alongside config.json)
-      3. PyInstaller: "models/" next to the executable
-      4. Fallback: "models/" in the current directory
-
-    This keeps the model self-contained within the program directory —
-    deleting the program folder removes everything, no residue.
+      2. ``<package>/models/`` — bundled package data
+         (wheel / PyInstaller --add-data / dev source tree)
+      3. ``STORYLOOM_APP_DIR`` / "models" (alongside config.json)
+      4. PyInstaller: "models/" next to the executable
+      5. Fallback: "models/" in the current directory
     """
     env = os.environ.get("STORYLOOM_MODEL_DIR")
     if env:
         return Path(env)
+    # Bundled in package (wheel, PyInstaller, dev)
+    pkg = Path(__file__).resolve().parent.parent / "models"
+    if pkg.is_dir():
+        return pkg
     app_dir = os.environ.get("STORYLOOM_APP_DIR")
     if app_dir:
         return Path(app_dir) / "models"
@@ -182,12 +177,13 @@ def _model_dir() -> Path:
 
 
 def _model_path() -> Path:
-    """Absolute path to the cached model file."""
+    """Absolute path to the model file."""
     return _model_dir() / BG_REMOVAL_MODEL_FILENAME
 
 
 def check_model() -> bool:
     """Return True if the model file exists with the expected SHA256."""
+    import hashlib
     path = _model_path()
     if not path.exists():
         return False
@@ -199,74 +195,6 @@ def check_model() -> bool:
     except OSError:
         return False
     return h.hexdigest() == BG_REMOVAL_MODEL_SHA256
-
-
-def download_model(on_progress=None) -> tuple[bool, str]:
-    """Download the background-removal model from GitHub Releases.
-
-    Streams ~168 MB via httpx, verifies SHA256, and atomically replaces
-    the cached file.
-
-    Args:
-        on_progress: Optional callback ``(received_bytes, total_bytes)``
-            called after each chunk.  ``total_bytes`` may be 0 if the
-            server doesn't report ``Content-Length``.
-
-    Returns:
-        ``(True, "Download complete")`` or ``(False, error_message)``.
-    """
-    path = _model_path()
-    _model_dir().mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".onnx.tmp")
-
-    try:
-        with httpx.stream(
-            "GET",
-            BG_REMOVAL_MODEL_URL,
-            timeout=BG_REMOVAL_DOWNLOAD_TIMEOUT_SEC,
-            follow_redirects=True,
-        ) as resp:
-            if resp.status_code != 200:
-                return False, f"HTTP {resp.status_code}"
-
-            total = int(resp.headers.get("content-length", 0))
-            received = 0
-            h = hashlib.sha256()
-
-            with open(tmp, "wb") as f:
-                for chunk in resp.iter_bytes(chunk_size=65536):
-                    f.write(chunk)
-                    h.update(chunk)
-                    received += len(chunk)
-                    if on_progress and total:
-                        on_progress(received, total)
-
-        # Verify checksum before replacing the cached file.
-        if h.hexdigest() != BG_REMOVAL_MODEL_SHA256:
-            try:
-                tmp.unlink()
-            except OSError:
-                pass
-            return False, "Checksum mismatch — downloaded file may be corrupt"
-
-        # Atomic replace — no partial files left behind.
-        os.replace(tmp, path)
-        return True, "Download complete"
-
-    except httpx.RequestError as e:
-        if tmp.exists():
-            try:
-                tmp.unlink()
-            except OSError:
-                pass
-        return False, f"Network error: {e}"
-    except Exception as e:
-        if tmp.exists():
-            try:
-                tmp.unlink()
-            except OSError:
-                pass
-        return False, str(e)
 
 
 # ── ONNX inference ────────────────────────────────────────────────
