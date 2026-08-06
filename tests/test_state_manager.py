@@ -145,7 +145,7 @@ class TestBranchFiltering:
         """Bare <seg> (no branch attr) always yields regardless of branch."""
         event = Event(EventType.SEGMENT, 1,
                       {"text": "narration", "branch": None,
-                       "position": "pre", "n": 1})
+                       "position": "pre"})
         results = list(sm.process(event))
         assert len(results) == 1
 
@@ -153,7 +153,7 @@ class TestBranchFiltering:
         sm._current_branch = "hero"
         event = Event(EventType.SEGMENT, 1,
                       {"text": "hero text", "branch": "hero",
-                       "position": "pre", "n": 1})
+                       "position": "pre"})
         results = list(sm.process(event))
         assert len(results) == 1
 
@@ -161,7 +161,72 @@ class TestBranchFiltering:
         sm._current_branch = "hero"
         event = Event(EventType.SEGMENT, 1,
                       {"text": "villain text", "branch": "villain",
-                       "position": "pre", "n": 1})
+                       "position": "pre"})
+        results = list(sm.process(event))
+        assert len(results) == 0
+
+    def test_set_bare_always_passes(self, sm):
+        """SET with no branch attr always passes."""
+        event = Event(EventType.SET, 1,
+                      {"var": "trust", "op": "=", "val": "10"})
+        results = list(sm.process(event))
+        assert len(results) == 1
+
+    def test_set_non_matching_branch_filtered(self, sm):
+        sm._current_branch = "hero"
+        event = Event(EventType.SET, 1,
+                      {"var": "trust", "op": "=", "val": "10",
+                       "branch": "villain"})
+        results = list(sm.process(event))
+        assert len(results) == 0
+
+    def test_set_matching_branch_passes(self, sm):
+        sm._current_branch = "hero"
+        event = Event(EventType.SET, 1,
+                      {"var": "trust", "op": "=", "val": "10",
+                       "branch": "hero"})
+        results = list(sm.process(event))
+        assert len(results) == 1
+
+    def test_choice_end_non_matching_not_prompted(self, sm):
+        """CHOICE_END on non-matching branch → needs_input stays False."""
+        sm._current_branch = "hero"
+        event = Event(EventType.CHOICE_END, 1,
+                      {"choice_data": {"id": "q1", "branches": ["x"],
+                                       "labels": ["X"], "conditions": {}},
+                       "branch": "villain"})
+        sm.needs_input = False
+        list(sm.process(event))
+        assert sm.needs_input is False, "should not prompt on wrong branch"
+
+    def test_choice_end_matching_prompts(self, sm):
+        """CHOICE_END on matching branch → needs_input = True."""
+        sm._current_branch = "hero"
+        event = Event(EventType.CHOICE_END, 1,
+                      {"choice_data": {"id": "q1", "branches": ["x"],
+                                       "labels": ["X"], "conditions": {}},
+                       "branch": "hero"})
+        list(sm.process(event))
+        assert sm.needs_input is True
+
+    def test_opt_non_matching_filtered(self, sm):
+        """OPT on non-matching branch → consumed silently, no crash."""
+        sm._current_branch = "hero"
+        results = list(sm.process(Event(EventType.OPT, 1,
+                                        {"key": "1", "target": "x",
+                                         "text": "X", "branch": "villain"})))
+        assert results == []  # consumed, no yield
+
+    def test_scene_bare_always_passes(self, sm):
+        event = Event(EventType.SCENE, 1,
+                      {"val": "tavern"})
+        results = list(sm.process(event))
+        assert len(results) == 1
+
+    def test_scene_non_matching_filtered(self, sm):
+        sm._current_branch = "hero"
+        event = Event(EventType.SCENE, 1,
+                      {"val": "tavern", "branch": "villain"})
         results = list(sm.process(event))
         assert len(results) == 0
 
@@ -266,10 +331,10 @@ class TestBridgeText:
     def test_accumulates_post_bridge_segments(self, sm):
         list(sm.process(Event(EventType.SEGMENT, 1,
                               {"text": "pre", "branch": None,
-                               "position": "pre", "n": 1})))
+                               "position": "pre"})))
         list(sm.process(Event(EventType.SEGMENT, 2,
                               {"text": "post bare", "branch": None,
-                               "position": "post", "n": 2})))
+                               "position": "post"})))
         bt = sm.get_bridge_text()
         assert "post bare" in bt
         assert "pre" not in bt
@@ -278,13 +343,13 @@ class TestBridgeText:
         sm._current_branch = "hero"
         list(sm.process(Event(EventType.SEGMENT, 1,
                               {"text": "bare", "branch": None,
-                               "position": "post", "n": 1})))
+                               "position": "post"})))
         list(sm.process(Event(EventType.SEGMENT, 2,
                               {"text": "hero text", "branch": "hero",
-                               "position": "post", "n": 2})))
+                               "position": "post"})))
         list(sm.process(Event(EventType.SEGMENT, 3,
                               {"text": "villain text", "branch": "villain",
-                               "position": "post", "n": 3})))
+                               "position": "post"})))
         bt = sm.get_bridge_text("hero")
         assert "bare" in bt
         assert "hero text" in bt
@@ -302,7 +367,7 @@ class TestBridgeText:
         ]):
             list(sm.process(Event(EventType.SEGMENT, i + 1,
                                   {"text": text, "branch": branch,
-                                   "position": "post", "n": i + 1})))
+                                   "position": "post"})))
         bt = sm.get_bridge_text()
         assert "bare" in bt
         assert "hero" in bt
@@ -359,6 +424,17 @@ class TestCheckpointHandling:
         result = sm.get_result()
         assert result.checkpoint_node == "ch1"
         assert "Done" in (result.checkpoint_summary or "")
+
+
+    def test_route_target_not_in_outline_fails(self, sm_with_outline):
+        """Route target not in outline → format_error + checkpoint fails."""
+        sm = sm_with_outline
+        list(sm.process(Event(EventType.CHECKPOINT, 1,
+                              {"node": "ch1", "summary": "s"})))
+        list(sm.process(Event(EventType.ROUTE, 2,
+                              {"if": None, "target": "ch99"})))
+        list(sm.process_checkpoint())
+        assert any("ch99" in e for e in sm.format_errors)
 
 
 # ── State queries ─────────────────────────────────────────────────

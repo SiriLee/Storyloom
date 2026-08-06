@@ -130,12 +130,15 @@ class StateManager:
             yield event
             return
 
-        # ── SEGMENT: branch filter + accumulate ────────────────────
-        if etype == EventType.SEGMENT:
+        # ── SEGMENT + SCENE: branch filter ────────────────────────
+        # SCENE (Phase 2) is same-level as SEGMENT — both are
+        # narrative events subject to branch routing.
+        if etype in (EventType.SEGMENT, EventType.SCENE):
             branch = event.payload.get("branch")
-            if not branch or branch == self._current_branch:
+            if branch and branch != self._current_branch:
+                return
+            if etype == EventType.SEGMENT:
                 self._segments.append(Segment(
-                    n=event.payload.get("n", 0),
                     text=event.payload.get("text", ""),
                     position=event.payload.get("position", "pre"),
                     branch=branch,
@@ -144,11 +147,14 @@ class StateManager:
                     self._bridge_text_items.append(
                         (event.payload["text"], branch)
                     )
-                yield event
+            yield event
             return
 
-        # ── SET: apply to GameState, accumulate, yield with result ─
+        # ── SET: branch filter + apply to GameState ────────────────
         if etype == EventType.SET:
+            branch = event.payload.get("branch")
+            if branch and branch != self._current_branch:
+                return
             var = event.payload.get("var", "")
             val = event.payload.get("val", "")
             op = event.payload.get("op", "=")
@@ -185,15 +191,21 @@ class StateManager:
                 yield event
             return
 
-        # ── CHOICE_BEGIN / OPT: consumed, no UI output ─────────────
+        # ── CHOICE_BEGIN / OPT: consumed, branch-filtered ──────────
         # StreamParser reconstructs structured choice_data from the
         # streaming tags and embeds it in the CHOICE_END payload.
         # StateManager reads it from there — no need to re-accumulate.
         if etype in (EventType.CHOICE_BEGIN, EventType.OPT):
+            branch = event.payload.get("branch")
+            if branch and branch != self._current_branch:
+                return
             return
 
-        # ── CHOICE_END: evaluate conditions, signal pause ───────────
+        # ── CHOICE_END: branch filter + evaluate conditions ─────────
         if etype == EventType.CHOICE_END:
+            branch = event.payload.get("branch")
+            if branch and branch != self._current_branch:
+                return
             choice_data = event.payload.get("choice_data")
             if choice_data:
                 # Evaluate option conditions (engine responsibility,
@@ -340,6 +352,15 @@ class StateManager:
         elif self._routes:
             target = self._evaluate_routes(self._choice_dict, self._routes)
             if target:
+                # Validate target exists in outline
+                if self._outline_nodes:
+                    valid_ids = {n.get("id", n.get("node_id", ""))
+                                 for n in self._outline_nodes}
+                    if target not in valid_ids:
+                        self._format_errors.append(
+                            f"Route target not in outline: {target}"
+                        )
+                        return
                 self._set_node_status(cp_node, "completed")
                 self._set_node_status(target, "active")
                 self._current_node = target

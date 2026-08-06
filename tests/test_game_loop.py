@@ -54,10 +54,10 @@ SAMPLE_OUTLINE_NODES = [
 ]
 
 SAMPLE_XML = """<story>
-<seg n="1">炉火噼啪作响。</seg>
-<seg n="2">旅店老板: 这么晚了还赶路？</seg>
-<seg n="3">疤脸人摘下兜帽。</seg>
-<seg n="4">疤脸人: 坐。听说你在找一样东西。</seg>
+<seg>炉火噼啪作响。</seg>
+<seg>旅店老板: 这么晚了还赶路？</seg>
+<seg>疤脸人摘下兜帽。</seg>
+<seg>疤脸人: 坐。听说你在找一样东西。</seg>
 <choice id="approach">
   <opt key="1" branch="take_lead">先开口</opt>
   <opt key="2" branch="wait">保持沉默</opt>
@@ -69,24 +69,24 @@ SAMPLE_XML = """<story>
 </checkpoint>
 <bridge/>
 <branch name="take_lead">
-<seg n="5">你在他对面坐下。</seg>
+<seg>你在他对面坐下。</seg>
 </branch>
 <branch name="wait">
-<seg n="6">你站着没动。</seg>
+<seg>你站着没动。</seg>
 </branch>
 </story>"""
 
 SIMPLE_XML = """<story>
-<seg n="1">开场叙事。</seg>
+<seg>开场叙事。</seg>
 <bridge/>
 </story>"""
 
 ENDING_XML = """<story>
-<seg n="1">最终对决。</seg>
-<seg n="2">你做出了选择。</seg>
+<seg>最终对决。</seg>
+<seg>你做出了选择。</seg>
 <checkpoint node="ch3_ally" summary="选择了盟友之路。"/>
 <bridge/>
-<seg n="3">尾声叙事。</seg>
+<seg>尾声叙事。</seg>
 </story>"""
 
 
@@ -1069,7 +1069,7 @@ class TestCheckpointProcessing:
 
         # Use a mock that outputs an unknown checkpoint node
         xml = """<story>
-        <seg n="1">测试。</seg>
+        <seg>测试。</seg>
         <checkpoint node="nonexistent_node" summary="x"/>
         <bridge/>
         </story>"""
@@ -1136,32 +1136,32 @@ class TestCheckpointProcessing:
 # ── BRANCH Set XML (data-driven branch control) ──────────────────
 
 BRANCH_SET_XML = """<story>
-<seg n="1">You approach the ancient door, its carvings pulsing with faint light.</seg>
+<seg>You approach the ancient door, its carvings pulsing with faint light.</seg>
 <set var="BRANCH" val="trust_path" if="信任度>=50"/>
 <set var="BRANCH" val="doubt_path" if="信任度<50"/>
 <bridge/>
 <branch name="trust_path">
-<seg n="2">A warmth spreads through your chest — the memory of a promise kept.</seg>
+<seg>A warmth spreads through your chest — the memory of a promise kept.</seg>
 </branch>
 <branch name="doubt_path">
-<seg n="3">Your hand hesitates. Cold emanates from the stone. Something is wrong.</seg>
+<seg>Your hand hesitates. Cold emanates from the stone. Something is wrong.</seg>
 </branch>
 </story>"""
 
 BRANCH_SET_UNCONDITIONAL_XML = """<story>
-<seg n="1">The path splits before you.</seg>
+<seg>The path splits before you.</seg>
 <set var="BRANCH" val="left_path"/>
 <bridge/>
 <branch name="left_path">
-<seg n="2">You take the left fork, descending into the moss-covered ravine.</seg>
+<seg>You take the left fork, descending into the moss-covered ravine.</seg>
 </branch>
 <branch name="right_path">
-<seg n="3">The right path climbs toward sunlight and birdsong.</seg>
+<seg>The right path climbs toward sunlight and birdsong.</seg>
 </branch>
 </story>"""
 
 BRANCH_SET_WITH_CHOICE_OVERRIDE_XML = """<story>
-<seg n="1">Two figures emerge from the shadows.</seg>
+<seg>Two figures emerge from the shadows.</seg>
 <choice id="react">
   <opt key="1" branch="fight">Draw your weapon</opt>
   <opt key="2" branch="talk">Try to reason with them</opt>
@@ -1169,13 +1169,13 @@ BRANCH_SET_WITH_CHOICE_OVERRIDE_XML = """<story>
 <set var="BRANCH" val="secret_ally" if="信任度>=80"/>
 <bridge/>
 <branch name="fight">
-<seg n="2">You reach for your blade.</seg>
+<seg>You reach for your blade.</seg>
 </branch>
 <branch name="talk">
-<seg n="3">You raise your hands and speak.</seg>
+<seg>You raise your hands and speak.</seg>
 </branch>
 <branch name="secret_ally">
-<seg n="4">One of them lowers their hood — a familiar face.</seg>
+<seg>One of them lowers their hood — a familiar face.</seg>
 </branch>
 </story>"""
 

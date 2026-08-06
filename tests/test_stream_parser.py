@@ -25,16 +25,19 @@ TAG_EVENT_MAP = [
     # Segment
     ('<seg>rain hammers the awning.</seg>', EventType.SEGMENT,
      {"text": "rain hammers the awning.", "position": "pre"}),
-    ('<seg n="5">numbered seg</seg>', EventType.SEGMENT,
-     {"text": "numbered seg", "n": 5}),
+    ('<seg>numbered seg</seg>', EventType.SEGMENT,
+     {"text": "numbered seg"}),
+    # Segment with optional char attribute (Phase 2)
+    ('<seg char="hero">Hero speaks.</seg>', EventType.SEGMENT,
+     {"text": "Hero speaks.", "char": "hero"}),
     # Choice
     ('<choice id="approach">', EventType.CHOICE_BEGIN,
      {"id": "approach"}),
     ('<opt key="1" branch="direct">Meet his gaze</opt>', EventType.OPT,
-     {"key": "1", "branch": "direct", "text": "Meet his gaze"}),
+     {"key": "1", "target": "direct", "text": "Meet his gaze"}),
     ('<opt key="2" branch="cautious" if="trust>50">Look around</opt>',
      EventType.OPT,
-     {"key": "2", "branch": "cautious", "if": "trust>50",
+     {"key": "2", "target": "cautious", "if": "trust>50",
       "text": "Look around"}),
     ("</choice>", EventType.CHOICE_END, {}),
     # SET
@@ -151,6 +154,187 @@ class TestStreamParserTags:
             events.extend(parser.feed_line(ln))
         for e in events:
             assert e.line > 0, f"{e.type.name} has line={e.line}"
+
+
+# ── StreamParser: SEG char attribute ────────────────────────────────
+
+class TestSegCharAttribute:
+    """SEGMENT ``char`` attribute — optional, empty = absent (Phase 2)."""
+
+    def test_char_present_when_non_empty(self, parser):
+        parser.feed_line("<story>")
+        evt = _parse_one(parser, '<seg char="hero">Hero speaks.</seg>')
+        assert evt.payload["char"] == "hero"
+
+    def test_no_char_key_when_absent(self, parser):
+        parser.feed_line("<story>")
+        evt = _parse_one(parser, "<seg>plain text</seg>")
+        assert "char" not in evt.payload
+
+    def test_no_char_key_when_empty(self, parser):
+        parser.feed_line("<story>")
+        evt = _parse_one(parser, '<seg char="">text</seg>')
+        assert "char" not in evt.payload
+
+
+# ── StreamParser: DECLARE parsing ────────────────────────────────────
+
+class TestDeclareParsing:
+    """``<declare>`` → validated, NOT in event stream (§7.5)."""
+
+    def test_declare_not_in_event_stream(self, parser):
+        parser.feed_line("<story>")
+        events = parser.feed_line(
+            '<declare kind="CHAR" name="ghost">a ghost</declare>')
+        assert events == []
+        assert parser.format_errors == []  # valid = no error
+
+    def test_declare_scene_kind_accepted(self, parser):
+        parser.feed_line("<story>")
+        events = parser.feed_line(
+            '<declare kind="SCENE" name="crypt">ancient crypt</declare>')
+        assert events == []
+
+    def test_declare_kind_case_insensitive(self, parser):
+        parser.feed_line("<story>")
+        events = parser.feed_line(
+            '<declare kind="char" name="ghost">desc</declare>')
+        assert events == []
+
+    def test_declare_invalid_kind_parse_error(self, parser):
+        parser.feed_line("<story>")
+        events = parser.feed_line(
+            '<declare kind="BGM" name="theme">epic</declare>')
+        assert len(events) == 1
+        assert events[0].type == EventType.PARSE_ERROR
+
+    def test_declare_after_bridge_format_error(self, parser):
+        parser.feed_line("<story>")
+        parser.feed_line("<bridge/>")
+        events = parser.feed_line(
+            '<declare kind="CHAR" name="ghost">desc</declare>')
+        assert events == []
+        assert any("declare" in e.lower() for e in parser.format_errors)
+
+
+# ── StreamParser: branch injection ───────────────────────────────────
+
+class TestBranchInjection:
+    """SET, CHOICE, OPT events inside a <branch> carry branch name."""
+
+    def test_set_in_branch(self, parser):
+        parser.feed_line("<story>")
+        parser.feed_line('<branch name="hero">')
+        evt = _parse_one(parser, '<set var="trust" val="10"/>')
+        assert evt.payload["branch"] == "hero"
+
+    def test_choice_begin_in_branch(self, parser):
+        parser.feed_line("<story>")
+        parser.feed_line('<branch name="hero">')
+        evt = _parse_one(parser, '<choice id="q1">')
+        assert evt.payload["branch"] == "hero"
+
+    def test_opt_in_branch(self, parser):
+        """OPT carries both target (opt's own branch) and container."""
+        parser.feed_line("<story>")
+        parser.feed_line('<branch name="hero">')
+        evt = _parse_one(parser,
+                         '<opt key="1" branch="x">Go</opt>')
+        assert evt.payload["target"] == "x"    # opt's own branch attr
+        assert evt.payload["branch"] == "hero" # container branch
+
+    def test_choice_end_in_branch(self, parser):
+        parser.feed_line("<story>")
+        parser.feed_line('<branch name="hero">')
+        parser.feed_line('<choice id="q1">')
+        parser.feed_line('<opt key="1" branch="x">Go</opt>')
+        evt = _parse_one(parser, '</choice>')
+        assert evt.payload["branch"] == "hero"
+
+    def test_set_outside_branch(self, parser):
+        parser.feed_line("<story>")
+        evt = _parse_one(parser, '<set var="trust" val="10"/>')
+        assert evt.payload["branch"] is None
+
+
+# ── StreamParser: post-bridge suppress ───────────────────────────────
+
+class TestPostBridgeSuppress:
+    """Prohibited tags after <bridge/> → format_error + return []."""
+
+    PROHIBITED = [
+        ('<set var="x" val="1"/>', "set"),
+        ('<choice id="bad">', "choice"),
+        ('</choice>', "choice"),
+        ('<opt key="1" branch="x">o</opt>', "opt"),
+        ('<checkpoint node="ch1" summary="s">', "checkpoint"),
+        ('<checkpoint node="ch1" summary="s"/>', "checkpoint"),
+        ('</checkpoint>', "checkpoint"),
+        ('<route target="ch2"/>', "route"),
+    ]
+
+    @pytest.mark.parametrize("line,tag_name", PROHIBITED)
+    def test_prohibited_tag_suppressed(self, parser, line, tag_name):
+        parser.feed_line("<story>")
+        parser.feed_line("<bridge/>")
+        events = parser.feed_line(line)
+        assert events == [], f"{tag_name} after bridge should return []"
+        assert any(tag_name in e.lower() for e in parser.format_errors), (
+            f"format_errors should mention '{tag_name}'"
+        )
+
+    def test_allowed_tags_still_pass(self, parser):
+        """<seg>, <branch>, </branch> still emit after bridge."""
+        parser.feed_line("<story>")
+        parser.feed_line("<bridge/>")
+        evt = _parse_one(parser, "<seg>after bridge</seg>")
+        assert evt.type == EventType.SEGMENT
+        evt = _parse_one(parser, '<branch name="epilogue">')
+        assert evt.type == EventType.BRANCH_ENTER
+        evt = _parse_one(parser, '</branch>')
+        assert evt.type == EventType.BRANCH_EXIT
+
+
+# ── StreamParser: SCENE parsing ─────────────────────────────────────
+
+class TestSceneParsing:
+    """``<set var="SCENE" val="...">`` → SCENE event, not SET (Phase 2)."""
+
+    def test_scene_produces_scene_event(self, parser):
+        parser.feed_line("<story>")
+        evt = _parse_one(parser, '<set var="SCENE" val="tavern"/>')
+        assert evt.type == EventType.SCENE
+        assert evt.payload["val"] == "tavern"
+
+    def test_scene_with_if_condition(self, parser):
+        parser.feed_line("<story>")
+        evt = _parse_one(parser,
+                         '<set var="SCENE" val="forest" if="x>1"/>')
+        assert evt.type == EventType.SCENE
+        assert evt.payload["if"] == "x>1"
+
+    def test_scene_op_not_equal_parse_error(self, parser):
+        parser.feed_line("<story>")
+        evt = _parse_one(parser, '<set var="SCENE" op="+" val="5"/>')
+        assert evt.type == EventType.PARSE_ERROR
+
+    def test_scene_has_position(self, parser):
+        parser.feed_line("<story>")
+        evt = _parse_one(parser, '<set var="SCENE" val="tavern"/>')
+        assert evt.payload["position"] == "pre"
+
+    def test_scene_after_bridge_suppressed(self, parser):
+        parser.feed_line("<story>")
+        parser.feed_line("<bridge/>")
+        events = parser.feed_line('<set var="SCENE" val="tavern"/>')
+        assert events == []
+        assert any("SCENE" in e for e in parser.format_errors)
+
+    def test_scene_in_branch_has_branch_name(self, parser):
+        parser.feed_line("<story>")
+        parser.feed_line('<branch name="hero">')
+        evt = _parse_one(parser, '<set var="SCENE" val="tavern"/>')
+        assert evt.payload["branch"] == "hero"
 
 
 # ── StreamParser: position tracking ───────────────────────────────

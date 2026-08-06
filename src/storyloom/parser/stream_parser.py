@@ -19,6 +19,8 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
+from storyloom.config import SCENE_VAR_NAME
+
 
 # ── Event ──────────────────────────────────────────────────────────
 # Per design.md §4.1:
@@ -60,7 +62,7 @@ class Event:
 
         STORY_BEGIN    — (empty)
         STORY_END      — (empty)
-        SEGMENT        — text, n, position, branch, char (optional, Phase 2)
+        SEGMENT        — text, position, branch, char (optional, Phase 2)
         CHOICE_BEGIN   — id
         OPT            — key, branch, if, text
         CHOICE_END     — choice_data (accumulated from CHOICE_BEGIN + OPT)
@@ -86,7 +88,7 @@ class Event:
 
 _RE_STORY_OPEN = re.compile(r'^<story>\s*$')
 _RE_STORY_CLOSE = re.compile(r'^</story>\s*$')
-_RE_SEG = re.compile(r'^<seg(?: n="(\d+)")?>(.*)</seg>\s*$')
+_RE_SEG = re.compile(r'^<seg(?: char="([^"]*)")?>(.*)</seg>\s*$')
 _RE_CHOICE_OPEN = re.compile(r'^<choice id="([^"]+)">\s*$')
 _RE_CHOICE_CLOSE = re.compile(r'^</choice>\s*$')
 _RE_OPT = re.compile(
@@ -109,6 +111,9 @@ _RE_ROUTE = re.compile(
 _RE_BRIDGE = re.compile(r'^<bridge\s*/>\s*$')
 _RE_BRANCH_OPEN = re.compile(r'^<branch name="([^"]+)">\s*$')
 _RE_BRANCH_CLOSE = re.compile(r'^</branch>\s*$')
+_RE_DECLARE = re.compile(
+    r'^<declare kind="([^"]+)" name="([^"]+)">(.*)</declare>\s*$'
+)
 
 
 # ── StreamParser ───────────────────────────────────────────────────
@@ -141,7 +146,6 @@ class StreamParser:
 
         # ── Counters ──────────────────────────────────────────────
         self._line_count = 0
-        self._seg_count = 0
 
         # ── Pending choice accumulator ────────────────────────────
         # Needed to build choice_data at CHOICE_END.  This is a
@@ -214,13 +218,21 @@ class StreamParser:
                 self._format_errors.append(
                     f"<choice> found after <bridge/> (line {self._line_count})"
                 )
+                return []
             return [Event(
                 type=EventType.CHOICE_BEGIN,
                 line=self._line_count,
-                payload={"id": m.group(1), "position": self._position},
+                payload={"id": m.group(1), "position": self._position,
+                         "branch": self._in_branch},
             )]
 
         if _RE_CHOICE_CLOSE.match(clean):
+            if self._post_bridge:
+                self._format_errors.append(
+                    f"</choice> found after <bridge/>"
+                    f" (line {self._line_count})"
+                )
+                return []
             # Pop the current choice — each CHOICE_END consumes its
             # own accumulated data.  Without pop(), an empty <choice>
             # (no <opt> children) would inherit the previous choice's
@@ -237,17 +249,19 @@ class StreamParser:
                 payload={
                     "position": self._position,
                     "choice_data": choice_data,
+                    "branch": self._in_branch,
                 },
             )]
 
         m = _RE_CHECKPOINT_OPEN.match(clean)
         if m:
-            self._in_checkpoint = True
             if self._post_bridge:
                 self._format_errors.append(
                     f"<checkpoint> found after <bridge/>"
                     f" (line {self._line_count})"
                 )
+                return []
+            self._in_checkpoint = True
             return [Event(
                 type=EventType.CHECKPOINT,
                 line=self._line_count,
@@ -265,6 +279,7 @@ class StreamParser:
                     f"<checkpoint> found after <bridge/>"
                     f" (line {self._line_count})"
                 )
+                return []
             return [Event(
                 type=EventType.CHECKPOINT,
                 line=self._line_count,
@@ -276,6 +291,12 @@ class StreamParser:
             )]
 
         if _RE_CHECKPOINT_CLOSE.match(clean):
+            if self._post_bridge:
+                self._format_errors.append(
+                    f"</checkpoint> found after <bridge/>"
+                    f" (line {self._line_count})"
+                )
+                return []
             self._in_checkpoint = False
             return [Event(
                 type=EventType.CHECKPOINT_END,
@@ -320,25 +341,28 @@ class StreamParser:
         # ── Leaf elements ─────────────────────────────────────────
         m = _RE_SEG.match(clean)
         if m:
-            n_val = m.group(1)  # None if no n="N" attribute
+            char_val = m.group(1)  # None if no char attribute
             text = m.group(2).strip()
-            self._seg_count += 1
-            seg_n = int(n_val) if n_val else self._seg_count
-            pos = self._position
 
-            return [Event(
-                type=EventType.SEGMENT,
-                line=self._line_count,
-                payload={
-                    "text": text,
-                    "n": seg_n,
-                    "position": pos,
-                    "branch": self._in_branch,
-                },
-            )]
+            payload = {
+                "text": text,
+                "position": self._position,
+                "branch": self._in_branch,
+            }
+            if char_val:  # non-empty only — "" same as absent
+                payload["char"] = char_val
+
+            return [Event(type=EventType.SEGMENT, line=self._line_count,
+                          payload=payload)]
 
         m = _RE_OPT.match(clean)
         if m:
+            if self._post_bridge:
+                self._format_errors.append(
+                    f"<opt> found after <bridge/>"
+                    f" (line {self._line_count})"
+                )
+                return []
             key = m.group(1)
             branch = m.group(2)
             if_cond = m.group(3)
@@ -364,10 +388,11 @@ class StreamParser:
                 line=self._line_count,
                 payload={
                     "key": key,
-                    "branch": branch,
+                    "target": branch,
                     "if": if_cond,
                     "text": text,
                     "position": self._position,
+                    "branch": self._in_branch,
                 },
             )]
 
@@ -378,10 +403,37 @@ class StreamParser:
             val = m.group(3)
             if_cond = m.group(4)
 
+            # SCENE interception (Phase 2): <set var="SCENE" val="...">
+            # is a separate event type — scene switch, not state change.
+            if var == SCENE_VAR_NAME:
+                if op != "=":
+                    return [Event(
+                        type=EventType.PARSE_ERROR,
+                        line=self._line_count,
+                        payload={"error": f"SCENE does not support op={op!r}"},
+                    )]
+                if self._post_bridge:
+                    self._format_errors.append(
+                        f"<set var=\"SCENE\"> found after <bridge/>"
+                        f" (line {self._line_count})"
+                    )
+                    return []
+                return [Event(
+                    type=EventType.SCENE,
+                    line=self._line_count,
+                    payload={
+                        "val": val,
+                        "if": if_cond,
+                        "position": self._position,
+                        "branch": self._in_branch,
+                    },
+                )]
+
             if self._post_bridge:
                 self._format_errors.append(
                     f"<set> found after <bridge/> (line {self._line_count})"
                 )
+                return []
 
             return [Event(
                 type=EventType.SET,
@@ -392,11 +444,18 @@ class StreamParser:
                     "val": val,
                     "if": if_cond,
                     "position": self._position,
+                    "branch": self._in_branch,
                 },
             )]
 
         m = _RE_ROUTE.match(clean)
         if m:
+            if self._post_bridge:
+                self._format_errors.append(
+                    f"<route> found after <bridge/>"
+                    f" (line {self._line_count})"
+                )
+                return []
             if_cond = m.group(1)
             target = m.group(2)
             return [Event(
@@ -408,6 +467,39 @@ class StreamParser:
                     "position": self._position,
                 },
             )]
+
+        # ── DECLARE (Phase 2) ──────────────────────────────────────
+        # Per design.md §4.1: parsed + validated, does NOT enter the
+        # event stream.  Only triggers TaskGenerator (§7.6).
+        m = _RE_DECLARE.match(clean)
+        if m:
+            kind = m.group(1)
+            name = m.group(2)
+            desc = m.group(3).strip()
+
+            if kind.upper() not in ("CHAR", "SCENE"):
+                return [Event(
+                    type=EventType.PARSE_ERROR,
+                    line=self._line_count,
+                    payload={"error": f"Invalid declare kind: {kind!r}"},
+                )]
+
+            if self._post_bridge:
+                self._format_errors.append(
+                    f"<declare> found after <bridge/>"
+                    f" (line {self._line_count})"
+                )
+                return []
+
+            # Build event (validated, full info) — discarded in §7.5.
+            # §7.6: pipeline coordinator calls task_gen.enqueue(event).
+            _declare_event = Event(
+                type=EventType.DECLARE,
+                line=self._line_count,
+                payload={"kind": kind, "name": name, "desc": desc},
+            )
+            # TODO(§7.6): task_gen.enqueue(_declare_event)
+            return []
 
         # ── Unrecognized line ─────────────────────────────────────
         # Post-bridge violations (LLM output error → record for feedback)
@@ -531,7 +623,6 @@ class ParseError(Exception):
 @dataclass
 class Segment:
     """A single narrative segment."""
-    n: int
     text: str
     position: str  # "pre" or "post"
     branch: str | None = None

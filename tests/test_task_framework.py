@@ -357,7 +357,7 @@ class TestTaskGenerator:
                             target=STUB_ASSET_ID)
 
         event = self._make_event(EventType.SEGMENT, 3,
-                                 text="...", n=1, position="pre",
+                                 text="...", position="pre",
                                  char="hero")
         task = pipeline.gen.enqueue(event)
 
@@ -474,7 +474,7 @@ class TestTaskGenerator:
     def test_non_media_event_returns_none(self, pipeline):
         """SEGMENT without char, SET, CHOICE etc. → None."""
         event = self._make_event(EventType.SEGMENT, 1,
-                                 text="hello", n=1, position="pre")
+                                 text="hello", position="pre")
         task = pipeline.gen.enqueue(event)
         assert task is None
 
@@ -497,7 +497,7 @@ class TestTaskGenerator:
     def test_seg_char_empty_does_not_trigger_match(self, pipeline):
         """SEGMENT with char='' → no MATCH (per design: empty means no portrait)."""
         event = self._make_event(EventType.SEGMENT, 5,
-                                 text="narrator", n=1, position="pre",
+                                 text="narrator", position="pre",
                                  char="")
         task = pipeline.gen.enqueue(event)
         assert task is None
@@ -561,8 +561,9 @@ class TestEventDispatcherConsume:
 
         assert "assets" in event.payload
         assert event.payload["assets"] == {AssetType.BACKGROUND.value: STUB_ASSET_ID}
-        # SCENE goes through default dispatch branch — payload is shared ref
-        assert result["payload"]["assets"] == {AssetType.BACKGROUND.value: STUB_ASSET_ID}
+        # SCENE now has its own dispatch handler (§7.5)
+        assert result["type"] == "scene"
+        assert result["assets"] == {AssetType.BACKGROUND.value: STUB_ASSET_ID}
 
     def test_sync_match_bind_seg_char(self, pipeline):
         """SEGMENT with known char → portrait bound in BOTH payload and UI dict."""
@@ -570,7 +571,7 @@ class TestEventDispatcherConsume:
                             target=STUB_ASSET_ID)
 
         event = self._make_event(EventType.SEGMENT, 3,
-                                 text="...", n=1, position="pre",
+                                 text="...", position="pre",
                                  char="hero")
         pipeline.gen.enqueue(event)
         result = pipeline.dispatcher.consume_event(event)
@@ -604,7 +605,7 @@ class TestEventDispatcherConsume:
         # First real event (line=3) → DECLARE task line=0 < line=3 →
         # popped, waited, discarded
         event = self._make_event(EventType.SEGMENT, 3,
-                                 text="hello", n=1, position="pre")
+                                 text="hello", position="pre")
         result = pipeline.dispatcher.consume_event(event)
 
         # DECLARE was discarded — no assets on this event
@@ -626,7 +627,7 @@ class TestEventDispatcherConsume:
         pipeline.gen.enqueue(orphan_event)     # task at line 3
 
         event = self._make_event(EventType.SEGMENT, 5,
-                                 text="later", n=1, position="pre")
+                                 text="later", position="pre")
         result = pipeline.dispatcher.consume_event(event)
 
         # Orphan discarded — no assets, queue drained
@@ -638,7 +639,7 @@ class TestEventDispatcherConsume:
     def test_no_task_pass_through(self, pipeline):
         """Event with no matching task → dispatched without assets."""
         event = self._make_event(EventType.SEGMENT, 1,
-                                 text="hello", n=1, position="pre")
+                                 text="hello", position="pre")
         result = pipeline.dispatcher.consume_event(event)
 
         assert result["type"] == "segment"
@@ -660,7 +661,7 @@ class TestEventDispatcherConsume:
         # Event at line 4: should pop line=2 (orphan discarded),
         # then bind line=4
         event = self._make_event(EventType.SEGMENT, 4,
-                                 text="at tavern", n=1, position="pre")
+                                 text="at tavern", position="pre")
         result = pipeline.dispatcher.consume_event(event)
 
         assert event.payload["assets"] == {AssetType.BACKGROUND.value: STUB_ASSET_ID}
@@ -692,7 +693,7 @@ class TestEventDispatcherConsume:
                             target=None)   # placeholder
 
         event = self._make_event(EventType.SEGMENT, 5,
-                                 text="...", n=1, position="pre",
+                                 text="...", position="pre",
                                  char="ghost")
         pipeline.gen.enqueue(event)
         result = pipeline.dispatcher.consume_event(event)
@@ -725,7 +726,7 @@ class TestPipelineE2E:
             (self._make_event(EventType.SCENE, 5, val="tavern"),
              AssetType.BACKGROUND),
             (self._make_event(EventType.SEGMENT, 10,
-                              text="The barkeep nods.", n=1,
+                              text="The barkeep nods.",
                               position="pre", char="barkeep"),
              AssetType.CHAR_PORTRAIT),
         ]
@@ -747,7 +748,7 @@ class TestPipelineE2E:
 
         # Narrative text (line=4) triggers DECLARE task consumption
         seg1 = self._make_event(EventType.SEGMENT, 4,
-                                text="You descend...", n=1, position="pre")
+                                text="You descend...", position="pre")
         r1 = pipeline.dispatcher.consume_event(seg1)
         assert r1["type"] == "segment"
         assert "assets" not in seg1.payload
@@ -764,9 +765,9 @@ class TestPipelineE2E:
         events = [
             self._make_event(EventType.STORY_BEGIN, 1),
             self._make_event(EventType.SEGMENT, 2,
-                             text="It was a dark night.", n=1, position="pre"),
+                             text="It was a dark night.", position="pre"),
             self._make_event(EventType.SEGMENT, 3,
-                             text="Rain fell steadily.", n=2, position="pre"),
+                             text="Rain fell steadily.", position="pre"),
             self._make_event(EventType.BRIDGE, 4),
             self._make_event(EventType.STORY_END, 5),
         ]
@@ -783,7 +784,7 @@ class TestPipelineE2E:
 
         # Known — sync
         e1 = self._make_event(EventType.SEGMENT, 5,
-                              text="I'm here.", n=1, position="pre",
+                              text="I'm here.", position="pre",
                               char="hero")
         pipeline.gen.enqueue(e1)
         r1 = pipeline.dispatcher.consume_event(e1)
@@ -791,7 +792,7 @@ class TestPipelineE2E:
 
         # Unknown — async (stub will resolve)
         e2 = self._make_event(EventType.SEGMENT, 10,
-                              text="Who goes there?", n=2, position="pre",
+                              text="Who goes there?", position="pre",
                               char="stranger")
         pipeline.gen.enqueue(e2)
         r2 = pipeline.dispatcher.consume_event(e2)
@@ -812,7 +813,7 @@ class TestTextModeUnaffected:
             Event(EventType.STORY_BEGIN, 1, {}),
             Event(EventType.STORY_END, 2, {}),
             Event(EventType.SEGMENT, 3,
-                  {"text": "hello", "n": 1, "position": "pre"}),
+                  {"text": "hello", "position": "pre"}),
             Event(EventType.SET, 4,
                   {"var": "trust", "op": "=", "val": "10"}),
             Event(EventType.BRIDGE, 5, {}),
@@ -835,7 +836,7 @@ class TestTextModeUnaffected:
         """Text mode never injects 'assets' into event payload."""
         d = EventDispatcher()
         event = Event(EventType.SEGMENT, 1,
-                      {"text": "hello", "n": 1, "position": "pre"})
+                      {"text": "hello", "position": "pre"})
         d.consume_event(event)
         assert "assets" not in event.payload
 
@@ -843,11 +844,19 @@ class TestTextModeUnaffected:
         """Segment event → correct UI dict (Phase 1 behavior unchanged)."""
         d = EventDispatcher()
         event = Event(EventType.SEGMENT, 1,
-                      {"text": "A door creaks.", "n": 1, "position": "pre",
+                      {"text": "A door creaks.", "position": "pre",
                        "branch": None})
         result = d.consume_event(event)
         assert result["type"] == "segment"
         assert result["text"] == "A door creaks."
+
+    def test_text_mode_scene_output(self):
+        """SCENE event → scene UI dict."""
+        d = EventDispatcher()
+        event = Event(EventType.SCENE, 1, {"val": "tavern"})
+        result = d.consume_event(event)
+        assert result["type"] == "scene"
+        assert result["val"] == "tavern"
 
     def test_text_mode_state_output(self):
         """SET event → state UI dict unchanged."""
@@ -896,16 +905,16 @@ class TestVerificationCriteria:
                              desc="a hooded figure"),
             # Plain narrative (triggers DECLARE consumption)
             self._make_event(EventType.SEGMENT, 4,
-                             text="A stranger enters.", n=1, position="pre"),
+                             text="A stranger enters.", position="pre"),
             # SCENE change (sync — roster hit)
             self._make_event(EventType.SCENE, 6, val="tavern"),
             # SEG with known char (sync — roster hit)
             self._make_event(EventType.SEGMENT, 8,
-                             text="The barkeep watches.", n=2, position="pre",
+                             text="The barkeep watches.", position="pre",
                              char="stranger"),
             # SEG without char (no media)
             self._make_event(EventType.SEGMENT, 10,
-                             text="Silence fills the room.", n=3,
+                             text="Silence fills the room.",
                              position="pre"),
         ]
 
@@ -936,7 +945,7 @@ class TestVerificationCriteria:
              AssetType.BACKGROUND),
             # Async MATCH — SEGMENT with unknown char
             (self._make_event(EventType.SEGMENT, 5,
-                              text="...", n=1, position="pre",
+                              text="...", position="pre",
                               char="unknown_hero"),
              AssetType.CHAR_PORTRAIT),
         ]
@@ -970,7 +979,7 @@ class TestVerificationCriteria:
             Event(EventType.STORY_BEGIN, 1, {}),
             Event(EventType.STORY_END, 2, {}),
             Event(EventType.SEGMENT, 3,
-                  {"text": "It was a dark night.", "n": 1, "position": "pre"}),
+                  {"text": "It was a dark night.", "position": "pre"}),
             Event(EventType.SET, 4,
                   {"var": "trust", "op": "=", "val": "10"}),
             Event(EventType.BRIDGE, 5, {}),

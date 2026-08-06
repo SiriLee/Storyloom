@@ -31,6 +31,7 @@ MAX_CONTEXT_TOKENS = 50_000   # target ceiling
 # <set var="BRANCH" val="..."/> sets current_branch directly
 # without going through GameState (no state variable registration needed).
 BRANCH_VAR_NAME = "BRANCH"
+SCENE_VAR_NAME = "SCENE"     # <set var="SCENE" val="..."> → SCENE event (Phase 2)
 
 # ── Co-creation ──────────────────────────────────────────────────
 

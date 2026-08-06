@@ -69,10 +69,15 @@ class EventDispatcher:
             result = {
                 "type": "segment",
                 "text": payload.get("text", ""),
-                "n": payload.get("n", 0),
                 "position": payload.get("position", "pre"),
                 "branch": payload.get("branch"),
             }
+            if "assets" in payload:
+                result["assets"] = payload["assets"]
+            return result
+
+        if etype == EventType.SCENE:
+            result = {"type": "scene", "val": payload.get("val", "")}
             if "assets" in payload:
                 result["assets"] = payload["assets"]
             return result
