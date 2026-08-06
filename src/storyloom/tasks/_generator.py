@@ -83,11 +83,13 @@ class TaskGenerator:
 
         if local_name and self._roster.lookup(asset_type, local_name) is not None:
             task.complete(result=local_name)          # O(1) hit
-        else:
+        elif local_name:
             task.process = self._process_factory(asset_type, local_name,
                                                            self._roster)
             if self._pool is not None:
                 self._pool.submit(task)
+        else:
+            task.complete()                           # empty name → no-op
         return task
 
     # ── GENERATE ──────────────────────────────────────────────────────────
@@ -98,6 +100,9 @@ class TaskGenerator:
         submitting to the pool (§6.4 step 3 — prevents duplicate
         declarations)."""
         kind = event.payload.get("kind", "CHAR").upper()
+        # Unknown kinds fall back to BACKGROUND (safest default).
+        # kind validation / format_error recording belongs in the Parser (§7.5),
+        # not in TaskGenerator — this is the data layer, not the validation layer.
         asset_type = self._DECLARE_KIND_MAP.get(kind, AssetType.BACKGROUND)
         local_name = event.payload.get("name", "")
         desc = event.payload.get("desc", "")

@@ -390,13 +390,13 @@ class TestTaskGenerator:
 
     # ── MATCH: no local_name ──────────────────────────────────────────
 
-    def test_match_empty_local_name_assigns_process(self, pipeline):
-        """SCENE with empty val → no program match attempt, process assigned."""
+    def test_match_empty_local_name_sync_completes_noop(self, pipeline):
+        """SCENE with val='' → sync-complete no-op (LLM output error)."""
         event = self._make_event(EventType.SCENE, 5, val="")
         task = pipeline.gen.enqueue(event)
         assert task is not None
-        assert task.completed is False
-        assert task.process is not None
+        assert task.completed is True
+        assert task.process is None
 
     # ── GENERATE: program match hit ───────────────────────────────────
 
@@ -511,6 +511,7 @@ class TestTaskGenerator:
         assert task.completed is True
         # No placeholder created with empty key
         assert len(pipeline.roster) == 2  # only the 2 stub entries
+
 
 
 # ═══════════════════════════════════════════════════════════════════════

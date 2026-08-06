@@ -732,6 +732,8 @@ class GameLoop:
             current_node=self.current_node,
             goal=self.goal,
         )
+        # §7.4: text mode — no task_queue, no roster.
+        # §7.6: graph mode injects task_queue + roster for consume_event alignment.
         dispatcher = EventDispatcher()
 
         collected: list[str] = []
