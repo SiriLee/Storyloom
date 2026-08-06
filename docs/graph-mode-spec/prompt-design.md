@@ -202,7 +202,7 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 
 **Requirements**:
 - Use `var="{BRANCH_VAR_NAME}"` to set `current_branch` to its value
-- Use `var="{SCENE_VAR_NAME}"` to switch the never-empty scene. The value must match a location or a prior `<declare>`. No condition
+- Use `var="{SCENE_VAR_NAME}"` to switch the never-empty scene. The value must match a location or a prior `<declare>`
 - State variables must use the exact names from "Current State" — use `Scope.Name` for character-scoped variables, bare name for globals
 
 **Snippet**:
@@ -307,6 +307,7 @@ Decide these in order mentally.
 
 ## Continue From
 {bridge_text}
+{scene_line}
 
 Plan silently using "Before You Write". Satisfy every rule in "Requirements". Follow "Story Setting" and "Current Status".
 ````
