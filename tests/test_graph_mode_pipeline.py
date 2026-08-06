@@ -147,7 +147,7 @@ class TestExample1Pipeline:
         char_names = {e.payload["char"] for e in char_segs}
         assert "Alex" in char_names
         assert "Mira" in char_names
-        assert "greycoat" in char_names
+        assert "agent" in char_names
 
     def test_seg_expression_variant(self):
         """Expression variants (e.g. Mira.angry, Alex.sad) are preserved."""
