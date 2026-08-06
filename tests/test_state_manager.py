@@ -233,6 +233,16 @@ class TestBranchFiltering:
         results = list(sm.process(event))
         assert len(results) == 0
 
+    def test_scene_updates_current_scene(self, sm):
+        sm._current_branch = "hero"
+        event = Event(EventType.SCENE, 1,
+                      {"val": "tavern", "branch": "hero"})
+        list(sm.process(event))
+        assert sm.current_scene == "tavern"
+
+    def test_current_scene_starts_none(self, sm):
+        assert sm.current_scene is None
+
 
 # ── CHOICE handling ───────────────────────────────────────────────
 

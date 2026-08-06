@@ -217,6 +217,30 @@ class TestDeclareParsing:
         assert events == []
         assert any("declare" in e.lower() for e in parser.format_errors)
 
+    def test_declare_dispatches_to_task_gen(self, parser):
+        """DECLARE triggers task_gen.enqueue() synchronously."""
+        dispatched = []
+        parser.task_gen = _FakeTaskGen(dispatched)
+        parser.feed_line("<story>")
+        events = parser.feed_line(
+            '<declare kind="CHAR" name="ghost">a ghost</declare>')
+        assert events == []
+        assert len(dispatched) == 1
+        e = dispatched[0]
+        assert e.type == EventType.DECLARE
+        assert e.payload["kind"] == "CHAR"
+        assert e.payload["name"] == "ghost"
+        assert e.payload["desc"] == "a ghost"
+
+
+class _FakeTaskGen:
+    """Records enqueue() calls.  duck-types TaskGenerator for tests."""
+    def __init__(self, sink: list):
+        self._sink = sink
+    def enqueue(self, event):
+        self._sink.append(event)
+        return None
+
 
 # ── StreamParser: branch injection ───────────────────────────────────
 

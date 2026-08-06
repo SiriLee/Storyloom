@@ -64,7 +64,7 @@ class Event:
         STORY_END      — (empty)
         SEGMENT        — text, position, branch, char (optional, Phase 2)
         CHOICE_BEGIN   — id
-        OPT            — key, branch, if, text
+        OPT            — key, target, if, text, branch
         CHOICE_END     — choice_data (accumulated from CHOICE_BEGIN + OPT)
         SET            — var, op, val, if
         CHECKPOINT     — node, summary
@@ -147,6 +147,11 @@ class StreamParser:
         # ── Counters ──────────────────────────────────────────────
         self._line_count = 0
 
+        # ── TaskGenerator ref (Phase 2) ───────────────────────────
+        # Set by pipeline coordinator in §7.6.  None in text mode.
+        # When set, DECLARE events trigger task_gen.enqueue().
+        self._task_gen: object | None = None
+
         # ── Pending choice accumulator ────────────────────────────
         # Needed to build choice_data at CHOICE_END.  This is a
         # parse-time concern (reconstructing structured data from
@@ -213,12 +218,12 @@ class StreamParser:
 
         m = _RE_CHOICE_OPEN.match(clean)
         if m:
-            self._in_choice = m.group(1)
             if self._post_bridge:
                 self._format_errors.append(
                     f"<choice> found after <bridge/> (line {self._line_count})"
                 )
                 return []
+            self._in_choice = m.group(1)
             return [Event(
                 type=EventType.CHOICE_BEGIN,
                 line=self._line_count,
@@ -491,14 +496,14 @@ class StreamParser:
                 )
                 return []
 
-            # Build event (validated, full info) — discarded in §7.5.
-            # §7.6: pipeline coordinator calls task_gen.enqueue(event).
-            _declare_event = Event(
-                type=EventType.DECLARE,
-                line=self._line_count,
-                payload={"kind": kind, "name": name, "desc": desc},
-            )
-            # TODO(§7.6): task_gen.enqueue(_declare_event)
+            # Trigger TaskGenerator synchronously (design.md §3.1 dashed
+            # arrow).  In text mode _task_gen is None → silently discard.
+            if self._task_gen is not None:
+                self._task_gen.enqueue(Event(
+                    type=EventType.DECLARE,
+                    line=self._line_count,
+                    payload={"kind": kind, "name": name, "desc": desc},
+                ))
             return []
 
         # ── Unrecognized line ─────────────────────────────────────
@@ -542,6 +547,20 @@ class StreamParser:
     def in_checkpoint(self) -> bool:
         """Whether parser is currently inside a ``<checkpoint>`` block."""
         return self._in_checkpoint
+
+    @property
+    def task_gen(self) -> object | None:
+        """TaskGenerator reference (Phase 2).  ``None`` in text mode.
+
+        Set by the pipeline coordinator in §7.6.  When set, DECLARE
+        events are synchronously dispatched to ``task_gen.enqueue()``
+        per design.md §3.1 (dashed trigger arrow).
+        """
+        return self._task_gen
+
+    @task_gen.setter
+    def task_gen(self, tg: object | None) -> None:
+        self._task_gen = tg
 
     @property
     def format_errors(self) -> list[str]:

@@ -41,6 +41,7 @@ class StateManager:
         # ── Per-round mutable state ────────────────────────────────
         self._current_branch: str = "main"
         self._choice_dict: dict[str, int] = {}
+        self._current_scene: str | None = None  # Phase 2 (§5.2, §7.5)
 
         # ── Accumulators (business data, moved from old parser) ────
         self._segments: list[Segment] = []
@@ -147,6 +148,8 @@ class StateManager:
                     self._bridge_text_items.append(
                         (event.payload["text"], branch)
                     )
+            else:
+                self._current_scene = event.payload.get("val")
             yield event
             return
 
@@ -245,9 +248,9 @@ class StateManager:
             return
 
         # ── Default: pass through unknown event types ──────────────
-        # Future Phase 2 types (SCENE, DECLARE) or program errors
-        # (PARSE_ERROR) should not be silently swallowed.  Yield the
-        # event so EventDispatcher can surface it.
+        # DECLARE never reaches here (Parser intercepts).  PARSE_ERROR
+        # and genuinely unknown types are yielded so EventDispatcher
+        # can surface them.
         yield event
 
     # ── Choice resolution ──────────────────────────────────────────
@@ -576,6 +579,11 @@ class StateManager:
     def current_branch(self) -> str:
         """Active branch name (from player's last choice or default)."""
         return self._current_branch
+
+    @property
+    def current_scene(self) -> str | None:
+        """Current scene name from last SCENE event (Phase 2)."""
+        return self._current_scene
 
     @property
     def rejected_changes(self) -> list[str]:

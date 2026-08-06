@@ -865,12 +865,15 @@ class TestTextModeUnaffected:
         assert result["text"] == "A door creaks."
 
     def test_text_mode_scene_output(self):
-        """SCENE event → scene UI dict."""
+        """SCENE event → scene UI dict with position and branch."""
         d = EventDispatcher()
-        event = Event(EventType.SCENE, 1, {"val": "tavern"})
+        event = Event(EventType.SCENE, 1,
+                      {"val": "tavern", "position": "pre", "branch": "hero"})
         result = d.consume_event(event)
         assert result["type"] == "scene"
         assert result["val"] == "tavern"
+        assert result["position"] == "pre"
+        assert result["branch"] == "hero"
 
     def test_text_mode_state_output(self):
         """SET event → state UI dict unchanged."""
