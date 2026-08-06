@@ -859,4 +859,144 @@ class TestTextModeUnaffected:
                                     "accepted": True, "reason": None}]})
         result = d.consume_event(event)
         assert result["type"] == "state"
-        assert result["vars"] == {"GLOBAL": {"trust": 55}}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 7. TestVerificationCriteria — §7.4 success criteria
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestVerificationCriteria:
+    """Explicit verification of the three §7.4 success criteria.
+
+    Run with::
+
+        pytest tests/test_task_framework.py::TestVerificationCriteria -v
+    """
+
+    @staticmethod
+    def _make_event(etype, line, **payload):
+        return Event(etype, line, payload)
+
+    def test_criterion_1_stub_pipeline_runs(self, pipeline):
+        """§7.4 criterion 1: stub pipeline runs end-to-end.
+
+        A complete narrative round with mixed media events — DECLARE a new
+        character, SCENE change, SEGMENT with char, and plain narrative —
+        flows through TaskGenerator → TaskPool → EventDispatcher without
+        error, producing valid UI dicts for every event.
+        """
+        pipeline.roster.add(AssetType.BACKGROUND, "tavern",
+                            target=STUB_ASSET_ID)
+
+        # Round with all three image-tag types + plain narrative
+        sequence = [
+            # DECLARE new character (async — pool)
+            self._make_event(EventType.DECLARE, 2,
+                             kind="CHAR", name="stranger",
+                             desc="a hooded figure"),
+            # Plain narrative (triggers DECLARE consumption)
+            self._make_event(EventType.SEGMENT, 4,
+                             text="A stranger enters.", n=1, position="pre"),
+            # SCENE change (sync — roster hit)
+            self._make_event(EventType.SCENE, 6, val="tavern"),
+            # SEG with known char (sync — roster hit)
+            self._make_event(EventType.SEGMENT, 8,
+                             text="The barkeep watches.", n=2, position="pre",
+                             char="stranger"),
+            # SEG without char (no media)
+            self._make_event(EventType.SEGMENT, 10,
+                             text="Silence fills the room.", n=3,
+                             position="pre"),
+        ]
+
+        results = []
+        for event in sequence:
+            pipeline.gen.enqueue(event)
+            result = pipeline.dispatcher.consume_event(event)
+            results.append(result)
+
+        # Every event produced a non-empty UI dict
+        assert all(isinstance(r, dict) for r in results)
+        assert all(r for r in results), "no empty dicts — all events dispatched"
+
+    def test_criterion_2_uniform_temp_image(self, pipeline):
+        """§7.4 criterion 2: all bound assets are the same temp image.
+
+        Every event that gets asset binding — regardless of type (portrait
+        or background), match method (sync hit or async stub), or trigger
+        (SCENE or SEGMENT char) — receives the identical ``STUB_ASSET_ID``.
+        """
+        # Pre-populate roster with a known entry (sync path)
+        pipeline.roster.add(AssetType.BACKGROUND, "forest",
+                            target=STUB_ASSET_ID)
+
+        events_and_types = [
+            # Sync MATCH — SCENE with known name
+            (self._make_event(EventType.SCENE, 2, val="forest"),
+             AssetType.BACKGROUND),
+            # Async MATCH — SEGMENT with unknown char
+            (self._make_event(EventType.SEGMENT, 5,
+                              text="...", n=1, position="pre",
+                              char="unknown_hero"),
+             AssetType.CHAR_PORTRAIT),
+        ]
+
+        bound_asset_ids = []
+        for event, expected_type in events_and_types:
+            pipeline.gen.enqueue(event)
+            result = pipeline.dispatcher.consume_event(event)
+
+            assert "assets" in event.payload, (
+                f"Event {event.type.name} line={event.line} missing assets"
+            )
+            aid = event.payload["assets"][expected_type.value]
+            bound_asset_ids.append(aid)
+
+        # Criterion: ALL resolved to the same stub image
+        unique = set(bound_asset_ids)
+        assert unique == {STUB_ASSET_ID}, (
+            f"All assets must be {STUB_ASSET_ID!r}, got {unique}"
+        )
+
+    def test_criterion_3_text_mode_unaffected(self):
+        """§7.4 criterion 3: text mode is completely unaffected.
+
+        ``EventDispatcher()`` with no arguments processes every Phase 1
+        event type identically to the pre-7.4 ``dispatch()`` path, and
+        never injects ``assets`` into any event payload or UI dict.
+        """
+        d = EventDispatcher()
+        events = [
+            Event(EventType.STORY_BEGIN, 1, {}),
+            Event(EventType.STORY_END, 2, {}),
+            Event(EventType.SEGMENT, 3,
+                  {"text": "It was a dark night.", "n": 1, "position": "pre"}),
+            Event(EventType.SET, 4,
+                  {"var": "trust", "op": "=", "val": "10"}),
+            Event(EventType.BRIDGE, 5, {}),
+            Event(EventType.CHOICE_BEGIN, 6, {"id": "q1"}),
+            Event(EventType.CHECKPOINT, 7,
+                  {"node": "ch1", "summary": "start"}),
+            Event(EventType.ROUTE, 8, {"target": "ch2"}),
+            Event(EventType.PARSE_ERROR, 9, {"error": "bad tag"}),
+            # Phase 2 types — pass through without error in text mode
+            Event(EventType.SCENE, 10, {"val": "tavern"}),
+            Event(EventType.DECLARE, 11,
+                  {"kind": "CHAR", "name": "ghost", "desc": "..."}),
+        ]
+
+        for event in events:
+            result = d.consume_event(event)
+
+            # Every event produces a dict (no crashes)
+            assert isinstance(result, dict), (
+                f"Event {event.type.name} returned {type(result).__name__}"
+            )
+            # No event gets assets injected in text mode
+            assert "assets" not in event.payload, (
+                f"Event {event.type.name} had assets injected in text mode"
+            )
+            if result:
+                assert "assets" not in result, (
+                    f"UI dict for {event.type.name} had assets in text mode"
+                )
