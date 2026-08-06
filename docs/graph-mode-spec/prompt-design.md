@@ -30,8 +30,8 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 015| <seg>No larger than a fingernail. Worth more than a year's salary.</seg>
 016| <seg char="Mira">Mira pocketed it without looking. Whatever was on that chip, she didn't want to touch it longer than necessary.</seg>
 017| <seg>A figure stepped out from behind a maintenance door.</seg>
-018| <seg>Grey trench coat. Clean shave. Wrong place, wrong time.</seg>
-019| <declare kind="CHAR" name="greycoat">Lean man in a grey trench coat, sharp cheekbones, cold unblinking eyes. Earpiece visible under the collar.</declare>
+018| <declare kind="CHAR" name="greycoat">Lean man in a grey trench coat, sharp cheekbones, cold unblinking eyes. Earpiece visible under the collar.</declare>
+019| <seg>Grey trench coat. Clean shave. Wrong place, wrong time.</seg>
 020| <seg char="greycoat">Greycoat: Alex Voss. You have something that belongs to my employer.</seg>
 021| <seg char="Alex">Alex didn't ask how he knew the name. In this line of work, the answer was never good.</seg>
 022| <seg char="Mira.angry">Mira: Alex. Go. Now.</seg>
