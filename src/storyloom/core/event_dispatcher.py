@@ -66,20 +66,26 @@ class EventDispatcher:
             return {"type": "bridge"}
 
         if etype == EventType.SEGMENT:
-            return {
+            result = {
                 "type": "segment",
                 "text": payload.get("text", ""),
                 "n": payload.get("n", 0),
                 "position": payload.get("position", "pre"),
                 "branch": payload.get("branch"),
             }
+            if "assets" in payload:
+                result["assets"] = payload["assets"]
+            return result
 
         if etype == EventType.SET:
-            return {
+            result = {
                 "type": "state",
                 "vars": payload.get("vars", {}),
                 "changes": payload.get("changes", []),
             }
+            if "assets" in payload:
+                result["assets"] = payload["assets"]
+            return result
 
         # Events that reach dispatch but have no UI representation.
         # StateManager passes them through but UI doesn't render them.

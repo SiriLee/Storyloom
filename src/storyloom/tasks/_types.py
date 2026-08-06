@@ -71,11 +71,10 @@ class Task:
             timeout: Seconds to wait, or ``None`` (block forever).
 
         Returns:
-            ``True`` if completed, ``False`` if *timeout* expired.
+            ``True`` when the task has completed.
 
         Raises:
-            TaskTimeoutError: When *timeout* expires.  Callers that
-                cannot recover should let this propagate.
+            TaskTimeoutError: When *timeout* expires before completion.
         """
         if self._done.wait(timeout):
             return True

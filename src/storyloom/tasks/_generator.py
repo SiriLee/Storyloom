@@ -23,9 +23,10 @@ class TaskGenerator:
     Args:
         task_queue: FIFO deque — tasks are appended immediately on creation.
         roster: Per-game asset roster for program-match lookups.
-        process_factory: ``Callable[[AssetType, str], Callable[[Task], None]]`` —
+        process_factory: ``Callable[[AssetType, str, GameAssetRoster], Callable[[Task], None]]`` —
             returns a closure for ``Task.process`` when program match fails.
-            **Required** — no default (stub in §7.4, real LLM in §7.8).
+            Receives *(asset_type, local_name, roster)*.  **Required** —
+            no default (stub in §7.4, real LLM in §7.8).
         task_pool: Thread 4 executor.  If ``None``, async tasks are not
             submitted (useful for testing program match in isolation).
     """

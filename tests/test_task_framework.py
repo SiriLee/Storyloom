@@ -540,7 +540,7 @@ class TestEventDispatcherConsume:
     # ── Sync bind (task pre-completed by program match) ───────────────
 
     def test_sync_match_bind(self, pipeline):
-        """SCENE with known name → task sync-completed → assets bound."""
+        """SCENE with known name → task sync-completed → assets in payload AND UI dict."""
         pipeline.roster.add(AssetType.BACKGROUND, "forest",
                             target=STUB_ASSET_ID)
 
@@ -550,9 +550,11 @@ class TestEventDispatcherConsume:
 
         assert "assets" in event.payload
         assert event.payload["assets"] == {AssetType.BACKGROUND.value: STUB_ASSET_ID}
+        # SCENE goes through default dispatch branch — payload is shared ref
+        assert result["payload"]["assets"] == {AssetType.BACKGROUND.value: STUB_ASSET_ID}
 
     def test_sync_match_bind_seg_char(self, pipeline):
-        """SEGMENT with known char → portrait bound."""
+        """SEGMENT with known char → portrait bound in BOTH payload and UI dict."""
         pipeline.roster.add(AssetType.CHAR_PORTRAIT, "hero",
                             target=STUB_ASSET_ID)
 
@@ -563,6 +565,9 @@ class TestEventDispatcherConsume:
         result = pipeline.dispatcher.consume_event(event)
 
         assert event.payload["assets"] == {AssetType.CHAR_PORTRAIT.value: STUB_ASSET_ID}
+        # dispatch() must propagate assets to the UI dict
+        assert result["assets"] == {AssetType.CHAR_PORTRAIT.value: STUB_ASSET_ID}
+        assert result["type"] == "segment"
 
     # ── Async bind (task goes through pool) ───────────────────────────
 
