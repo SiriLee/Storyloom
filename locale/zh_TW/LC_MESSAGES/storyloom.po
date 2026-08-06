@@ -293,8 +293,11 @@ msgstr "設定檔版本不符"
 msgid "Your configuration file is from an older version and needs to be reset. Please note down your API keys and other settings before continuing."
 msgstr "您的設定檔版本過舊，需要重置。請在繼續前記下您的 API 金鑰等重要設定。"
 
-msgid "Reset and Continue"
-msgstr "重置並繼續"
+msgid "Reset and Restart"
+msgstr "重置並重啟"
+
+msgid "Configuration reset. Please restart the application."
+msgstr "設定已重置，請重新啟動程式。"
 
 msgid "Exit Application"
 msgstr "退出程式"

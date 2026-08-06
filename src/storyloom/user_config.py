@@ -31,7 +31,7 @@ class UserConfig:
         "img_api_key": "",
         "img_api_base_url": "",
         "img_api_model": "flux-2-pro",
-        "img_remove_bg": "never",
+        "img_remove_bg": "auto",
     }
 
     def __init__(self, app_dir: str | Path | None = None):

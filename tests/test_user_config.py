@@ -152,7 +152,7 @@ class TestUserConfigImageFields:
 
     def test_img_remove_bg_default(self):
         cfg = UserConfig()
-        assert cfg.img_remove_bg == "never"
+        assert cfg.img_remove_bg == "auto"
 
     # ── Setters ──
 
@@ -200,7 +200,7 @@ class TestUserConfigImageFields:
         assert cfg.img_api_key == ""
         assert cfg.img_api_base_url == ""
         assert cfg.img_api_model == "flux-2-pro"
-        assert cfg.img_remove_bg == "never"
+        assert cfg.img_remove_bg == "auto"
         # Should have been re-saved with all fields
         saved = json.loads((tmp_path / "config.json").read_text())
         assert "game_mode" in saved
@@ -235,7 +235,7 @@ class TestUserConfigImageFields:
         assert data["img_api_key"] == "sk-test"
         assert data["img_api_base_url"] == ""
         assert data["img_api_model"] == "flux-2-pro"
-        assert data["img_remove_bg"] == "never"
+        assert data["img_remove_bg"] == "auto"
         # Version matches current schema
         assert data["version"] == 2
 

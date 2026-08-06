@@ -8,5 +8,5 @@
   "img_api_key": "",
   "img_api_base_url": "https://api.apiyi.com/v1",
   "img_api_model": "flux-2-pro",
-  "img_remove_bg": "never"
+  "img_remove_bg": "auto"
 }

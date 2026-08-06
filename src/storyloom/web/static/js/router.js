@@ -303,7 +303,7 @@
                             ${esc(_("Exit Application"))}
                         </button>
                         <button class="menu-btn accent" id="btn-migrate-confirm">
-                            ${esc(_("Reset and Continue"))}
+                            ${esc(_("Reset and Restart"))}
                         </button>
                     </div>
                 </div>
@@ -314,9 +314,19 @@
             try {
                 await API.post("/api/config/migrate");
             } catch (_) { /* server may already be shutting down */ }
-            GameState.needsMigration = null;
-            // Reload: initConfig will now find version match
-            Router.dispatch();
+            // Config has been reset — show goodbye and exit.
+            app.innerHTML = `
+                <div class="menu-view">
+                    <h1 class="menu-title">${esc(_("Storyloom"))}</h1>
+                    <p style="font-size:1.3rem; color:var(--text-accent); margin-top:2rem">
+                        ${esc(_("Configuration reset. Please restart the application."))}
+                    </p>
+                    <p class="text-muted" style="margin-top:0.5rem">
+                        ${esc(_("You may close this tab."))}
+                    </p>
+                </div>
+            `;
+            try { await API.post("/api/exit"); } catch (_) { /* expected */ }
         });
 
         document.getElementById("btn-migrate-exit").addEventListener("click", async () => {
