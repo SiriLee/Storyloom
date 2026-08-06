@@ -6,6 +6,135 @@
 
 ---
 
+## 2026-08-06（周四）
+
+> **概述**：Phase 2 引擎侧核心实现日——§7.4 Task 框架 stub + §7.5 StreamParser 图模式扩展 + graph-mode PromptBuilder 三模块落地。同步完成 prompt-design 基线文档、两轮 test hardening、§7.5 E2E pipeline 测试。共 23 commits，27 files，+3216/-107 lines，测试从 720 增至 744。
+
+### §7.4 Task 框架 Stub——TaskPool + TaskGenerator + consume_event
+
+**背景**：`graph-mode-spec/design.md` §3-4 定义了 Event→Task 调度架构——StreamParser 产出 Event，EventDispatcher 通过 `consume_event()` 将其对齐到素材槽位并触发异步任务。§7.4 要求先以 stub 实现落地框架（`time.sleep` 模拟处理，所有素材映射到同一临时图片），为 §7.5（真实 parser 标签）和 §7.6（真实图像生成）提供可测试的骨架。
+
+**决策**（commits `3aee07d` → `de7ad00` → `8565aa2` → `da9d8fc` → `c68d20f` → `558e3f5`）：
+
+1. **数据类型**（`tasks/_types.py`，94 行）：
+   - `TaskType` 枚举：`GENERATE` / `MATCH`——两种素材获取路径（生成新素材 vs 匹配已有素材）
+   - `Task` dataclass：11 字段（task_type, asset_type, local_name, local_description, target, error, _done, _event, _lock, _condition, _pool），`wait(timeout)` 阻塞等待完成（`threading.Condition`），`complete()` 单写者线程安全（D50）——只有创建者线程调用
+   - `TaskTimeoutError`：`wait()` 超时时抛出（永不返回 False——修复了初始 docstring 矛盾，commit `8565aa2`）
+   - `TaskQueue` = `queue.Queue[Task]`——线程安全队列，单消费者语义
+
+2. **TaskGenerator**（`tasks/_generator.py`，126 行）：
+   - `consume_event(event, line_number, outline, task_gen, roster)` → `list[Task]`——核心调度算法（§4.3）
+   - 算法：行号对齐（`_current_line_number` 单调递增，确保素材与叙事位置对应）→ asset 绑定（`_story_assets` dict 跟踪 `asset_type:local_name:asset_id` 映射）→ `_enqueue_generate()` / `_enqueue_match()`
+   - `_DECLARE_KIND_MAP`：CHAR → CHAR_PORTRAIT, SCENE → BACKGROUND——可扩展 dict 替代 if/else（commit `da9d8fc`）
+   - 空 `local_name` 防护：GENERATE 和 MATCH 路径均将空字符串视为 no-op（commit `c68d20f`）——防止无效占位符条目
+   - `_task_gen_ref`：StreamParser 注入 TaskGenerator 引用，DECLARE 事件在 parse 时同步触发 `enqueue()`（commit `09933eb`）
+   - 单线程队列访问：`consume_event()` 假设由主线程独占调用（commit `da9d8fc` 文档化）
+
+3. **TaskPool**（`tasks/_pool.py`，72 行）：
+   - `ThreadPoolExecutor` 包装——`submit(task, process_fn)` → `Future`，回调链自动调用 `task.complete()`
+   - `TASK_POOL_MAX_WORKERS` 配置常量（`config.py`）——默认 `min(4, os.cpu_count() or 2)`
+   - `shutdown(wait)` 委托给 executor——优雅关闭，等待进行中任务完成
+   - Stub `process_fn`：`time.sleep(0.01)` + 返回固定 `stub_asset` 临时图片——§7.6 替换为真实 API 调用
+
+4. **EventDispatcher consume_event 集成**（`event_dispatcher.py`）：
+   - `dispatch()` 改为 `consume_event()`——文本模式 Event 直接转 UI dict（零行为变化），图像 Event（SCENE、DECLARE）委托给 TaskGenerator
+   - `assets` key 传播：SEGMENT 和 SET UI dict 中注入 `assets` 字段（commit `8565aa2`）——消费端可据此显示生成的素材
+   - SCENE handler：`{"type": "scene", ...}` + position/branch 字段（commit `09933eb`）——与 SEGMENT 同级叙事事件
+
+5. **测试**（`test_task_framework.py`，1031 行，+ `test_graph_mode_pipeline.py`，420 行）：
+   - Task 生命周期：create → submit → wait → complete（含超时和异常路径）
+   - Program match：GENERATE（未知 local_name 触发生成）、MATCH（已知 local_name 匹配已有素材）、DECLARE 各 kind
+   - §4.3 算法：行号对齐、asset 绑定、重复 DECLARE 幂等、orphan task 丢弃
+   - E2E pipeline：完整 round 模拟——所有图像标签 → stub 处理 → UI dict 输出（`test_graph_mode_pipeline.py`）
+   - 验证标准（commit `558e3f5`）：三条成功标准直接映射到 `TestVerificationCriteria`——stub pipeline 运行、统一临时图片、文本模式零影响（11 种 EventType）
+
+**依据**：
+- commits: `3aee07d`（实现）、`de7ad00`（测试硬化 round 1）、`8565aa2`（assets 传播 + docstring 修复）、`da9d8fc`（round 2 audit 修复）、`c68d20f`（空名防护 + §7.6 注释）、`558e3f5`（验证标准测试）
+- `docs/graph-mode-spec/design.md`：§3（Event→Task 调度）、§4（Task 数据类型）、§7.4（Stub 实现要求）
+- 新建文件：`src/storyloom/tasks/__init__.py`、`_types.py`、`_generator.py`、`_pool.py`；`tests/test_task_framework.py`、`tests/test_graph_mode_pipeline.py`
+
+### §7.5 StreamParser 图模式扩展——新标签 + 分支过滤全覆盖
+
+**背景**：`graph-mode-spec/design.md` §5 定义了图模式新增的 XML 标签（`<seg char="...">`、`<set var="SCENE">`、`<declare kind="CHAR/SCENE">`）。同时 `block-spec.md` 要求 post-bridge 禁止标签全面抑制（此前仅记录不丢弃），分支过滤需覆盖所有叙事级事件类型。§7.5 在 §7.4 Task stub 就位后实施——parser 产出的 DECLARE Event 同步触发 TaskGenerator。
+
+**决策**（commits `707fed9` → `1bbcd18` → `09933eb` → `73db3c9` → `8b68b67`）：
+
+1. **Parser 扩展**（`stream_parser.py`，+154/-104 行）：
+   - `<seg char="...">`：可选属性，绑定角色立绘——存入 Segment.char 字段，传播到 UI dict
+   - `<set var="SCENE">` → SCENE Event 拦截：SET 标签当 var="SCENE" 时产生 SCENE 事件而非 SET——`op` 属性被忽略，始终视为赋值（commit `73db3c9`）
+   - `<declare kind="CHAR/SCENE">`：kind 校验（未知 kind → FORMAT_ERROR），大小写不敏感（commit `1bbcd18` 强化测试）
+   - 分支注入：SET / CHOICE_BEGIN / OPT / CHOICE_END 的 payload 中注入 `branch` 字段（此前缺失——导致分支过滤对这些事件类型无效）
+   - Post-bridge 禁止标签：从"仅记录不丢弃"改为"完全丢弃"——符合 `block-spec.md` 硬约束
+   - 清理：移除废弃的 `<seg n="N">` 属性解析、`Segment.n` 字段、`_seg_count` 自动编号——均已迁移到 `NNN|` line prefix
+
+2. **StateManager 分支过滤扩展**（`state_manager.py`，+51/-16 行）：
+   - SEGMENT + SCENE 合并分支过滤——同级叙事事件，统一处理
+   - SET / CHOICE_BEGIN / OPT / CHOICE_END 新增分支过滤——此前这些事件类型不受 `current_branch` 约束
+   - ROUTE target 验证：检查目标节点是否存在于 outline 中（commit `707fed9`）
+   - `current_scene` 追踪：StateManager 维护当前场景状态（commit `09933eb`）——Phase 2 后续使用
+
+3. **EventDispatcher SCENE 处理**（`event_dispatcher.py`）：
+   - SCENE 从通用 default handler 提升为专用 handler——`{"type": "scene", ...}` + position/branch 字段（与 SEGMENT 同级）
+   - 移除 SEGMENT UI dict 中已死的 `n` 字段
+
+4. **测试硬化**（`test_stream_parser.py` +249 行，`test_state_manager.py` +107 行，`test_game_loop.py` +42 行）：
+   - 两轮 code review 修复（commit `1bbcd18` P1+P2 覆盖缺口，commit `09933eb` P2×6）
+   - SCENE op='=' 显式接受、bare SCENE/CHOICE_BEGIN/OPT/CHOICE_END branch=None
+   - DECLARE 大小写不敏感验证、SET bare-filter 实际应用验证
+   - §7.5 E2E pipeline 测试（commit `8b68b67`）：24 tests——`TestGraphModeE2E` 完整 round 模拟，修复 seg char UI dict 传播 + 缺失 `</seg>` 闭合标签
+   - 712 tests passed，零回归
+
+**依据**：
+- commits: `707fed9`（实现）、`1bbcd18`（测试硬化）、`09933eb`（review 修复）、`73db3c9`（SCENE op 忽略）、`8b68b67`（E2E pipeline 测试）
+- `docs/graph-mode-spec/design.md`：§5（XML 标签扩展）
+- `docs/spec/block-spec.md`：post-bridge 禁止标签约束
+- `docs/spec/data-model.md`：分支过滤规则
+
+### Graph-Mode Prompt——基线文档 + PromptBuilder 实现
+
+**背景**：图模式需要独立的 prompt 模板——与文本模式共享核心结构（ROUND1 + ROUND_TEMPLATE）但包含素材声明语法（`<declare>`）、场景行（`{scene_line}`）、角色-立绘绑定等图模式特有元素。`docs/graph-mode-spec/prompt-design.md` 作为权威 prompt 规范，`PromptBuilder` 的 graph 方法将其编译为实际发送给 LLM 的字符串。
+
+**决策**（commits `a023559` → `b3b0b4e` → `3396a92`）：
+
+1. **Prompt 规范文档**（`docs/graph-mode-spec/prompt-design.md`，316 行）：
+   - 从文本模式 `docs/spec/prompt-design.md` 复制基线（commit `a023559`）
+   - 用户精修 Requirements 章节（commit `abdadb1`）
+   - 替换示例为"The Drop"和"The Last Archive"（commit `f3f41ca`）——更贴合图模式叙事风格
+   - 示例 1 post-bridge 添加角色属性：Alex×5、greycoat×1（commit `ccc994b`）
+   - 表达式变体：Mira.angry、Alex.sad、Yara.angry、Kai.smile（commit `c6d232a`）
+   - `<declare>` 标签位置调整（commit `69441f9`）
+   - `{scene_line}` 占位符加入 ROUND_TEMPLATE（commit `0dd9674`）
+   - 示例 1 拆分过长 seg——强制 1-2 句限制（commit `7397945`）
+
+2. **PromptBuilder 实现**（`prompt_builder.py`，+451 行）：
+   - `GRAPH_ROUND1_PREFIX`：首轮图模式前缀——包含素材声明语法说明、场景描述要求
+   - `GRAPH_ROUND_TEMPLATE`：后续轮模板——`{scene_line}` + `{outline_block}` + `{choice_block}`
+   - `build_round1_graph(config, story_config, outline, scene_line, char_roster)` → 完整首轮 prompt
+   - `build_round_n_graph(config, story_config, context, scene_line, outline_block, choice_block)` → 完整续轮 prompt
+   - 行顺序与 `prompt-design.md` 严格对齐（commit `3396a92` 修复两处顺序偏差）
+
+**依据**：
+- commits: `a023559`（基线文档）、`abdadb1`（Requirements 精修）、`f3f41ca`（示例替换）、`b3b0b4e`（PromptBuilder 实现）、`3396a92`（行顺序对齐）
+- `docs/graph-mode-spec/prompt-design.md`：Graph prompt 权威规范
+- `docs/spec/prompt-design.md`：Text prompt 模板参考
+
+### 配置迁移修复——重启要求 + 背景去除默认值
+
+**背景**：上一日（08-05）实现了配置版本迁移（v1→v2）和 onnxruntime 背景去除。两个遗留问题：① 配置重置后面临"新配置 + 旧 session 状态"不一致窗口——UI 应提示重启而非继续；② 模型现已内置（随 PyInstaller 打包），背景去除默认值无需保持 NEVER——可改为 AUTO。
+
+**决策**（commit `180c234`）：
+- 重命名按钮：Reset and Continue → Reset and Restart
+- 新增 i18n key：`Configuration reset. Please restart the application.`
+- 默认值变更：`img_remove_bg` NEVER → AUTO（模型始终可用，不再需要按需下载）
+- `config.example.json` + 全部测试断言同步更新
+
+**依据**：
+- commit: `180c234`
+- 上一日 memory：`2026-08-05-7.3-image-api.md`（背景去除实现决策）
+- 8 files changed，+34/-16 lines
+
+---
+
 ## 2026-08-05（周三）
 
 > **概述**：§7.2 素材数据库 + §7.3 图像 API 双模块落地——从 spec 到完整实现 + 测试 + code review 四轮硬化。同步完成配置版本迁移（v1→v2）、背景去除（onnxruntime 直推替代 rembg/pip）、Web 设置页扩展。共 28 commits，+5454/-61 lines，39 files。
