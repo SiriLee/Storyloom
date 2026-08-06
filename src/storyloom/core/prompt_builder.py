@@ -327,7 +327,7 @@ GRAPH_ROUND1_PREFIX = """You are the director for a real-time visual novel game.
 025| <set var="BRANCH" val="mira_helps" if="Mira.trust>=50"/>
 026| <set var="BRANCH" val="alone" if="Mira.trust<50"/>
 027| <branch name="mira_helps">
-028| <seg char="Alex">A text buzzed on Alex's phone.
+028| <seg char="Alex">A text buzzed on Alex's phone.</seg>
 029| <seg char="Mira">Mira: "Corporate security. I stalled him — you have twenty minutes."</seg>
 030| <seg>Twenty minutes was enough. It had to be.</seg>
 031| </branch>

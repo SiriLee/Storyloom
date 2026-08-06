@@ -72,6 +72,8 @@ class EventDispatcher:
                 "position": payload.get("position", "pre"),
                 "branch": payload.get("branch"),
             }
+            if "char" in payload:
+                result["char"] = payload["char"]
             if "assets" in payload:
                 result["assets"] = payload["assets"]
             return result
