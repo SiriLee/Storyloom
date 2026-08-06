@@ -34,7 +34,7 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 019| <declare kind="CHAR" name="greycoat">Lean man in a grey trench coat, sharp cheekbones, cold unblinking eyes. Earpiece visible under the collar.</declare>
 020| <seg char="greycoat">Greycoat: Alex Voss. You have something that belongs to my employer.</seg>
 021| <seg char="Alex">Alex didn't ask how he knew the name. In this line of work, the answer was never good.</seg>
-022| <seg char="Mira">Mira: Alex. Go. Now.</seg>
+022| <seg char="Mira.angry">Mira: Alex. Go. Now.</seg>
 023| <seg char="greycoat">Greycoat: I wouldn't.</seg>
 024| <set var="SCENE" val="grand_hotel_lobby"/>
 025| <set var="BRANCH" val="mira_helps" if="Mira.trust>=50"/>
@@ -57,7 +57,7 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 042| <seg>Guests in evening wear glanced up from their cocktails, then looked away. A man running through a hotel lobby wasn't their problem.</seg>
 043| <seg char="Alex">The chip was still in the jacket pocket. The deal was set for midnight.</seg>
 044| <seg>A piano player ran through a tired jazz standard. Nobody in this room was running from anything.</seg>
-045| <seg char="Alex">Alex envied them for exactly three seconds.</seg>
+045| <seg char="Alex.sad">Alex envied them for exactly three seconds.</seg>
 046| <seg>Then the revolving door moved, and the grey coat stepped through.</seg>
 047| <seg>The piano didn't stop. Nobody looked up.</seg>
 048| <seg char="greycoat">The grey coat's eyes swept the room once, then locked onto the back of Alex's head.</seg>
@@ -103,9 +103,9 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 033| <seg>She'd agreed to work with a man she couldn't trust. But some truths were worth the risk.</seg>
 034| </branch>
 035| <branch name="expose">
-036| <seg char="Yara">Yara shook her head. Whatever Kai was hiding, she wouldn't become complicit.</seg>
+036| <seg char="Yara.angry">Yara shook her head. Whatever Kai was hiding, she wouldn't become complicit.</seg>
 037| <seg char="Kai">Kai's expression hardened. The fear vanished, replaced by something colder.</seg>
-038| <seg char="Kai">Kai: I was hoping you'd say that. It makes what comes next so much simpler.</seg>
+038| <seg char="Kai.smile">Kai: I was hoping you'd say that. It makes what comes next so much simpler.</seg>
 039| <seg>He turned and walked back into the stacks. The lights in Yara's sector flickered once, then went out.</seg>
 040| <seg>The Archive had always been her sanctuary. Tonight it felt like a tomb.</seg>
 041| <seg>Yara stood alone in the dark, the hum of the servers her only company. Somewhere above, a door sealed with a heavy clang.</seg>
