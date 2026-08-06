@@ -52,7 +52,7 @@ class TaskGenerator:
         etype = event.type
         if etype == EventType.SCENE:
             return self._enqueue_match(event, AssetType.BACKGROUND)
-        elif etype == EventType.SEGMENT and "char" in event.payload:
+        elif etype == EventType.SEGMENT and event.payload.get("char"):
             return self._enqueue_match(event, AssetType.CHAR_PORTRAIT)
         elif etype == EventType.DECLARE:
             return self._enqueue_generate(event)

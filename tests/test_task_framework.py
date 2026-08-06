@@ -190,11 +190,20 @@ class TestTask:
         result = t.wait(timeout=2.0)
         assert result is True
         assert t.completed is True
+        assert completed_flag.is_set()  # side thread completed its work
 
     def test_error_defaults_to_none(self):
         """error is None by default."""
         t = Task(TaskType.MATCH, 1, AssetType.CHAR_PORTRAIT)
         assert t.error is None
+
+    def test_wait_multiple_calls_after_complete(self):
+        """wait() called multiple times after complete → all return True."""
+        t = Task(TaskType.MATCH, 1, AssetType.CHAR_PORTRAIT)
+        t.complete()
+        assert t.wait(timeout=0.01) is True
+        assert t.wait(timeout=0.01) is True
+        assert t.wait(timeout=0.01) is True
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -396,7 +405,7 @@ class TestTaskGenerator:
         pipeline.roster.add(AssetType.CHAR_PORTRAIT, "stranger",
                             target=None)  # placeholder
 
-        event = self._make_event(EventType.DECLARE, 0,
+        event = self._make_event(EventType.DECLARE, 2,
                                  kind="CHAR", name="stranger",
                                  desc="a hooded figure")
         task = pipeline.gen.enqueue(event)
@@ -410,7 +419,7 @@ class TestTaskGenerator:
 
     def test_generate_new_name_creates_placeholder(self, pipeline):
         """DECLARE of new name → placeholder created BEFORE pool submit."""
-        event = self._make_event(EventType.DECLARE, 0,
+        event = self._make_event(EventType.DECLARE, 2,
                                  kind="CHAR", name="ghost",
                                  desc="a spectral presence")
         task = pipeline.gen.enqueue(event)
@@ -424,7 +433,7 @@ class TestTaskGenerator:
 
     def test_generate_duplicate_prevented_by_placeholder(self, pipeline):
         """Second DECLARE of same name → sync complete (placeholder blocks)."""
-        event = self._make_event(EventType.DECLARE, 0,
+        event = self._make_event(EventType.DECLARE, 2,
                                  kind="CHAR", name="wraith",
                                  desc="first declare")
 
@@ -437,7 +446,7 @@ class TestTaskGenerator:
 
     def test_generate_scene_kind_becomes_background(self, pipeline):
         """DECLARE kind='SCENE' → asset_type = BACKGROUND."""
-        event = self._make_event(EventType.DECLARE, 0,
+        event = self._make_event(EventType.DECLARE, 2,
                                  kind="SCENE", name="crypt",
                                  desc="an ancient crypt")
         task = pipeline.gen.enqueue(event)
@@ -472,6 +481,24 @@ class TestTaskGenerator:
     def test_set_event_returns_none(self, pipeline):
         event = self._make_event(EventType.SET, 2,
                                  var="trust", op="=", val="10")
+        task = pipeline.gen.enqueue(event)
+        assert task is None
+
+    # ── Edge cases ─────────────────────────────────────────────────────
+
+    def test_declare_unknown_kind_defaults_to_background(self, pipeline):
+        """DECLARE kind='BGM' (unknown) → asset_type = BACKGROUND."""
+        event = self._make_event(EventType.DECLARE, 2,
+                                 kind="BGM", name="theme",
+                                 desc="an epic theme")
+        task = pipeline.gen.enqueue(event)
+        assert task.asset_type == AssetType.BACKGROUND
+
+    def test_seg_char_empty_does_not_trigger_match(self, pipeline):
+        """SEGMENT with char='' → no MATCH (per design: empty means no portrait)."""
+        event = self._make_event(EventType.SEGMENT, 5,
+                                 text="narrator", n=1, position="pre",
+                                 char="")
         task = pipeline.gen.enqueue(event)
         assert task is None
 
@@ -551,20 +578,26 @@ class TestEventDispatcherConsume:
 
     def test_declare_discard_before_first_event(self, pipeline):
         """DECLARE task (line=0) → waited + discarded before first event."""
-        # Enqueue a DECLARE task
-        dec_event = self._make_event(EventType.DECLARE, 0,
+        # Enqueue a DECLARE task (Event line=2 — real parser line number)
+        dec_event = self._make_event(EventType.DECLARE, 2,
                                      kind="CHAR", name="ghost",
                                      desc="a ghost")
-        pipeline.gen.enqueue(dec_event)
+        dec_task = pipeline.gen.enqueue(dec_event)
+        assert dec_task.line == 0  # Task.line=0, not Event.line
 
-        # First real event (line=1) → DECLARE task line=0 < line=1 →
+        # First real event (line=3) → DECLARE task line=0 < line=3 →
         # popped, waited, discarded
-        event = self._make_event(EventType.SEGMENT, 1,
+        event = self._make_event(EventType.SEGMENT, 3,
                                  text="hello", n=1, position="pre")
         result = pipeline.dispatcher.consume_event(event)
 
         # DECLARE was discarded — no assets on this event
         assert "assets" not in event.payload
+        # DECLARE task completed, placeholder filled by stub
+        assert dec_task.completed is True
+        item = pipeline.roster.lookup(AssetType.CHAR_PORTRAIT, "ghost")
+        assert item is not None
+        assert item.target == STUB_ASSET_ID
 
     # ── Orphan task discard ───────────────────────────────────────────
 
@@ -580,8 +613,9 @@ class TestEventDispatcherConsume:
                                  text="later", n=1, position="pre")
         result = pipeline.dispatcher.consume_event(event)
 
-        # Orphan discarded — no assets
+        # Orphan discarded — no assets, queue drained
         assert "assets" not in event.payload
+        assert len(pipeline.queue) == 0
 
     # ── Pass-through (no task) ────────────────────────────────────────
 
@@ -689,21 +723,21 @@ class TestPipelineE2E:
 
     def test_declare_then_scene_same_round(self, pipeline):
         """DECLARE a new scene → then SCENE uses it → both resolved."""
-        # DECLARE creates placeholder + async process
-        dec_event = self._make_event(EventType.DECLARE, 0,
+        # DECLARE creates placeholder + async process (Event line=2)
+        dec_event = self._make_event(EventType.DECLARE, 2,
                                      kind="SCENE", name="crypt",
                                      desc="an ancient crypt")
         pipeline.gen.enqueue(dec_event)
 
-        # Some narrative text passes through (DECLARE task consumed here)
-        seg1 = self._make_event(EventType.SEGMENT, 1,
+        # Narrative text (line=4) triggers DECLARE task consumption
+        seg1 = self._make_event(EventType.SEGMENT, 4,
                                 text="You descend...", n=1, position="pre")
         r1 = pipeline.dispatcher.consume_event(seg1)
         assert r1["type"] == "segment"
         assert "assets" not in seg1.payload
 
-        # Later: SCENE uses the declared location
-        scene_event = self._make_event(EventType.SCENE, 3, val="crypt")
+        # Later: SCENE uses the declared location (line=6)
+        scene_event = self._make_event(EventType.SCENE, 6, val="crypt")
         pipeline.gen.enqueue(scene_event)
         r2 = pipeline.dispatcher.consume_event(scene_event)
 
@@ -772,6 +806,10 @@ class TestTextModeUnaffected:
                   {"name": "hero", "position": "pre"}),
             Event(EventType.CHECKPOINT_END, 8, {}),
             Event(EventType.PARSE_ERROR, 9, {"error": "bad"}),
+            # Phase 2 event types — must pass through in text mode
+            Event(EventType.SCENE, 10, {"val": "tavern"}),
+            Event(EventType.DECLARE, 11,
+                  {"kind": "CHAR", "name": "ghost", "desc": "a ghost"}),
         ]
         for event in events:
             result = d.consume_event(event)
