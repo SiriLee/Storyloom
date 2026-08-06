@@ -14,100 +14,94 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 ## Example 1
 
 001| <story>
-002| <seg>The stranger's eyes didn't waver. Whatever he was selling, he wasn't afraid of a man with questions</seg>
-003| <seg>Kael: You know the Guild's reputation. Why would I take their offer?</seg>
-004| <seg>Stranger: Because the alternative is worse. They didn't send me to negotiate — they sent me to deliver</seg>
-005| <seg>Greta set a mug down harder than necessary, water sloshing the counter</seg>
-006| <seg>Greta: If you're here to deliver, deliver. Then leave</seg>
-007| <choice id="approach_tone">
-008|   <opt key="1">Back Greta's hostility — she knows something you don't</opt>
-009|   <opt key="2">De-escalate. Antagonizing a Guild messenger is a short career</opt>
-010| </choice>
-011| <set var="Greta.favor" op="+" val="15" if="approach_tone==1"/>
-012| <set var="Greta.favor" op="-" val="10" if="approach_tone==2"/>
-013| <seg>The stranger ignored Greta entirely, his focus locked on Kael</seg>
-014| <seg>Stranger: The watchtower road. Midnight. Come alone. If you bring anyone, the deal is void</seg>
-015| <seg>He slid a brass token across the bar — stamped with the crossed-keys seal</seg>
-016| <seg>Kael didn't touch it. A Guild token meant insurance, and the Guild didn't insure deals they planned to honor</seg>
-017| <seg>Kael: And if I don't show?</seg>
-018| <seg>Stranger: Then they send someone less polite. Probably someone you've already met</seg>
-019| <set var="BRANCH" val="greta_intervenes" if="Greta.favor>=20"/>
-020| <set var="BRANCH" val="greta_stays_back" if="Greta.favor<20"/>
-021| <branch name="greta_intervenes">
-022| <seg>Greta reached under the bar and set something heavy beside the register — wrapped in cloth, unmistakably a weapon</seg>
-023| <seg>Greta: Midnight at the watchtower. That's four hours from now</seg>
-024| <seg>She looked at Kael, not the stranger</seg>
-025| <seg>Greta: I know a back way. No roads, no patrols. You won't go alone</seg>
-026| </branch>
-027| <branch name="greta_stays_back">
-028| <seg>The stranger pocketed the token with a thin smile and stood</seg>
-029| <seg>Stranger: Smart man. You'll go far — assuming you show up</seg>
-030| <seg>Greta watched him leave, her jaw tight, but she said nothing. She'd been burned by Guild business before</seg>
-031| <seg>When the door swung shut, the silence was heavier than the conversation</seg>
+002| <seg char="Alex">The subway platform was empty at this hour. Just the way Mira liked it.</seg>
+003| <seg>Fluorescent lights flickered overhead, buzzing like trapped flies. Somewhere down the tunnel, a train horn echoed and died.</seg>
+004| <seg char="Mira">Mira: You're late.</seg>
+005| <seg char="Alex">Alex: Your intel was bad. The courier had a tail.</seg>
+006| <seg char="Mira">Mira leaned against a pillar, arms crossed. Her eyes never stopped scanning the exits.</seg>
+007| <seg char="Mira">Mira: They all have tails. Did you lose them?</seg>
+008| <choice id="trust_check">
+009|   <opt key="1">Tell her everything. She needs to know.</opt>
+010|   <opt key="2">Keep it vague. Mira talks too much.</opt>
+011| </choice>
+012| <set var="Mira.trust" op="+" val="15" if="trust_check==1"/>
+013| <set var="Mira.trust" op="-" val="10" if="trust_check==2"/>
+014| <seg>Alex handed over the data chip. No larger than a fingernail. Worth more than a year's salary.</seg>
+015| <seg char="Mira">Mira pocketed it without looking. Whatever was on that chip, she didn't want to touch it longer than necessary.</seg>
+016| <seg>A figure stepped out from behind a maintenance door. Grey trench coat. Clean shave. Wrong place, wrong time.</seg>
+017| <declare kind="CHAR" name="greycoat">Lean man in a grey trench coat, sharp cheekbones, cold unblinking eyes. Earpiece visible under the collar.</declare>
+018| <seg char="greycoat">Greycoat: Alex Voss. You have something that belongs to my employer.</seg>
+019| <seg char="Alex">Alex didn't ask how he knew the name. In this line of work, the answer was never good.</seg>
+020| <seg char="Mira">Mira: Alex. Go. Now.</seg>
+021| <seg char="greycoat">Greycoat: I wouldn't.</seg>
+022| <set var="SCENE" val="grand_hotel_lobby"/>
+023| <set var="BRANCH" val="mira_helps" if="Mira.trust>=50"/>
+024| <set var="BRANCH" val="alone" if="Mira.trust<50"/>
+025| <branch name="mira_helps">
+026| <seg char="Alex">A text buzzed on Alex's phone. Mira: "Corporate security. I stalled him — you have twenty minutes."</seg>
+027| <seg>Twenty minutes was enough. It had to be.</seg>
+028| </branch>
+029| <branch name="alone">
+030| <seg>The phone stayed dark. Mira had her own problems — or she'd decided Alex wasn't one of them.</seg>
+031| <seg char="Alex">Alex: Fine. I've done more with less.</seg>
 032| </branch>
 033| <bridge/>
-034| <seg>Kael picked up the brass token. It was warm — body heat or something worse, he couldn't tell</seg>
-035| <seg>The crossed keys caught the lamplight. Beneath them, letters so fine he had to squint: "Property of the Guild. Return upon completion."</seg>
-036| <seg>Greta: I meant what I said. Don't let pride make you stupid</seg>
-037| <seg>She pulled the cloth off the weapon — an old crossbow, well-oiled, with a stock worn smooth by years of use</seg>
-038| <seg>Greta: My father's. He ran the north road for thirty years. The Guild killed him too</seg>
-039| <seg>Kael had known Greta for five years. She'd never once mentioned a father</seg>
-040| <seg>The fire crackled. The huntsman in the corner gathered his things and left without a word</seg>
-041| <seg>Kael: Four hours. How far to the back way?</seg>
-042| <seg>Greta: Far enough that we leave now. Finish your drink</seg>
-043| <seg>The wind outside had picked up, rattling the shutters. Somewhere in the dark, a dog barked twice and went silent</seg>
-044| <seg>Kael slipped the token into his coat. The metal was still warm against his ribs</seg>
-045| </story>
+034| <seg>The hotel lobby was everything the subway wasn't. Marble floors. Chandelier light. The quiet rustle of money.</seg>
+035| <seg char="Alex">Alex pushed through the revolving door, breath still ragged from the sprint. No sign of the grey coat. Not yet.</seg>
+036| <seg>Guests in evening wear glanced up from their cocktails, then looked away. A man running through a hotel lobby wasn't their problem.</seg>
+037| <seg>The chip was still in the jacket pocket. The deal was set for midnight.</seg>
+038| <seg>A piano player ran through a tired jazz standard. Nobody in this room was running from anything. Alex envied them for exactly three seconds.</seg>
+039| <seg>Then the revolving door moved, and the grey coat stepped through.</seg>
+040| <seg>The piano didn't stop. Nobody looked up. The grey coat's eyes swept the room once, then locked onto the back of Alex's head.</seg>
+041| <seg char="Alex">Alex didn't turn around. But in the polished reflection of the elevator doors, every detail was sharp — the grey coat's hand inside his pocket, the small bulge of something cold.</seg>
+042| <seg>The elevator chimed. Doors opened. The next sixty seconds would decide whether Alex walked out of this hotel at all.</seg>
+043| </story>
 
 ## Example 2
 
 001| <story>
-002| <seg>The Vault of Echoes had been sealed for three hundred years</seg>
-003| <seg>Elena's torch lit the stone door — twelve feet high, carved with spirals that seemed to move in the flame</seg>
-004| <seg>Silan: The seal is intact. We're the first souls to stand here since the Sundering</seg>
-005| <seg>His whisper echoed back in fragments, stretched into something that didn't sound human</seg>
-006| <seg>Elena touched the stone — warm, almost alive. A faint vibration ran under her palm</seg>
-007| <seg>Elena: The inscription says 'Only the twin-borne may pass.' What does that mean?</seg>
-008| <seg>Silan: Two people of the same bloodline. That's why I needed you</seg>
-009| <choice id="examine_door">
-010|   <opt key="1">Study the carvings for a warning</opt>
-011|   <opt key="2">Check the walls for another way out</opt>
-012| </choice>
-013| <seg>No traps, no hidden text — the door was built to keep something in, not to warn anyone away</seg>
-014| <seg>She stared at him. They shared a father — a cold man who died owing debts. That was their bond</seg>
-015| <seg>Elena: You said this was research. Recover artifacts, map the interior, collect a fee</seg>
-016| <seg>Silan: Everything the Sundering destroyed is behind this door. The truth about what we were</seg>
-017| <seg>His eyes burned with greed and desperation. She'd seen that look on their father's face</seg>
-018| <seg>Elena: And if I refuse?</seg>
-019| <seg>Silan: Then you'll always wonder. Put your hand on the door, sister. Please</seg>
-020| <seg>The air felt wrong — too still, too cold. Something behind the stone was waiting</seg>
-021| <choice id="vault_choice">
-022|   <opt key="1" branch="together">Step through together — face it as equals</opt>
-023|   <opt key="2" branch="send_first">Let Silan enter first. He wanted this</opt>
-024| </choice>
-025| <set var="Silan.loyalty" op="+" val="20" if="vault_choice==1"/>
-026| <set var="Silan.loyalty" op="-" val="15" if="vault_choice==2"/>
-027| <set var="Seal" val="Broken"/>
-028| <checkpoint node="ch3_vault" summary="Elena and Silan opened the Vault of Echoes, sealed since the Sundering. Her choice to enter together or send him first shifted the balance of their fragile trust.">
-029|   <route if="vault_choice==1" target="ch4_together"/>
-030|   <route if="vault_choice==2" target="ch4_alone"/>
-031| </checkpoint>
-032| <bridge/>
-033| <branch name="together">
-034| <seg>Elena and Silan pressed their palms to the stone together. The door groaned open into darkness</seg>
-035| <seg>A voice spoke inside Elena's skull — ancient, patient, curious</seg>
-036| <seg>Voice: Twin-borne. You bring each other. This is acceptable</seg>
-037| <seg>Silan gripped her hand, trembling. The first honest thing he'd shown her</seg>
-038| <seg>A shard of obsidian floated before them, pulsing with slow light. Something inside was waking</seg>
-039| </branch>
-040| <branch name="send_first">
-041| <seg>Silan pressed his palms to the door alone. The stone swallowed him whole</seg>
-042| <seg>Silence. Then screaming — not pain, but recognition</seg>
-043| <seg>Elena found him kneeling before a floating shard. His face was wet with tears</seg>
-044| <seg>Voice: Only one offered freely. The other is now the witness — and the witness carries the heavier burden</seg>
-045| <seg>The shard's light fell on Elena. Inside the crystal, something ancient opened an eye</seg>
-046| </branch>
-047| </story>
+002| <seg char="Yara">Dr. Yara Voss had spent twelve years curating the Archive. She knew every vault, every corridor, every record.</seg>
+003| <seg>What she didn't know was how long someone had been erasing them.</seg>
+004| <seg char="Yara">Yara: The deletion logs go back eighteen months. Someone's been scrubbing Sector 7 since before the last audit.</seg>
+005| <seg>Server towers hummed around her, stretching into darkness overhead. The air was cold enough to see her breath.</seg>
+006| <seg char="Kai">Overseer Kai emerged from between two towers, hands clasped behind his back. He didn't look surprised.</seg>
+007| <seg char="Kai">Kai: You were always too thorough for your own good, Doctor.</seg>
+008| <choice id="confront_style">
+009|   <opt key="1">Demand answers. He owes you that much.</opt>
+010|   <opt key="2">Play it cool. Let him think you know less than you do.</opt>
+011| </choice>
+012| <seg>The servers hummed, indifferent to the standoff. Somewhere deeper in the stacks, a cooling fan rattled.</seg>
+013| <seg char="Yara">Yara: What was in Sector 7, Kai? What was worth erasing eighteen months of history?</seg>
+014| <seg char="Kai">Kai stepped closer. For the first time Yara saw something beneath the authority — something closer to fear.</seg>
+015| <seg char="Kai">Kai: The kind of history that doesn't belong in an archive. But you're not going to let this go, are you?</seg>
+016| <seg char="Kai">Kai: So I have a proposition.</seg>
+017| <choice id="deal_choice">
+018|   <opt key="1" branch="ally">Hear him out. He knows things you don't.</opt>
+019|   <opt key="2" branch="expose">Refuse. The truth belongs to everyone.</opt>
+020| </choice>
+021| <set var="Kai.cooperation" op="+" val="25" if="deal_choice==1"/>
+022| <set var="Kai.cooperation" op="-" val="30" if="deal_choice==2"/>
+023| <set var="Archive_Integrity" val="Compromised"/>
+024| <checkpoint node="ch2_confrontation" summary="Dr. Yara Voss confronted Overseer Kai about the systematic deletion of Sector 7 data. Her choice to collaborate or expose him will determine who controls what remains of the truth.">
+025|   <route if="deal_choice==1" target="ch3_ally"/>
+026|   <route if="deal_choice==2" target="ch3_expose"/>
+027| </checkpoint>
+028| <bridge/>
+029| <branch name="ally">
+030| <seg char="Kai">Kai nodded slowly, as if he'd expected this answer all along.</seg>
+031| <seg char="Kai">Kai: Then follow me, Doctor. What's in Sector 7 will change everything you think you know about this place.</seg>
+032| <seg char="Yara">Yara followed him deeper into the stacks. The cooling fans grew louder — or maybe that was her heartbeat.</seg>
+033| <seg>She'd agreed to work with a man she couldn't trust. But some truths were worth the risk.</seg>
+034| </branch>
+035| <branch name="expose">
+036| <seg char="Yara">Yara shook her head. Whatever Kai was hiding, she wouldn't become complicit.</seg>
+037| <seg char="Kai">Kai's expression hardened. The fear vanished, replaced by something colder.</seg>
+038| <seg char="Kai">Kai: I was hoping you'd say that. It makes what comes next so much simpler.</seg>
+039| <seg>He turned and walked back into the stacks. The lights in Yara's sector flickered once, then went out.</seg>
+040| <seg>The Archive had always been her sanctuary. Tonight it felt like a tomb.</seg>
+041| <seg>Yara stood alone in the dark, the hum of the servers her only company. Somewhere above, a door sealed with a heavy clang.</seg>
+042| </branch>
+043| </story>
 
 (These are format examples only. Your output is an entirely new story segment.)
 
@@ -182,9 +176,9 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 **Snippet**:
 ```
 <choice id="approach">
-  <opt key="1" branch="direct">Step forward and speak</opt>
-  <opt key="2">Hang back and listen</opt>
-  <opt key="3" if="Stamina >= 30" branch="run">Make a break for it</opt>
+  <opt key="1" branch="direct">Step forward and speak.</opt>
+  <opt key="2">Hang back and listen.</opt>
+  <opt key="3" if="Stamina >= 30" branch="run">Make a break for it.</opt>
 </choice>
 ```
 
