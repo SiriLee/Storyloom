@@ -32,10 +32,10 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 017| <seg>A figure stepped out from behind a maintenance door.</seg>
 018| <declare kind="CHAR" name="agent">Lean man in a grey trench coat, sharp cheekbones, cold unblinking eyes. Earpiece visible under the collar.</declare>
 019| <seg>The man didn't hurry. He didn't have to.</seg>
-020| <seg char="agent">Greycoat: Alex Voss. You have something that belongs to my employer.</seg>
+020| <seg char="agent">Agent: Alex Voss. You have something that belongs to my employer.</seg>
 021| <seg char="Alex">Alex didn't ask how he knew the name. In this line of work, the answer was never good.</seg>
 022| <seg char="Mira.angry">Mira: Alex. Go. Now.</seg>
-023| <seg char="agent">Greycoat: I wouldn't.</seg>
+023| <seg char="agent">Agent: I wouldn't.</seg>
 024| <set var="SCENE" val="grand_hotel_lobby"/>
 025| <set var="BRANCH" val="mira_helps" if="Mira.trust>=50"/>
 026| <set var="BRANCH" val="alone" if="Mira.trust<50"/>
@@ -53,15 +53,15 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 038| <seg>Marble floors. Chandelier light.</seg>
 039| <seg>The quiet rustle of money.</seg>
 040| <seg char="Alex">Alex pushed through the revolving door, breath still ragged from the sprint.</seg>
-041| <seg>No sign of the grey coat. Not yet.</seg>
+041| <seg>No sign of the agent. Not yet.</seg>
 042| <seg>Guests in evening wear glanced up from their cocktails, then looked away. A man running through a hotel lobby wasn't their problem.</seg>
 043| <seg char="Alex">The chip was still in the jacket pocket. The deal was set for midnight.</seg>
 044| <seg>A piano player ran through a tired jazz standard. Nobody in this room was running from anything.</seg>
 045| <seg char="Alex.sad">Alex envied them for exactly three seconds.</seg>
-046| <seg>Then the revolving door moved, and the grey coat stepped through.</seg>
+046| <seg>Then the revolving door moved, and the agent stepped through.</seg>
 047| <seg>The piano didn't stop. Nobody looked up.</seg>
-048| <seg char="agent">The grey coat's eyes swept the room once, then locked onto the back of Alex's head.</seg>
-049| <seg char="Alex">Alex didn't turn around. But in the polished reflection of the elevator doors, every detail was sharp — the grey coat's hand inside his pocket, the small bulge of something cold.</seg>
+048| <seg char="agent">The agent's eyes swept the room once, then locked onto the back of Alex's head.</seg>
+049| <seg char="Alex">Alex didn't turn around. But in the polished reflection of the elevator doors, every detail was sharp — the agent's hand inside his pocket, the small bulge of something cold.</seg>
 050| <seg>The elevator chimed. Doors opened.</seg>
 051| <seg char="Alex">The next sixty seconds would decide whether Alex walked out of this hotel at all.</seg>
 052| </story>
