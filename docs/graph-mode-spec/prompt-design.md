@@ -26,36 +26,43 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 011| </choice>
 012| <set var="Mira.trust" op="+" val="15" if="trust_check==1"/>
 013| <set var="Mira.trust" op="-" val="10" if="trust_check==2"/>
-014| <seg>Alex handed over the data chip. No larger than a fingernail. Worth more than a year's salary.</seg>
-015| <seg char="Mira">Mira pocketed it without looking. Whatever was on that chip, she didn't want to touch it longer than necessary.</seg>
-016| <seg>A figure stepped out from behind a maintenance door. Grey trench coat. Clean shave. Wrong place, wrong time.</seg>
-017| <declare kind="CHAR" name="greycoat">Lean man in a grey trench coat, sharp cheekbones, cold unblinking eyes. Earpiece visible under the collar.</declare>
-018| <seg char="greycoat">Greycoat: Alex Voss. You have something that belongs to my employer.</seg>
-019| <seg char="Alex">Alex didn't ask how he knew the name. In this line of work, the answer was never good.</seg>
-020| <seg char="Mira">Mira: Alex. Go. Now.</seg>
-021| <seg char="greycoat">Greycoat: I wouldn't.</seg>
-022| <set var="SCENE" val="grand_hotel_lobby"/>
-023| <set var="BRANCH" val="mira_helps" if="Mira.trust>=50"/>
-024| <set var="BRANCH" val="alone" if="Mira.trust<50"/>
-025| <branch name="mira_helps">
-026| <seg char="Alex">A text buzzed on Alex's phone. Mira: "Corporate security. I stalled him — you have twenty minutes."</seg>
-027| <seg>Twenty minutes was enough. It had to be.</seg>
-028| </branch>
-029| <branch name="alone">
-030| <seg>The phone stayed dark. Mira had her own problems — or she'd decided Alex wasn't one of them.</seg>
-031| <seg char="Alex">Alex: Fine. I've done more with less.</seg>
-032| </branch>
-033| <bridge/>
-034| <seg>The hotel lobby was everything the subway wasn't. Marble floors. Chandelier light. The quiet rustle of money.</seg>
-035| <seg char="Alex">Alex pushed through the revolving door, breath still ragged from the sprint. No sign of the grey coat. Not yet.</seg>
-036| <seg>Guests in evening wear glanced up from their cocktails, then looked away. A man running through a hotel lobby wasn't their problem.</seg>
-037| <seg>The chip was still in the jacket pocket. The deal was set for midnight.</seg>
-038| <seg>A piano player ran through a tired jazz standard. Nobody in this room was running from anything. Alex envied them for exactly three seconds.</seg>
-039| <seg>Then the revolving door moved, and the grey coat stepped through.</seg>
-040| <seg>The piano didn't stop. Nobody looked up. The grey coat's eyes swept the room once, then locked onto the back of Alex's head.</seg>
-041| <seg char="Alex">Alex didn't turn around. But in the polished reflection of the elevator doors, every detail was sharp — the grey coat's hand inside his pocket, the small bulge of something cold.</seg>
-042| <seg>The elevator chimed. Doors opened. The next sixty seconds would decide whether Alex walked out of this hotel at all.</seg>
-043| </story>
+014| <seg>Alex handed over the data chip.</seg>
+015| <seg>No larger than a fingernail. Worth more than a year's salary.</seg>
+016| <seg char="Mira">Mira pocketed it without looking. Whatever was on that chip, she didn't want to touch it longer than necessary.</seg>
+017| <seg>A figure stepped out from behind a maintenance door.</seg>
+018| <seg>Grey trench coat. Clean shave. Wrong place, wrong time.</seg>
+019| <declare kind="CHAR" name="greycoat">Lean man in a grey trench coat, sharp cheekbones, cold unblinking eyes. Earpiece visible under the collar.</declare>
+020| <seg char="greycoat">Greycoat: Alex Voss. You have something that belongs to my employer.</seg>
+021| <seg char="Alex">Alex didn't ask how he knew the name. In this line of work, the answer was never good.</seg>
+022| <seg char="Mira">Mira: Alex. Go. Now.</seg>
+023| <seg char="greycoat">Greycoat: I wouldn't.</seg>
+024| <set var="SCENE" val="grand_hotel_lobby"/>
+025| <set var="BRANCH" val="mira_helps" if="Mira.trust>=50"/>
+026| <set var="BRANCH" val="alone" if="Mira.trust<50"/>
+027| <branch name="mira_helps">
+028| <seg char="Alex">A text buzzed on Alex's phone. Mira: "Corporate security. I stalled him — you have twenty minutes."</seg>
+029| <seg>Twenty minutes was enough. It had to be.</seg>
+030| </branch>
+031| <branch name="alone">
+032| <seg>The phone stayed dark. Mira had her own problems — or she'd decided Alex wasn't one of them.</seg>
+033| <seg char="Alex">Alex: Fine. I've done more with less.</seg>
+034| </branch>
+035| <bridge/>
+036| <seg>The hotel lobby was everything the subway wasn't.</seg>
+037| <seg>Marble floors. Chandelier light. The quiet rustle of money.</seg>
+038| <seg char="Alex">Alex pushed through the revolving door, breath still ragged from the sprint.</seg>
+039| <seg>No sign of the grey coat. Not yet.</seg>
+040| <seg>Guests in evening wear glanced up from their cocktails, then looked away. A man running through a hotel lobby wasn't their problem.</seg>
+041| <seg>The chip was still in the jacket pocket. The deal was set for midnight.</seg>
+042| <seg>A piano player ran through a tired jazz standard. Nobody in this room was running from anything.</seg>
+043| <seg>Alex envied them for exactly three seconds.</seg>
+044| <seg>Then the revolving door moved, and the grey coat stepped through.</seg>
+045| <seg>The piano didn't stop. Nobody looked up.</seg>
+046| <seg>The grey coat's eyes swept the room once, then locked onto the back of Alex's head.</seg>
+047| <seg char="Alex">Alex didn't turn around. But in the polished reflection of the elevator doors, every detail was sharp — the grey coat's hand inside his pocket, the small bulge of something cold.</seg>
+048| <seg>The elevator chimed. Doors opened.</seg>
+049| <seg>The next sixty seconds would decide whether Alex walked out of this hotel at all.</seg>
+050| </story>
 
 ## Example 2
 
