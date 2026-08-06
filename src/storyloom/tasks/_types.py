@@ -56,6 +56,16 @@ class Task:
 
         Sets *completed*, fires the ``threading.Event``, and sets *result*
         on the **first** call only (subsequent calls do not overwrite).
+
+        .. warning::
+
+            This method is safe for a **single writer** (TaskPool Thread 4)
+            paired with **multiple readers** (EventDispatcher Thread 2 via
+            ``wait()``).  It is NOT safe for concurrent writers — two
+            threads calling ``complete()`` simultaneously may race on
+            *result*.  The architecture guarantees at most one writer
+            (TaskGenerator sync-complete OR TaskPool async-complete,
+            never both).
         """
         if self.completed:
             return

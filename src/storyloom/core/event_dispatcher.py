@@ -165,6 +165,14 @@ class EventDispatcher:
                 send_to_ui(event)
 
         In text mode (``_task_queue is None``), delegates to ``dispatch()``.
+
+        .. note::
+
+            The task queue is accessed only from Thread 2 (Event Pipe).
+            ``TaskGenerator`` (producer) and this method (consumer) run
+            on the same thread via generator yield per design.md §3.3.
+            Only ``task.completed`` / ``task.result`` are touched by
+            Thread 4 (TaskPool).
         """
         # Text mode / Phase 1: no task subsystem wired.
         if self._task_queue is None:

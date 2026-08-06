@@ -502,6 +502,16 @@ class TestTaskGenerator:
         task = pipeline.gen.enqueue(event)
         assert task is None
 
+    def test_declare_empty_name_sync_completes_noop(self, pipeline):
+        """DECLARE with name='' → sync-complete as no-op (LLM output error)."""
+        event = self._make_event(EventType.DECLARE, 2,
+                                 kind="CHAR", name="", desc="forgotten name")
+        task = pipeline.gen.enqueue(event)
+        assert task is not None
+        assert task.completed is True
+        # No placeholder created with empty key
+        assert len(pipeline.roster) == 2  # only the 2 stub entries
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # 4. TestEventDispatcherConsume

@@ -31,6 +31,13 @@ class TaskGenerator:
             submitted (useful for testing program match in isolation).
     """
 
+    # Per design.md §2.1: "类型可扩展至特效、语音等".  Map DECLARE kind
+    # strings to AssetType so new types only require adding an entry here.
+    _DECLARE_KIND_MAP: dict[str, AssetType] = {
+        "CHAR": AssetType.CHAR_PORTRAIT,
+        "SCENE": AssetType.BACKGROUND,
+    }
+
     def __init__(self, task_queue: deque[Task], roster: GameAssetRoster,
                  process_factory,
                  task_pool: TaskPool | None = None):
@@ -61,10 +68,16 @@ class TaskGenerator:
 
     # ── MATCH ─────────────────────────────────────────────────────────────
 
+    # Per design.md §4.1: MATCH keys by event type.
+    _MATCH_KEY: dict[AssetType, str] = {
+        AssetType.BACKGROUND: "val",        # SCENE event
+        AssetType.CHAR_PORTRAIT: "char",    # SEGMENT event (with char attr)
+    }
+
     def _enqueue_match(self, event: Event, asset_type: AssetType) -> Task:
         """Per design.md §6.3: create MATCH task, run O(1) roster lookup."""
-        local_name = (event.payload.get("val")       # SCENE
-                      or event.payload.get("char"))   # SEGMENT
+        key = self._MATCH_KEY.get(asset_type, "")
+        local_name = event.payload.get(key, "") if key else ""
         task = Task(TaskType.MATCH, event.line, asset_type)
         self._queue.append(task)
 
@@ -85,8 +98,7 @@ class TaskGenerator:
         submitting to the pool (§6.4 step 3 — prevents duplicate
         declarations)."""
         kind = event.payload.get("kind", "CHAR").upper()
-        asset_type = (AssetType.CHAR_PORTRAIT if kind == "CHAR"
-                      else AssetType.BACKGROUND)
+        asset_type = self._DECLARE_KIND_MAP.get(kind, AssetType.BACKGROUND)
         local_name = event.payload.get("name", "")
         desc = event.payload.get("desc", "")
 
@@ -95,11 +107,15 @@ class TaskGenerator:
 
         if local_name and self._roster.lookup(asset_type, local_name) is not None:
             task.complete()                            # already declared
-        else:
+        elif local_name:
             # Placeholder first — sync, before pool submit (design.md §6.4)
             self._roster.add(asset_type, local_name, desc, target=None)
             task.process = self._process_factory(asset_type, local_name,
                                                            self._roster)
             if self._pool is not None:
                 self._pool.submit(task)
+        # else: empty local_name → skip placeholder, sync-complete as no-op
+        # (LLM output error — nothing meaningful to generate)
+        else:
+            task.complete()
         return task
