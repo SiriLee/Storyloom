@@ -46,6 +46,15 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | `src/storyloom/core/session.py` | `GameSession` lifecycle coordinator |
 | `src/storyloom/parser/stream_parser.py` | StreamParser, Event, EventType, LineBuffer, shared data types |
 | `src/storyloom/io/api_client.py` | OpenAI-compatible API client |
+| `src/storyloom/io/_types.py` | Shared image I/O data types — enums, dataclasses |
+| `src/storyloom/io/img_api_client.py` | Image generation API client (§7.3) |
+| `src/storyloom/io/img_utils.py` | Image utilities — format detection, background removal |
+| `src/storyloom/assets/_types.py` | AssetType, Asset, AssetItem data types (§2) |
+| `src/storyloom/assets/_library.py` | AssetLibrary — global registry (§2.2) |
+| `src/storyloom/assets/_roster.py` | GameAssetRoster — per-game mapping (§2.3) |
+| `src/storyloom/tasks/_types.py` | Task, TaskType, TaskTimeoutError data types (§4.2) |
+| `src/storyloom/tasks/_generator.py` | TaskGenerator — Event→Task dispatch, O(1) program match (§3.2) |
+| `src/storyloom/tasks/_pool.py` | TaskPool — ThreadPoolExecutor wrapper (§3.3) |
 | `src/storyloom/web/` | Web UI (FastAPI + SSE + SPA) |
 | `src/storyloom/dev_cli/` | Dev CLI — `DevObserver`, deque-buffered display |
 | `src/storyloom/config.py` | Configurable constants |
@@ -57,7 +66,16 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | `tests/test_state_manager.py` | StateManager unit tests — SET, branch filter, choice, checkpoint, bridge |
 | `tests/test_game_loop.py` | GameLoop & GameState unit tests |
 | `tests/test_web_server.py` | Web server integration tests |
-| `tests/test_*.py` | Other pytest unit tests (mock, no API) |
+| `tests/test_assets.py` | Asset data types, library, roster unit tests (§2) |
+| `tests/test_img_api_client.py` | Image generation API client tests (§7.3) |
+| `tests/test_img_utils.py` | Image utilities — format detection, bg removal tests |
+| `tests/test_task_framework.py` | Task framework tests — lifecycle, program match, §4.3 algorithm, E2E |
+| `tests/test_co_create.py` | Co-creation flow unit tests |
+| `tests/test_save_manager.py` | Save manager — atomic JSON save/load/delete/list tests |
+| `tests/test_prompt_builder.py` | Prompt builder unit tests |
+| `tests/test_user_config.py` | UserConfig unit tests |
+| `tests/test_integration.py` | End-to-end integration tests |
+| `tests/test_*.py` | Other pytest unit tests (api_client, context_manager, i18n, session) |
 
 **Test structure:** `tests/test_*.py` = pytest unit tests (mock, no API). `tests/prompt_lab/` = ad-hoc prompt design tools (require API key).
 
