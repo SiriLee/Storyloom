@@ -411,12 +411,6 @@ class StreamParser:
             # SCENE interception (Phase 2): <set var="SCENE" val="...">
             # is a separate event type — scene switch, not state change.
             if var == SCENE_VAR_NAME:
-                if op != "=":
-                    return [Event(
-                        type=EventType.PARSE_ERROR,
-                        line=self._line_count,
-                        payload={"error": f"SCENE does not support op={op!r}"},
-                    )]
                 if self._post_bridge:
                     self._format_errors.append(
                         f"<set var=\"SCENE\"> found after <bridge/>"

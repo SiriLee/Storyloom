@@ -363,10 +363,12 @@ class TestSceneParsing:
                          '<set var="SCENE" op="=" val="tavern"/>')
         assert evt.type == EventType.SCENE
 
-    def test_scene_op_not_equal_parse_error(self, parser):
+    def test_scene_op_ignored_always_sets(self, parser):
+        """op='+' is ignored for SCENE — treated as plain assignment."""
         parser.feed_line("<story>")
-        evt = _parse_one(parser, '<set var="SCENE" op="+" val="5"/>')
-        assert evt.type == EventType.PARSE_ERROR
+        evt = _parse_one(parser, '<set var="SCENE" op="+" val="tavern"/>')
+        assert evt.type == EventType.SCENE
+        assert evt.payload["val"] == "tavern"
 
     def test_scene_has_position(self, parser):
         parser.feed_line("<story>")
