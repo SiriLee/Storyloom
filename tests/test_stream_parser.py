@@ -200,6 +200,7 @@ class TestDeclareParsing:
         events = parser.feed_line(
             '<declare kind="char" name="ghost">desc</declare>')
         assert events == []
+        assert parser.format_errors == []  # no error = accepted
 
     def test_declare_invalid_kind_parse_error(self, parser):
         parser.feed_line("<story>")
@@ -254,6 +255,24 @@ class TestBranchInjection:
     def test_set_outside_branch(self, parser):
         parser.feed_line("<story>")
         evt = _parse_one(parser, '<set var="trust" val="10"/>')
+        assert evt.payload["branch"] is None
+
+    def test_choice_begin_outside_branch(self, parser):
+        parser.feed_line("<story>")
+        evt = _parse_one(parser, '<choice id="q1">')
+        assert evt.payload["branch"] is None
+
+    def test_opt_outside_branch(self, parser):
+        parser.feed_line("<story>")
+        evt = _parse_one(parser,
+                         '<opt key="1" branch="x">Go</opt>')
+        assert evt.payload["branch"] is None
+
+    def test_choice_end_outside_branch(self, parser):
+        parser.feed_line("<story>")
+        parser.feed_line('<choice id="q1">')
+        parser.feed_line('<opt key="1" branch="x">Go</opt>')
+        evt = _parse_one(parser, '</choice>')
         assert evt.payload["branch"] is None
 
 
@@ -313,6 +332,13 @@ class TestSceneParsing:
         assert evt.type == EventType.SCENE
         assert evt.payload["if"] == "x>1"
 
+    def test_scene_op_equals_accepted(self, parser):
+        """Explicit op='=' is valid for SCENE (same as default)."""
+        parser.feed_line("<story>")
+        evt = _parse_one(parser,
+                         '<set var="SCENE" op="=" val="tavern"/>')
+        assert evt.type == EventType.SCENE
+
     def test_scene_op_not_equal_parse_error(self, parser):
         parser.feed_line("<story>")
         evt = _parse_one(parser, '<set var="SCENE" op="+" val="5"/>')
@@ -322,6 +348,11 @@ class TestSceneParsing:
         parser.feed_line("<story>")
         evt = _parse_one(parser, '<set var="SCENE" val="tavern"/>')
         assert evt.payload["position"] == "pre"
+
+    def test_scene_outside_branch_branch_none(self, parser):
+        parser.feed_line("<story>")
+        evt = _parse_one(parser, '<set var="SCENE" val="tavern"/>')
+        assert evt.payload["branch"] is None
 
     def test_scene_after_bridge_suppressed(self, parser):
         parser.feed_line("<story>")

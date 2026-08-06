@@ -166,11 +166,14 @@ class TestBranchFiltering:
         assert len(results) == 0
 
     def test_set_bare_always_passes(self, sm):
-        """SET with no branch attr always passes."""
+        """SET with no branch attr always passes and is accumulated."""
         event = Event(EventType.SET, 1,
                       {"var": "trust", "op": "=", "val": "10"})
         results = list(sm.process(event))
         assert len(results) == 1
+        # Verify the SET was actually applied, not silently filtered
+        assert len(sm.get_result().sets) == 1
+        assert sm.get_result().sets[0].var == "trust"
 
     def test_set_non_matching_branch_filtered(self, sm):
         sm._current_branch = "hero"

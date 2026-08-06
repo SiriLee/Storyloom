@@ -807,8 +807,17 @@ class TestTextModeUnaffected:
     """Text mode — ``EventDispatcher()`` with no args → dispatch() unchanged."""
 
     def test_text_mode_all_event_types(self):
-        """All Phase 1 event types dispatch without error."""
+        """All Phase 1 + Phase 2 event types dispatch correctly."""
         d = EventDispatcher()
+        expected_types = {
+            EventType.STORY_BEGIN: "story_begin",
+            EventType.STORY_END: "story_end",
+            EventType.SEGMENT: "segment",
+            EventType.SET: "state",
+            EventType.BRIDGE: "bridge",
+            EventType.PARSE_ERROR: "error",
+            EventType.SCENE: "scene",
+        }
         events = [
             Event(EventType.STORY_BEGIN, 1, {}),
             Event(EventType.STORY_END, 2, {}),
@@ -823,14 +832,19 @@ class TestTextModeUnaffected:
                   {"name": "hero", "position": "pre"}),
             Event(EventType.CHECKPOINT_END, 8, {}),
             Event(EventType.PARSE_ERROR, 9, {"error": "bad"}),
-            # Phase 2 event types — must pass through in text mode
+            # Phase 2 event types — must dispatch correctly
             Event(EventType.SCENE, 10, {"val": "tavern"}),
             Event(EventType.DECLARE, 11,
                   {"kind": "CHAR", "name": "ghost", "desc": "a ghost"}),
         ]
         for event in events:
             result = d.consume_event(event)
-            assert isinstance(result, dict), f"dispatch returned non-dict for {event.type}"
+            assert isinstance(result, dict), f"non-dict for {event.type}"
+            if event.type in expected_types:
+                assert result["type"] == expected_types[event.type], (
+                    f"{event.type.name}: expected type={expected_types[event.type]!r},"
+                    f" got {result.get('type')!r}"
+                )
 
     def test_text_mode_no_assets_injected(self):
         """Text mode never injects 'assets' into event payload."""
@@ -1001,6 +1015,9 @@ class TestVerificationCriteria:
             assert isinstance(result, dict), (
                 f"Event {event.type.name} returned {type(result).__name__}"
             )
+            # Phase 2 types must have correct UI type
+            if event.type == EventType.SCENE:
+                assert result.get("type") == "scene"
             # No event gets assets injected in text mode
             assert "assets" not in event.payload, (
                 f"Event {event.type.name} had assets injected in text mode"
