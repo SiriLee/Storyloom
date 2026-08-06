@@ -66,3 +66,6 @@ BG_REMOVAL_MODEL_FILENAME = "u2netp.onnx"
 BG_REMOVAL_MODEL_SHA256 = (
     "309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8"
 )
+
+# ── Task framework (Phase 2) ────────────────────────────────────
+TASK_POOL_MAX_WORKERS = 4    # Thread 4 default pool size

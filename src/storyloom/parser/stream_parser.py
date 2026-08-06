@@ -44,6 +44,8 @@ class EventType(Enum):
     BRANCH_ENTER = auto()      # <branch name="X">
     BRANCH_EXIT = auto()       # </branch>
     PARSE_ERROR = auto()       # Unrecognized or invalid element
+    SCENE = auto()             # <set var="SCENE" val="...">   (Phase 2)
+    DECLARE = auto()           # <declare kind="CHAR/SCENE" name="...">...</declare>  (Phase 2)
 
 
 @dataclass
@@ -58,7 +60,7 @@ class Event:
 
         STORY_BEGIN    — (empty)
         STORY_END      — (empty)
-        SEGMENT        — text, n, position, branch
+        SEGMENT        — text, n, position, branch, char (optional, Phase 2)
         CHOICE_BEGIN   — id
         OPT            — key, branch, if, text
         CHOICE_END     — choice_data (accumulated from CHOICE_BEGIN + OPT)
@@ -70,6 +72,8 @@ class Event:
         BRANCH_ENTER   — name, position
         BRANCH_EXIT    — name, position
         PARSE_ERROR    — error
+        SCENE          — val (local_name)                      (Phase 2)
+        DECLARE        — kind, name, desc                      (Phase 2)
     """
     type: EventType
     line: int

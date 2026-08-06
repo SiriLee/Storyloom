@@ -13,6 +13,7 @@ from storyloom.user_config import UserConfig
 
 from storyloom.assets import Asset, AssetItem, AssetLibrary, AssetType, GameAssetRoster
 from storyloom.parser import ParsedOutput, ParseError, Segment
+from storyloom.tasks import Task, TaskGenerator, TaskPool, TaskType
 
 __all__ = [
     "ApiClient",
@@ -35,6 +36,10 @@ __all__ = [
     "RoundResult",
     "SaveManager",
     "Segment",
+    "Task",
+    "TaskGenerator",
+    "TaskPool",
+    "TaskType",
     "UserConfig",
 
     "WINDOW_SIZE",

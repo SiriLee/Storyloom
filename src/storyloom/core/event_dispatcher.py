@@ -8,7 +8,14 @@ Phase 2: ``consume_event()`` implements the §4.3 algorithm with Task
 Queue alignment and asset binding.
 """
 
+from collections import deque
+from typing import TYPE_CHECKING
+
 from storyloom.parser.stream_parser import Event, EventType
+
+if TYPE_CHECKING:
+    from storyloom.assets import GameAssetRoster
+    from storyloom.tasks import Task
 
 
 class EventDispatcher:
@@ -19,7 +26,22 @@ class EventDispatcher:
     Phase 1 — ``dispatch()``: pure Event → UI dict conversion.
     Phase 2 — ``consume_event()``: Task Queue alignment (§4.3 algorithm),
     asset binding via roster lookup, then dispatch to UI.
+
+    Args:
+        task_queue: FIFO deque of pending Tasks.  ``None`` in text mode.
+        roster: Per-game asset roster for binding.  ``None`` in text mode.
+            Must be both set (graph mode) or both ``None`` (text mode).
     """
+
+    def __init__(self, task_queue: deque | None = None,
+                 roster: "GameAssetRoster | None" = None):
+        if (task_queue is None) != (roster is None):
+            raise ValueError(
+                "task_queue and roster must both be set (graph mode) "
+                "or both be None (text mode)"
+            )
+        self._task_queue = task_queue
+        self._roster = roster
 
     # ── Phase 1: dispatch ──────────────────────────────────────────
 
@@ -116,10 +138,10 @@ class EventDispatcher:
             "checkpoint_node": checkpoint_node,
         }
 
-    # ── Phase 2 extension point ────────────────────────────────────
+    # ── Phase 2: consume_event (§4.3 algorithm) ──────────────────────
 
     def consume_event(self, event: Event) -> dict:
-        """Phase 2 entry point — Task Queue alignment + dispatch.
+        """Phase 2 entry point — Task Queue alignment + asset binding.
 
         Per design.md §4.3::
 
@@ -136,6 +158,30 @@ class EventDispatcher:
                     event.payload["assets"] = {...}
                 send_to_ui(event)
 
-        In Phase 1 this simply delegates to ``dispatch()``.
+        In text mode (``_task_queue is None``), delegates to ``dispatch()``.
         """
+        # Text mode / Phase 1: no task subsystem wired.
+        if self._task_queue is None:
+            return self.dispatch(event)
+
+        q = self._task_queue
+
+        # 1. Drain tasks strictly before this event's line.
+        while q and q[0].line < event.line:
+            task = q.popleft()
+            if task.line == 0:
+                task.wait()                    # DECLARE: wait then discard
+            # else: orphan task, discard (no wait)
+
+        # 2. Aligned task at this line → wait + lookup + bind.
+        if q and q[0].line == event.line:
+            task = q.popleft()
+            task.wait()
+            item = self._roster.lookup(task.asset_type, task.result)
+            asset_id = item.target if item is not None else None
+            if asset_id is not None:
+                event.payload["assets"] = {task.asset_type.value: asset_id}
+            # lookup failed or target=None → silent skip (no binding)
+
+        # 3. Convert to UI dict.
         return self.dispatch(event)

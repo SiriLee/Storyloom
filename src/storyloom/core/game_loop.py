@@ -787,7 +787,7 @@ class GameLoop:
                     # Per design.md §4.1: every Phase 1 event type
                     # passes through StateManager.
                     for processed in state_mgr.process(event):
-                        ui_event = dispatcher.dispatch(processed)
+                        ui_event = dispatcher.consume_event(processed)
                         if ui_event:
                             yield ui_event
 
