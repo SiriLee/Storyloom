@@ -201,22 +201,34 @@ const GameView = (function () {
             token: () => { /* silent — reserved for typewriter effect */ },
             segment: (data) => {
                 _contentStarted = true;
-                /* §7.7: assets are applied immediately (visual layers);
-                   text is queued for paced display via shared _eventQueue. */
-                if (_gameMode === "graph" && data.assets) {
-                    if (data.assets.background_img) {
+                /* §7.7: assets applied immediately (visual layers).
+                   No char → clear sprite (design.md §4.1: char="" means no portrait). */
+                if (_gameMode === "graph") {
+                    if (data.assets && data.assets.background_img) {
                         GraphRenderer.setBackground(
                             GraphRenderer.assetUrl("background_img", data.assets.background_img)
                         );
                     }
-                    if (data.assets.char_portrait) {
-                        GraphRenderer.setSprite(
-                            GraphRenderer.assetUrl("char_portrait", data.assets.char_portrait)
-                        );
+                    if (data.char) {
+                        if (data.assets && data.assets.char_portrait) {
+                            GraphRenderer.setSprite(
+                                GraphRenderer.assetUrl("char_portrait", data.assets.char_portrait)
+                            );
+                        }
+                    } else {
+                        GraphRenderer.clearSprite();
                     }
                 }
                 _eventQueue.push({ type: "segment", text: data.text, char: data.char || null });
                 _wakeDisplay();
+            },
+            scene: (data) => {
+                /* §7.7: standalone SCENE event — update background layer */
+                if (_gameMode === "graph" && data.assets && data.assets.background_img) {
+                    GraphRenderer.setBackground(
+                        GraphRenderer.assetUrl("background_img", data.assets.background_img)
+                    );
+                }
             },
             bridge: () => {
                 _eventQueue.push({ type: "bridge" });

@@ -62,6 +62,11 @@ const SSEClient = {
                 if (this._handlers.segment) this._handlers.segment(data);
             });
 
+            this._es.addEventListener("scene", (e) => {
+                const data = JSON.parse(e.data);
+                if (this._handlers.scene) this._handlers.scene(data);
+            });
+
             this._es.addEventListener("bridge", (e) => {
                 if (this._handlers.bridge) this._handlers.bridge({});
             });

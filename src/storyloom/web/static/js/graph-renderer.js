@@ -244,15 +244,22 @@ const GraphRenderer = (function () {
 
     function showLoading() {
         var el = $("#vnText");
-        if (!el || el.textContent) return;  // don't overwrite existing text
-        el.innerHTML = '<span style="color:var(--text-secondary);font-style:italic">'
-            + _("Loading") + '<span class="cc-dots"><span>.</span><span>.</span><span>.</span></span></span>';
+        if (!el || el.textContent) return;
+        el.innerHTML = '<svg width="60" height="12" viewBox="0 0 60 12" style="display:block;margin:0 auto">'
+            + '<circle cx="6" cy="6" r="4" fill="var(--text-secondary)" opacity="0.3">'
+            + '<animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" begin="0s" repeatCount="indefinite"/></circle>'
+            + '<circle cx="22" cy="6" r="4" fill="var(--text-secondary)" opacity="0.3">'
+            + '<animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" begin="0.2s" repeatCount="indefinite"/></circle>'
+            + '<circle cx="38" cy="6" r="4" fill="var(--text-secondary)" opacity="0.3">'
+            + '<animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" begin="0.4s" repeatCount="indefinite"/></circle>'
+            + '<circle cx="54" cy="6" r="4" fill="var(--text-secondary)" opacity="0.3">'
+            + '<animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" begin="0.6s" repeatCount="indefinite"/></circle>'
+            + '</svg>';
     }
 
     function hideLoading() {
         var el = $("#vnText");
-        // Only clear if it's the loading placeholder (text set by showLoading)
-        if (el && el.querySelector(".cc-dots")) el.textContent = "";
+        if (el && el.querySelector("svg")) el.textContent = "";
     }
 
     /* ═══════════════════════════════════════════════════════════════
