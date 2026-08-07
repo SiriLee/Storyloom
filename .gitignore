@@ -25,6 +25,7 @@ venv/
 
 # Runtime data (generated at runtime, not source)
 saves/
+media/
 
 # Test outputs (LLM-generated, reproducible via toolchain)
 tests/prompt_lab/data/output/
