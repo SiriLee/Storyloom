@@ -1261,16 +1261,21 @@ class GameLoop:
         self._task_pool = TaskPool()
 
         # -- §7.8 delete block start: stub pre-population + stub factory --
-        # Pre-populate roster with __stub__ entries so sync/async MATCH
-        # both resolve to a known target during stub phase.
+        # §7.7: register real stub assets in the library so roster.add()
+        # with target="stub_default_*" succeeds.  Roster entries themselves
+        # are seeded by _init_stub_roster() from story_config.
         from storyloom.assets import AssetType
-        for atype in (AssetType.CHAR_PORTRAIT, AssetType.BACKGROUND):
-            if library.get(atype, "__stub__") is None:
-                library.add(atype, "__stub__", "stub placeholder",
-                            asset_id="__stub__")
-            if self._roster.lookup(atype, "__stub__") is None:
-                self._roster.add(atype, "__stub__", "stub placeholder",
-                                 target="__stub__")
+        _STUB_PORTRAIT_ID = "stub_default_portrait"
+        _STUB_BG_ID = "stub_default_background"
+
+        for atype, aid in (
+            (AssetType.CHAR_PORTRAIT, _STUB_PORTRAIT_ID),
+            (AssetType.BACKGROUND, _STUB_BG_ID),
+        ):
+            if library.get(atype, aid) is None:
+                library.add(atype, aid,
+                            "Stub " + ("Portrait" if atype == AssetType.CHAR_PORTRAIT else "Background"),
+                            asset_id=aid)
 
         self._process_factory = self._stub_process_factory()
         # -- §7.8 delete block end --
@@ -1278,22 +1283,34 @@ class GameLoop:
     # -- §7.8 delete block start: _stub_process_factory --
     @staticmethod
     def _stub_process_factory():
-        """§7.6 stub — MATCH returns ``__stub__``; GENERATE fills placeholder.
+        """§7.6 stub — MATCH passes through local_name; GENERATE fills placeholder.
 
-        Relies on pre-populated ``__stub__`` roster entries (done in
-        ``mount_graph_pipeline``).  §7.8 deletes this entire method and
-        replaces ``self._process_factory`` with a real implementation.
+        Per design.md §4.3: EventDispatcher calls ``roster.lookup(type,
+        task.result).target`` to get the asset_id for URL construction.
+        MATCH sets result=local_name so lookup finds the roster entry created
+        by _init_stub_roster() → target=stub_default_*.
+
+        GENERATE sets target on the placeholder created by TaskGenerator.
+        §7.8 deletes this entire method and replaces with real LLM matching.
         """
         import time
+        from storyloom.assets import AssetType
         from storyloom.tasks import TaskType
 
+        _TARGET = {
+            AssetType.CHAR_PORTRAIT: "stub_default_portrait",
+            AssetType.BACKGROUND: "stub_default_background",
+        }
+
         def _factory(asset_type, local_name, roster):
+            target = _TARGET.get(asset_type, "stub_default_background")
+
             def _process(task):
                 time.sleep(0.01)
                 if task.task_type is TaskType.MATCH:
-                    task.result = "__stub__"
-                else:  # GENERATE: fill the placeholder created by TaskGenerator
-                    roster.set_target(asset_type, local_name, "__stub__")
+                    task.result = local_name  # → EventDispatcher resolves via roster
+                else:  # GENERATE: fill the placeholder
+                    roster.set_target(asset_type, local_name, target)
             return _process
 
         return _factory
