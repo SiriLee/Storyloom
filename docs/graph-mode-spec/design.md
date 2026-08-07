@@ -387,7 +387,7 @@ Asset、AssetLibrary、GameAssetRoster 完整实现——增删、计数、排�
 
 ### 7.4 Task 框架（stub）
 
-实现 Task 类 + TaskGenerator（独立模块，Parser 不感知）+ EventDispatcher 行号对齐与绑定。`process` 用固定时长占位，`result` 统一赋值为临时图像。此阶段 Parser **不**触发 TaskGen——通过手动构造事件序列验证管线。测试用例设计为可复用的集成测试，7.6 用真实事件重放同一套用例。
+实现 Task 类 + TaskGenerator + EventDispatcher 行号对齐与绑定。`process` 用固定时长占位，`result` 统一赋值为临时图像。此阶段暂不将 TaskGenerator 注入 Parser（7.6 完成）——通过手动构造事件序列验证管线。测试用例设计为可复用的集成测试，7.6 用真实事件重放同一套用例。
 
 **验证**：stub 管线跑通，所有"素材"为统一临时图像，文本模式不受影响 → **事件-任务-绑定架构正确**。
 
@@ -399,7 +399,7 @@ Asset、AssetLibrary、GameAssetRoster 完整实现——增删、计数、排�
 
 ### 7.6 管线集成
 
-将 Parser 的图像事件与 TaskGenerator 挂接——通过管线协调层在 Event 产出后调用 TaskGenerator（Parser 自身不持有 TaskGen 引用）。文本模式不挂载。
+`GameLoop` 作为管线协调层，装配 Task 子系统并注入 Parser 与 EventDispatcher。运行时 Parser 识别图像标签时触发 TaskGenerator（与 §3.1 虚线触发箭头一致）。文本模式不装配 Task 管线。
 
 **验证**：stub 管线 + 真实事件流端到端跑通 → **集成正确，封装性保持**。
 
