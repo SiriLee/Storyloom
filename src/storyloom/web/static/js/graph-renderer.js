@@ -139,9 +139,9 @@ const GraphRenderer = (function () {
                         <div class="vn-setting-row">
                             <span class="vn-setting-label">${_("Display Speed")}</span>
                             <div class="vn-setting-options" id="vnSettingAuto">
-                                <button class="vn-setting-opt" data-val="${AUTO_CHAR_MS.short}">${_("Fast")}</button>
-                                <button class="vn-setting-opt active" data-val="${AUTO_CHAR_MS.normal}">${_("Medium")}</button>
                                 <button class="vn-setting-opt" data-val="${AUTO_CHAR_MS.long}">${_("Slow")}</button>
+                                <button class="vn-setting-opt active" data-val="${AUTO_CHAR_MS.normal}">${_("Medium")}</button>
+                                <button class="vn-setting-opt" data-val="${AUTO_CHAR_MS.short}">${_("Fast")}</button>
                             </div>
                         </div>
                         <div class="vn-setting-row">
