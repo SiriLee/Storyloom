@@ -321,5 +321,8 @@ msgstr "沉浸模式"
 msgid "Preparing your world"
 msgstr "正在准备你的世界"
 
+msgid "Game Mode"
+msgstr "游戏模式"
+
 msgid "Text Speed"
 msgstr "文字速度"

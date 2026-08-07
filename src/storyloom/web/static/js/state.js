@@ -91,6 +91,16 @@ const SETTINGS = [
             { value: "en", label: "English" },
         ],
     },
+    /* ── Game Mode (§7.7) ── */
+    {
+        key: "game_mode",
+        type: "select",
+        label: "Game Mode",
+        options: [
+            { value: "text", label: "Text" },
+            { value: "graph", label: "Graph" },
+        ],
+    },
     /* ── API Configuration (mirrors UserConfig properties) ── */
     {
         key: "api_base_url",
@@ -177,6 +187,7 @@ async function saveConfig() {
     const imgKey = getSetting("img_api_key");
     const body = {
         language: getSetting("lang"),
+        game_mode: getSetting("game_mode"),
         api_base_url: getSetting("api_base_url"),
         api_model: getSetting("api_model"),
         img_api_base_url: getSetting("img_api_base_url"),
