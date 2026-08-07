@@ -131,6 +131,8 @@ const GameView = (function () {
             _container.style.minHeight = "100vh";
             GraphRenderer.init(_container);
             GraphRenderer.setTitle(_title);
+            /* Typewriter controls pacing — completion triggers next tick */
+            GraphRenderer.onAdvance(function () { _displayTick(); });
             var exitBtn = _container.querySelector("#vnBtnExit");
             if (exitBtn) exitBtn.addEventListener("click", _handleExit);
             return;
@@ -199,56 +201,32 @@ const GameView = (function () {
             token: () => { /* silent — reserved for typewriter effect */ },
             segment: (data) => {
                 _contentStarted = true;
-                if (_gameMode === "graph") {
-                    /* §7.7: direct rendering — no queue */
-                    if (data.assets) {
-                        if (data.assets.background_img) {
-                            GraphRenderer.setBackground(
-                                GraphRenderer.assetUrl("background_img", data.assets.background_img)
-                            );
-                        }
-                        if (data.assets.char_portrait) {
-                            GraphRenderer.setSprite(
-                                GraphRenderer.assetUrl("char_portrait", data.assets.char_portrait)
-                            );
-                        }
+                /* §7.7: assets are applied immediately (visual layers);
+                   text is queued for paced display via shared _eventQueue. */
+                if (_gameMode === "graph" && data.assets) {
+                    if (data.assets.background_img) {
+                        GraphRenderer.setBackground(
+                            GraphRenderer.assetUrl("background_img", data.assets.background_img)
+                        );
                     }
-                    GraphRenderer.showSegment(data.text, data.char || null);
-                } else {
-                    _eventQueue.push({ type: "segment", text: data.text });
-                    _wakeDisplay();
+                    if (data.assets.char_portrait) {
+                        GraphRenderer.setSprite(
+                            GraphRenderer.assetUrl("char_portrait", data.assets.char_portrait)
+                        );
+                    }
                 }
+                _eventQueue.push({ type: "segment", text: data.text, char: data.char || null });
+                _wakeDisplay();
             },
             bridge: () => {
                 _eventQueue.push({ type: "bridge" });
                 _wakeDisplay();
             },
             options: (data) => {
-                if (_gameMode === "graph") {
-                    /* §7.7: show choices immediately via VN overlay */
-                    var _showGraphChoices = function () {
-                        GraphRenderer.showChoices(data.choices || [], async (key) => {
-                            var flat = Display.flattenChoices(data.choices || []);
-                            var selected = flat.find(function (o) { return o.key === key; });
-                            if (selected) {
-                                GraphRenderer.showSegment(selected.label, null);
-                            }
-                            try {
-                                await SSEClient.sendChoice(_gameId, key);
-                            } catch (err) {
-                                Display.showErrorModal(
-                                    _("Choice send failed: ") + err.message,
-                                    _showGraphChoices,  // retry: re-show same choices
-                                    function () { Router.navigate("menu"); }
-                                );
-                            }
-                        });
-                    };
-                    _showGraphChoices();
-                } else {
-                    _optionsPending = data;
-                    _wakeDisplay();
-                }
+                /* §7.7: same deferred pattern for both modes — queue must
+                   drain before choices appear. */
+                _optionsPending = data;
+                _wakeDisplay();
             },
             state: (data) => {
                 if (data.vars) GameState.stateVars = data.vars;
@@ -381,16 +359,21 @@ const GameView = (function () {
         const event = _eventQueue.shift();
 
         if (event.type === "segment") {
-            Display.appendSegment(event.text);
+            if (_gameMode === "graph") {
+                GraphRenderer.showSegment(event.text, event.char || null);
+            } else {
+                Display.appendSegment(event.text);
+            }
         }
 
         /* ── Pacing (after segment display, per dev_cli pattern) ─── */
+        /* §7.7: graph mode — typewriter controls its own pacing.
+           _displayTick is re-entered via onAdvance callback. */
+        if (_gameMode === "graph") return;
+
         if (_mode === "auto") {
             _drainTimer = setTimeout(_displayTick, SPEED_DELAY[_speed] || 2000);
         } else {
-            /* Manual mode — wait for click / Space / Enter.
-               _optionsPending does NOT override this: the user chose
-               manual pacing and each segment must be confirmed. */
             _waitForUserAdvance().then(() => {
                 if (!_displayRunning) return;
                 _displayTick();
@@ -438,51 +421,57 @@ const GameView = (function () {
 
     async function _handleOptions(data) {
         const choices = data.choices || [];
+        const isGraph = _gameMode === "graph";
 
-        /* Show choice buttons and wait for selection.
-           The display loop has stopped (returned from _displayTick's
-           _optionsPending branch).  We restart it after the choice
-           is sent so post-choice content is displayed. */
-        Display.showChoices(choices).then(async (key) => {
-            /* Find the selected option label for green display */
+        /* §7.7: same deferred pattern — queue drained, show choices.
+           Rendering differs: text → Display buttons, graph → VN overlay. */
+
+        function _onChoice(key) {
             const flat = Display.flattenChoices(choices);
             const selected = flat.find(o => o.key === key);
             if (selected) {
-                Display.appendChoiceText(selected.label);
+                if (isGraph) {
+                    /* Show selected choice as a segment in the dialog */
+                    GraphRenderer.showSegment(selected.label, null);
+                } else {
+                    Display.appendChoiceText(selected.label);
+                }
             }
 
-            /* Clear choice buttons */
-            Display.clearChoices();
+            if (isGraph) GraphRenderer.clearChoices();
+            else Display.clearChoices();
 
-            /* Send choice to server (this unblocks the background thread) */
-            try {
-                await SSEClient.sendChoice(_gameId, key);
-            } catch (err) {
+            SSEClient.sendChoice(_gameId, key).then(() => {
+                /* Restart display loop (identical for both modes) */
+                if (_mode === "auto") {
+                    _drainTimer = setTimeout(_displayTick, SPEED_DELAY[_speed] || 2000);
+                } else {
+                    _waitForUserAdvance().then(() => {
+                        if (!_displayRunning) return;
+                        _displayTick();
+                    });
+                }
+            }).catch(err => {
+                var _retry = function () { _onChoice(key); };
+                if (isGraph) {
+                    /* Re-show VN choices overlay */
+                    GraphRenderer.showChoices(choices, _retry);
+                } else {
+                    Display.showChoices(choices).then(_retry);
+                }
                 Display.showErrorModal(
                     _("Choice send failed: ") + err.message,
-                    () => _handleOptions(data),  /* retry same options */
-                    () => Router.navigate("menu")
+                    function () {}, /* retry via re-shown choices */
+                    function () { Router.navigate("menu"); }
                 );
-                return;
-            }
+            });
+        }
 
-            /* Restart the display loop with pacing — the green choice
-               text already provides a visual beat, so the first
-               post-choice segment must also respect the current mode
-               (auto: speed-based delay, manual: wait for advance).
-               Otherwise it appears instantly and looks like a duplicate
-               of the choice text. */
-            if (_mode === "auto") {
-                _drainTimer = setTimeout(
-                    _displayTick, SPEED_DELAY[_speed] || 2000
-                );
-            } else {
-                _waitForUserAdvance().then(() => {
-                    if (!_displayRunning) return;
-                    _displayTick();
-                });
-            }
-        });
+        if (isGraph) {
+            GraphRenderer.showChoices(choices, _onChoice);
+        } else {
+            Display.showChoices(choices).then(_onChoice);
+        }
     }
 
     /* ═══════════════════════════════════════════════════════════════
