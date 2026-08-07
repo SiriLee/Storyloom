@@ -766,6 +766,7 @@ class PromptBuilder:
         characters: list[dict] | None = None,
         locations: list[dict] | None = None,
         variables: list[dict] | None = None,
+        current_scene: str | None = None,
     ) -> str:
         """Build graph-mode Round 1 prompt (permanent anchor).
 
@@ -773,8 +774,9 @@ class PromptBuilder:
         constants with ``<declare>``, ``<set var="SCENE">``, and
         ``<seg char="...">`` elements.
 
-        Round 1 has no scene set — the prompt directs the LLM to include
-        an immediate scene transition.
+        *current_scene* is None for new games (prompt directs LLM to set
+        an initial scene).  When loading a save it carries the scene from
+        the checkpoint, so the LLM knows where the story left off.
         """
         language = story_config.get("language", DEFAULT_LANGUAGE)
 
@@ -801,10 +803,13 @@ class PromptBuilder:
             locations=locations_text,
         )
 
-        scene_line = (
-            "(No scene is set — include a scene transition "
-            "at the start of your output)"
-        )
+        if current_scene:
+            scene_line = f"(Current scene: {current_scene})"
+        else:
+            scene_line = (
+                "(No scene is set — include a scene transition "
+                "at the start of your output)"
+            )
 
         round_part = GRAPH_ROUND_TEMPLATE.format(
             outline_text=outline_text,

@@ -520,6 +520,7 @@ class GameLoop:
         self._game_mode: str = "text"  # written to every save file
         self._roster: GameAssetRoster | None = None
         self._task_pool: TaskPool | None = None
+        self._last_scene: str | None = None  # §7.7: persisted in save, emitted on load
         self._process_factory: Callable | None = None
 
         # Pending API state — every round's Phase 5 launches the *next*
@@ -661,6 +662,7 @@ class GameLoop:
                 characters=self.characters,
                 locations=self.locations,
                 variables=self.variables,
+                current_scene=self._last_scene,
             )
         else:
             r1_prompt = self._prompter.build_round1(
@@ -772,6 +774,20 @@ class GameLoop:
             goal=self.goal,
         )
         dispatcher = EventDispatcher(task_queue, self._roster)
+
+        # §7.7: restore scene background on first round after load.
+        # Only fires when _last_scene is set (loaded save) and this is
+        # the first round of the session (round_count == 0).  New games
+        # have _last_scene=None → no-op.
+        if self._last_scene and self._roster is not None and self._context_mgr.round_count == 0:
+            from storyloom.assets import AssetType
+            item = self._roster.lookup(AssetType.BACKGROUND, self._last_scene)
+            if item is not None and item.target is not None:
+                yield {
+                    "type": "scene",
+                    "val": self._last_scene,
+                    "assets": {"background_img": item.target},
+                }
 
         collected: list[str] = []
         ttft: float | None = None
@@ -903,6 +919,7 @@ class GameLoop:
         self.goal = state_mgr.goal or self.goal
         self.ending_flag = state_mgr.ending_flag
         self._checkpoint_snapshots = state_mgr.checkpoint_snapshots
+        self._last_scene = state_mgr.current_scene  # §7.7: persist for next save
 
         # ── Store round in context manager ──────────────────────────
         bridge_text = state_mgr.get_bridge_text(current_branch)
@@ -1160,6 +1177,7 @@ class GameLoop:
             "outline": outline_for_save,
             "progress": {
                 "current_node": self.current_node or "",
+                "current_scene": self._last_scene or "",
                 "checkpoint_snapshots": copy.deepcopy(self._checkpoint_snapshots),
             },
         }
@@ -1213,6 +1231,7 @@ class GameLoop:
         )
 
         gl._checkpoint_snapshots = dict(progress.get("checkpoint_snapshots", {}))
+        gl._last_scene = progress.get("current_scene") or None  # §7.7
 
         # Restore config — temperature, mode (§7.6)
         config = data.get("config", {})
