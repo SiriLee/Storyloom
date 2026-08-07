@@ -518,7 +518,6 @@ class GameLoop:
         # stream_round() reads these to decide whether to create TaskGen
         # and inject task_queue + roster into EventDispatcher.
         self._game_mode: str = "text"  # written to every save file
-        # and inject task_queue + roster into EventDispatcher.
         self._roster: GameAssetRoster | None = None
         self._task_pool: TaskPool | None = None
         self._process_factory: Callable | None = None
@@ -1218,8 +1217,13 @@ class GameLoop:
         ``stream_round()`` reads ``self._roster`` — when set, it creates
         a TaskGenerator and injects it plus the shared task queue into
         the EventDispatcher.
+
+        Idempotent — safe to call multiple times.
         """
-        from storyloom.assets import AssetLibrary, AssetType, GameAssetRoster
+        if self._roster is not None:
+            return  # already mounted
+
+        from storyloom.assets import AssetLibrary, GameAssetRoster
         from storyloom.tasks import TaskPool
 
         self._game_mode = "graph"
@@ -1228,8 +1232,10 @@ class GameLoop:
         self._roster = GameAssetRoster.load(roster_path, library, game_id)
         self._task_pool = TaskPool()
 
-        # §7.6 stub: pre-populate roster with __stub__ entries so that
-        # sync-match and async-match both resolve.  §7.8 removes this.
+        # -- §7.8 delete block start: stub pre-population + stub factory --
+        # Pre-populate roster with __stub__ entries so sync/async MATCH
+        # both resolve to a known target during stub phase.
+        from storyloom.assets import AssetType
         for atype in (AssetType.CHAR_PORTRAIT, AssetType.BACKGROUND):
             if library.get(atype, "__stub__") is None:
                 library.add(atype, "__stub__", "stub placeholder",
@@ -1239,24 +1245,31 @@ class GameLoop:
                                  target="__stub__")
 
         self._process_factory = self._stub_process_factory()
+        # -- §7.8 delete block end --
 
+    # -- §7.8 delete block start: _stub_process_factory --
     @staticmethod
     def _stub_process_factory():
-        """§7.6 stub — returns ``__stub__`` for all MATCH results.
+        """§7.6 stub — MATCH returns ``__stub__``; GENERATE fills placeholder.
 
-        Relies on the caller having pre-populated the roster with a
-        ``__stub__`` entry per AssetType (done in ``mount_graph_pipeline``).
-        §7.8 replaces with real LLM matching / image generation.
+        Relies on pre-populated ``__stub__`` roster entries (done in
+        ``mount_graph_pipeline``).  §7.8 deletes this entire method and
+        replaces ``self._process_factory`` with a real implementation.
         """
         import time
+        from storyloom.tasks import TaskType
 
         def _factory(asset_type, local_name, roster):
             def _process(task):
                 time.sleep(0.01)
-                task.result = "__stub__"
+                if task.task_type is TaskType.MATCH:
+                    task.result = "__stub__"
+                else:  # GENERATE: fill the placeholder created by TaskGenerator
+                    roster.set_target(asset_type, local_name, "__stub__")
             return _process
 
         return _factory
+    # -- §7.8 delete block end --
 
     # ── Observer ──────────────────────────────────────────────────
 
