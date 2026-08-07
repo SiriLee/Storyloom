@@ -16,7 +16,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
-from storyloom.config import SAVE_VERSION, STREAM_STALL_TIMEOUT_SEC, GLOBAL_SCOPE
+from storyloom.config import DEFAULT_MEDIA_DIR, SAVE_VERSION, STREAM_STALL_TIMEOUT_SEC, GLOBAL_SCOPE
 from storyloom.io.api_client import ApiClient
 from storyloom.core.context_manager import ContextManager
 from storyloom.core.prompt_builder import PromptBuilder
@@ -1255,7 +1255,7 @@ class GameLoop:
         from storyloom.tasks import TaskPool
 
         self._game_mode = "graph"
-        library = AssetLibrary("media")
+        library = AssetLibrary(DEFAULT_MEDIA_DIR)
         roster_path = os.path.join(saves_root, game_id, "_asset_roster.json")
         self._roster = GameAssetRoster.load(roster_path, library, game_id)
         self._task_pool = TaskPool()

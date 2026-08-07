@@ -17,7 +17,7 @@ import shutil
 import time
 from pathlib import Path
 
-from storyloom.config import SAVE_VERSION
+from storyloom.config import DEFAULT_SAVES_DIR, SAVE_VERSION
 
 
 class SaveManager:
@@ -339,7 +339,7 @@ class SaveManager:
         return str(game_dir), game_id, created_at
 
     @staticmethod
-    def list_games(root: str = "saves", enrich: bool = False) -> list[dict]:
+    def list_games(root: str = DEFAULT_SAVES_DIR, enrich: bool = False) -> list[dict]:
         """List all games under *root* by reading each ``_init.json``.
 
         Args:

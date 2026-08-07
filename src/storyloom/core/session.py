@@ -15,7 +15,7 @@ import copy
 import os
 import time
 
-from storyloom.config import SAVE_VERSION, GLOBAL_SCOPE
+from storyloom.config import DEFAULT_SAVES_DIR, SAVE_VERSION, GLOBAL_SCOPE
 from storyloom.io.api_client import ApiClient
 from storyloom.core.save_manager import SaveManager
 from storyloom.core.co_create import CoCreateFlow
@@ -39,7 +39,7 @@ class GameSession:
     """
 
     def __init__(self, api_client: ApiClient | None = None,
-                 saves_dir: str = "saves"):
+                 saves_dir: str = DEFAULT_SAVES_DIR):
         self._api_client = api_client if api_client is not None else ApiClient()
         self._saves_root = saves_dir
         self._game_loop: GameLoop | None = None

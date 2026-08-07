@@ -3,6 +3,10 @@
 # ── Save format ──────────────────────────────────────────────────
 SAVE_VERSION = 3           # save file format version; mismatch → load error (user decides)
 
+# ── Default directory names ──────────────────────────────────────
+DEFAULT_SAVES_DIR = "saves"
+DEFAULT_MEDIA_DIR = "media"
+
 # ── Sliding window ─────────────────────────────────────────────
 WINDOW_SIZE = 3          # full rounds to keep in window
 FIRST_COMPRESSION_AT = 5  # round number to trigger first compression
