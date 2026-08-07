@@ -309,8 +309,8 @@ msgid "Expected version:"
 msgstr "期望版本："
 
 # §7.7: graph mode UI strings
-msgid "Auto Delay"
-msgstr "自動延遲"
+msgid "Display Speed"
+msgstr "顯示速度"
 
 msgid "Backlog"
 msgstr "回看"
@@ -335,12 +335,3 @@ msgstr "慢"
 
 msgid "Fast"
 msgstr "快"
-
-msgid "Short"
-msgstr "短"
-
-msgid "Long"
-msgstr "長"
-
-msgid "Text Speed"
-msgstr "文字速度"

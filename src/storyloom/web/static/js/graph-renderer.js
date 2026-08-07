@@ -34,7 +34,7 @@
 
 const GraphRenderer = (function () {
     /* ── Tunable constants (§4) ─────────────────────────────────── */
-    const SPEEDS       = { slow: 25, normal: 15, fast: 5 };         // ms / char (typewriter)
+    const SPEEDS       = { slow: 25, normal: 15, fast: 8 };         // ms / char (typewriter)
     const AUTO_CHAR_MS = { short: 30, normal: 50, long: 70 };       // ms / char (auto-delay)
     const FONT_SIZES   = { small: "1.15rem", medium: "1.35rem", large: "1.55rem" };
     const AUTO_BASE_MS = 500;  // minimum auto-delay (ms)
@@ -137,19 +137,11 @@ const GraphRenderer = (function () {
                     <div class="vn-settings-panel">
                         <h3>${_("Settings")}</h3>
                         <div class="vn-setting-row">
-                            <span class="vn-setting-label">${_("Text Speed")}</span>
-                            <div class="vn-setting-options" id="vnSettingSpeed">
-                                <button class="vn-setting-opt" data-val="${SPEEDS.slow}">${_("Slow")}</button>
-                                <button class="vn-setting-opt active" data-val="${SPEEDS.normal}">${_("Medium")}</button>
-                                <button class="vn-setting-opt" data-val="${SPEEDS.fast}">${_("Fast")}</button>
-                            </div>
-                        </div>
-                        <div class="vn-setting-row">
-                            <span class="vn-setting-label">${_("Auto Delay")}</span>
+                            <span class="vn-setting-label">${_("Display Speed")}</span>
                             <div class="vn-setting-options" id="vnSettingAuto">
-                                <button class="vn-setting-opt" data-val="${AUTO_CHAR_MS.short}">${_("Short")}</button>
+                                <button class="vn-setting-opt" data-val="${AUTO_CHAR_MS.short}">${_("Fast")}</button>
                                 <button class="vn-setting-opt active" data-val="${AUTO_CHAR_MS.normal}">${_("Medium")}</button>
-                                <button class="vn-setting-opt" data-val="${AUTO_CHAR_MS.long}">${_("Long")}</button>
+                                <button class="vn-setting-opt" data-val="${AUTO_CHAR_MS.long}">${_("Slow")}</button>
                             </div>
                         </div>
                         <div class="vn-setting-row">
@@ -198,7 +190,6 @@ const GraphRenderer = (function () {
         $("#vnSettingsClose").addEventListener("click", function () { hideSettings(); });
 
         /* Settings handlers — O(1) delegated click */
-        _bindSettingClicks("vnSettingSpeed", function (val) { _charDelay = parseInt(val); });
         _bindSettingClicks("vnSettingAuto", function (val) { _autoCharMs = parseInt(val); });
         _bindSettingClicks("vnSettingFont", function (val) {
             document.documentElement.style.setProperty("--vn-font-size", val);
