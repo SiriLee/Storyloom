@@ -11,6 +11,7 @@ src/storyloom/models/*.onnx
 
 # Claude Code internal (worktrees, session transcripts)
 .claude/
+.superpowers/
 
 # Secrets & env
 .env
