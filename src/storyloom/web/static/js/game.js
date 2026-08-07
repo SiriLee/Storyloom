@@ -373,29 +373,26 @@ const GameView = (function () {
         const event = _eventQueue.shift();
 
         if (event.type === "scene") {
-            /* §7.7: apply background immediately, no pacing — continue */
-            if (_gameMode === "graph" && event.data.assets && event.data.assets.background_img) {
+            if (_gameMode !== "graph") {
+                _drainTimer = setTimeout(_displayTick, 0);  // text: skip
+                return;
+            }
+            /* §7.7: apply background, then fall through to pacing.
+               Scene takes one pacing slot (same as segment). */
+            if (event.data && event.data.assets && event.data.assets.background_img) {
                 GraphRenderer.setBackground(
                     GraphRenderer.assetUrl("background_img", event.data.assets.background_img)
                 );
             }
-            _drainTimer = setTimeout(_displayTick, 0);
-            return;
-        }
-
-        if (event.type === "segment") {
+        } else if (event.type === "segment") {
             if (_gameMode === "graph") {
                 GraphRenderer.showSegment(event.text, event.char || null);
-            } else {
-                Display.appendSegment(event.text);
+                return;  // typewriter controls its own pacing
             }
+            Display.appendSegment(event.text);
         }
 
-        /* ── Pacing (after segment display, per dev_cli pattern) ─── */
-        /* §7.7: graph mode — typewriter controls its own pacing.
-           _displayTick is re-entered via onAdvance callback. */
-        if (_gameMode === "graph") return;
-
+        /* ── Pacing (for scene events + text-mode segments) ─── */
         if (_mode === "auto") {
             _drainTimer = setTimeout(_displayTick, SPEED_DELAY[_speed] || 2000);
         } else {

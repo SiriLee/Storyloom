@@ -219,8 +219,28 @@ const GraphRenderer = (function () {
        ═══════════════════════════════════════════════════════════════ */
 
     function setBackground(url) {
-        var img = $("#vnBg") ? $("#vnBg").querySelector("img") : null;
-        if (img) img.src = url;
+        var container = $("#vnBg");
+        if (!container) return;
+        var oldImg = container.querySelector("img");
+        if (oldImg && oldImg.src === url) return;  // no change
+        // Crossfade: insert new img behind, fade old out, remove old
+        var newImg = document.createElement("img");
+        newImg.src = url;
+        newImg.style.opacity = "0";
+        newImg.style.position = "absolute";
+        newImg.style.inset = "0";
+        newImg.style.width = "100%";
+        newImg.style.height = "100%";
+        newImg.style.objectFit = "cover";
+        newImg.style.transition = "opacity 0.6s ease";
+        container.appendChild(newImg);
+        // Force layout then fade in
+        void newImg.offsetWidth;
+        newImg.style.opacity = "1";
+        if (oldImg) {
+            oldImg.style.opacity = "0";
+            setTimeout(function () { if (oldImg.parentNode) oldImg.remove(); }, 700);
+        }
     }
 
     function setSprite(url) {
