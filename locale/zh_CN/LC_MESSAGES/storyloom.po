@@ -307,3 +307,19 @@ msgstr "当前版本："
 
 msgid "Expected version:"
 msgstr "期望版本："
+
+# §7.7: graph mode UI strings
+msgid "Auto Delay"
+msgstr "自动延迟"
+
+msgid "Backlog"
+msgstr "回看"
+
+msgid "Immersive Mode"
+msgstr "沉浸模式"
+
+msgid "Preparing your world"
+msgstr "正在准备你的世界"
+
+msgid "Text Speed"
+msgstr "文字速度"

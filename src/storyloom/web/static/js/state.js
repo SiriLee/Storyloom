@@ -21,6 +21,7 @@
 
 const GameState = {
     gameId: null,
+    gameMode: null,           // §7.7: "text" | "graph" — set from API response
     roundCount: 0,
     currentNode: null,
     endingFlag: false,
@@ -41,6 +42,7 @@ const GameState = {
     /** Reset all per-game state.  Called on menu entry. */
     reset() {
         this.gameId = null;
+        this.gameMode = null;  // §7.7
         this.roundCount = 0;
         this.currentNode = null;
         this.endingFlag = false;
