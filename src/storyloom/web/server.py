@@ -337,6 +337,22 @@ def co_create_retry_generate():
     }
 
 
+class PrebuildBody(BaseModel):
+    game_id: str
+
+
+@app.post("/api/co-create/prebuild")
+def co_create_prebuild(body: PrebuildBody):
+    """Run material pre-build for a graph-mode game.  (§7.7)
+
+    Called by the UI after story generation completes.  Seeds the
+    per-game asset roster from story_config.  Must be called before
+    ``POST /api/game/{id}/start``.
+    """
+    result = _game_session.prebuild_assets(body.game_id)
+    return result
+
+
 @app.post("/api/co-create/abort")
 async def co_create_abort():
     """Abort the co-creation session and discard all state."""

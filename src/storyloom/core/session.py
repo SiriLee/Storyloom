@@ -76,18 +76,35 @@ class GameSession:
         SaveManager(game_dir).save(init_data)  # cp_title=None → _init.json
 
         gl = self.load_game(game_id, "_init.json")
+        return gl, game_id
 
-        # §7.7: graph mode — seed roster from story_config for program match
-        # §7.8c DELETE BLOCK START
-        if game_mode == "graph" and gl._roster is not None:
+    def prebuild_assets(self, game_id: str) -> dict:
+        """Run material pre-build for a graph-mode game.  (§7.7 / §7.8c)
+
+        Loads the game (triggers ``mount_graph_pipeline``), then seeds the
+        roster from ``story_config`` via ``_init_stub_roster()``.  Called by
+        the UI after story generation completes, BEFORE entering the game.
+
+        §7.8c replaces the stub seeding with real AI pre-build (LLM
+        selection + image generation per entity).
+
+        Returns:
+            ``{"status": "ok"}`` on success.
+        """
+        sm = SaveManager(os.path.join(self._saves_root, game_id))
+        data = sm.load("_init.json")
+
+        gl = self.load_game(game_id, "_init.json")
+
+        # §7.8c DELETE BLOCK START — replaced by real AI pre-build
+        if gl._roster is not None:
             from storyloom.core.game_loop import _init_stub_roster
             _init_stub_roster(gl._roster, data)
-            # Persist roster to disk so subsequent loads find the entries
             roster_path = os.path.join(self._saves_root, game_id, "_asset_roster.json")
             gl._roster.save(roster_path)
         # §7.8c DELETE BLOCK END
 
-        return gl, game_id
+        return {"status": "ok"}
 
     def load_game(self, game_id: str, filename: str) -> GameLoop:
         """Load a save file and return a ready-to-play ``GameLoop``.

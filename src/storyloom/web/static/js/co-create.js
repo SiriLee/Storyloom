@@ -127,6 +127,15 @@ const CoCreateView = (function () {
 
     /* ── Start button — Phase 1: generate story setup ────────────── */
 
+    /** Minimum display time for the material pre-build transition (ms).
+     *  §7.7: engine signals completion quickly (stub), UI pads to 2 s. */
+    const PREBUILD_MIN_DISPLAY_MS = 2000;
+
+    /** Wait until at least *ms* have elapsed since *start* (wall-clock). */
+    function _sleep(ms) {
+        return new Promise(function (resolve) { setTimeout(resolve, ms); });
+    }
+
     async function _handleStart() {
         if (_phase !== "chatting") return;
 
@@ -139,18 +148,29 @@ const CoCreateView = (function () {
 
         _phase = "generating";
         _setInputEnabled(false);
-        _renderTransition();
 
         try {
-            // Step 1: Generate story setup (co_create.py generate)
+            // ── Phase 1: Story generation ──────────────────────────
+            _renderTransition(_("Generating settings"));
             const genData = await API.post("/api/co-create/generate");
-
-            // Step 2: Store game_id + story config for the preview page
             GameState.gameId = genData.game_id;
             GameState.gameMode = genData.game_mode || "text";  // §7.7
             GameState.storyConfig = genData.story_config;
 
-            // Step 3: Navigate to the game preview (transition) page
+            // ── Phase 2: Material pre-build (§7.7 stub) ────────────
+            if (genData.game_mode === "graph") {
+                _renderTransition(_("Preparing your world"));
+                var t0 = Date.now();
+                await API.post("/api/co-create/prebuild", { game_id: genData.game_id });
+
+                // §7.7: wait at least 2 s so the transition is visible
+                var elapsed = Date.now() - t0;
+                if (elapsed < PREBUILD_MIN_DISPLAY_MS) {
+                    await _sleep(PREBUILD_MIN_DISPLAY_MS - elapsed);
+                }
+            }
+
+            // ── Navigate ────────────────────────────────────────────
             _phase = "done";
             Router.navigate("game-preview");
         } catch (err) {
@@ -166,18 +186,27 @@ const CoCreateView = (function () {
     /** Retry generation after a CoCreateError. */
     async function _retryGenerate() {
         _phase = "generating";
-        _renderTransition();
 
         try {
-            // Step 1: Retry generate
+            // ── Phase 1: Retry story generation ────────────────────
+            _renderTransition(_("Generating settings"));
             const genData = await API.post("/api/co-create/retry-generate");
-
-            // Step 2: Store game_id + story config for the preview page
             GameState.gameId = genData.game_id;
             GameState.gameMode = genData.game_mode || "text";  // §7.7
             GameState.storyConfig = genData.story_config;
 
-            // Step 3: Navigate to the game preview (transition) page
+            // ── Phase 2: Material pre-build (§7.7 stub) ────────────
+            if (genData.game_mode === "graph") {
+                _renderTransition(_("Preparing your world"));
+                var t0 = Date.now();
+                await API.post("/api/co-create/prebuild", { game_id: genData.game_id });
+                var elapsed = Date.now() - t0;
+                if (elapsed < PREBUILD_MIN_DISPLAY_MS) {
+                    await _sleep(PREBUILD_MIN_DISPLAY_MS - elapsed);
+                }
+            }
+
+            // ── Navigate ────────────────────────────────────────────
             _phase = "done";
             Router.navigate("game-preview");
         } catch (err) {
@@ -193,11 +222,12 @@ const CoCreateView = (function () {
 
     /** Render the centered transition screen with animated dots.
      *  Reuses the existing cc-dots / cc-bounce animation design. */
-    function _renderTransition() {
+    function _renderTransition(msg) {
+        var text = msg || _("Generating settings");
         _container.innerHTML = `
             <div class="cc-transition">
                 <div class="cc-transition-text">
-                    <span>${esc(_("Generating settings"))}</span>
+                    <span>${esc(text)}</span>
                     <span class="cc-dots">
                         <span>.</span><span>.</span><span>.</span>
                     </span>
