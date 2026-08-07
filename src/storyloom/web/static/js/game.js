@@ -201,12 +201,12 @@ const GameView = (function () {
                     if (data.assets) {
                         if (data.assets.background_img) {
                             GraphRenderer.setBackground(
-                                "/media/background_img/" + data.assets.background_img + ".png"
+                                GraphRenderer.assetUrl("background_img", data.assets.background_img)
                             );
                         }
                         if (data.assets.char_portrait) {
                             GraphRenderer.setSprite(
-                                "/media/char_portrait/" + data.assets.char_portrait + ".png"
+                                GraphRenderer.assetUrl("char_portrait", data.assets.char_portrait)
                             );
                         }
                     }

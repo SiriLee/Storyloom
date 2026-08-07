@@ -496,6 +496,7 @@ const GraphRenderer = (function () {
         clearSprite: clearSprite,
         showLoading: showLoading,
         hideLoading: hideLoading,
+        assetUrl: assetUrl,
         showSegment: showSegment,
         showChoices: showChoices,
         clearChoices: clearChoices,
