@@ -433,7 +433,7 @@ Asset、AssetLibrary、GameAssetRoster 完整实现——增删、计数、排�
 
 图像模式与文本模式共享 StreamParser、StateManager、EventDispatcher。区别在于管线构建时是否挂载 TaskGenerator。
 
-文本模式下：Parser 正常解析所有标签，TaskGenerator 不存在故触发信号无接收者。若 LLM 误输出图像标签视为错误输出。
+文本模式下 Task 管线不装配。若 LLM 误输出图像标签（小概率事件——text Prompt 不含对应规范），由 UI 侧处理。
 
 两个模式使用不同的叙事 Prompt 文件。`UserConfig.game_mode` 决定模式和 UI 布局。其余 Prompt（共创、故事生成、冒险日志）不受影响。
 

@@ -651,16 +651,28 @@ class GameLoop:
             raise RuntimeError("Round 1 already started")
         self._game_started = True
 
-        r1_prompt = self._prompter.build_round1(
-            story_config=self.story_config,
-            outline_text=self.outline_text,
-            current_node=self.current_node or "",
-            goal=self.goal or "",
-            state_vars=self.game_state.state_vars,
-            characters=self.characters,
-            locations=self.locations,
-            variables=self.variables,
-        )
+        if self._roster is not None:
+            r1_prompt = self._prompter.build_round1_graph(
+                story_config=self.story_config,
+                outline_text=self.outline_text,
+                current_node=self.current_node or "",
+                goal=self.goal or "",
+                state_vars=self.game_state.state_vars,
+                characters=self.characters,
+                locations=self.locations,
+                variables=self.variables,
+            )
+        else:
+            r1_prompt = self._prompter.build_round1(
+                story_config=self.story_config,
+                outline_text=self.outline_text,
+                current_node=self.current_node or "",
+                goal=self.goal or "",
+                state_vars=self.game_state.state_vars,
+                characters=self.characters,
+                locations=self.locations,
+                variables=self.variables,
+            )
 
         messages = [{"role": "user", "content": r1_prompt}]
         self._launch_api(messages, r1_prompt)
@@ -961,19 +973,35 @@ class GameLoop:
         # ── Build next-round prompt → launch background API ─────────
         bridge_text_for_prompt = self._context_mgr.get_last_bridge_text()
 
-        rn_context = self._prompter.build_round_n(
-            outline_text=self.outline_text,
-            current_node=self.current_node or "",
-            goal=self.goal or "",
-            state_vars=self.game_state.state_vars,
-            variables=self.variables,
-            bridge_text=bridge_text_for_prompt,
-            rejected_changes=(
-                self._rejected_changes if self._rejected_changes else None
-            ),
-            format_error=self._format_error,
-            no_choices_last_round=no_choices,
-        )
+        if self._roster is not None:
+            rn_context = self._prompter.build_round_n_graph(
+                outline_text=self.outline_text,
+                current_node=self.current_node or "",
+                goal=self.goal or "",
+                state_vars=self.game_state.state_vars,
+                variables=self.variables,
+                bridge_text=bridge_text_for_prompt,
+                current_scene=state_mgr.current_scene,
+                rejected_changes=(
+                    self._rejected_changes if self._rejected_changes else None
+                ),
+                format_error=self._format_error,
+                no_choices_last_round=no_choices,
+            )
+        else:
+            rn_context = self._prompter.build_round_n(
+                outline_text=self.outline_text,
+                current_node=self.current_node or "",
+                goal=self.goal or "",
+                state_vars=self.game_state.state_vars,
+                variables=self.variables,
+                bridge_text=bridge_text_for_prompt,
+                rejected_changes=(
+                    self._rejected_changes if self._rejected_changes else None
+                ),
+                format_error=self._format_error,
+                no_choices_last_round=no_choices,
+            )
 
         messages = self._context_mgr.get_messages()
         messages.append({"role": "user", "content": rn_context})

@@ -1415,6 +1415,83 @@ class TestGameLoopGraphPipeline:
         assert "assets" in scene, "SCENE missing assets in graph mode"
         assert scene["assets"] == {AssetType.BACKGROUND.value: "__stub__"}
 
+    def test_graph_mode_uses_graph_prompt_round1(self, tmp_path):
+        """Graph mode start_game() → build_round1_graph, not build_round1."""
+        gl = self._make_gl()
+        gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
+        gl.set_save_manager(_FakeSaveManager(str(tmp_path)))
+
+        scene_xml = (
+            "001| <story>\n"
+            '002| <set var="SCENE" val="stub"/>\n'
+            "003| </story>"
+        )
+        gl.api_client = MockApiClient(response=scene_xml)
+
+        gl.start_game()
+        # The mock records messages sent to the API
+        r1_messages = gl.api_client.last_messages
+        r1_content = r1_messages[0]["content"]
+        # Graph prompt contains graph-only elements
+        assert "<declare" in r1_content
+        assert 'var="SCENE"' in r1_content
+        assert 'char="' in r1_content
+
+    def test_text_mode_uses_text_prompt_round1(self, tmp_path):
+        """Text mode start_game() → build_round1 (no graph elements)."""
+        gl = self._make_gl()
+        gl.set_save_manager(_FakeSaveManager(str(tmp_path)))
+
+        scene_xml = (
+            "001| <story>\n"
+            "002| <seg>hello</seg>\n"
+            "003| </story>"
+        )
+        gl.api_client = MockApiClient(response=scene_xml)
+
+        gl.start_game()
+        r1_messages = gl.api_client.last_messages
+        r1_content = r1_messages[0]["content"]
+        # Text prompt must NOT contain graph-only elements
+        assert "<declare" not in r1_content
+        assert 'var="SCENE"' not in r1_content
+        assert 'char="' not in r1_content
+
+    def test_graph_mode_round_n_includes_current_scene(self, tmp_path):
+        """Graph mode stream_round() Phase 5 → build_round_n_graph with
+        current_scene from StateManager."""
+        from storyloom.assets import AssetType
+
+        gl = self._make_gl()
+        gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
+        gl.set_save_manager(_FakeSaveManager(str(tmp_path)))
+
+        # Round 1: SCENE sets current_scene to 'tavern'
+        r1_xml = (
+            "001| <story>\n"
+            '002| <set var="SCENE" val="tavern"/>\n'
+            "003| <seg>The tavern bustles.</seg>\n"
+            "004| <bridge/>\n"
+            "005| </story>"
+        )
+        gl.api_client = MockApiClient(response=r1_xml)
+        gl.start_game()
+        list(gl.stream_round())  # consume round 1
+
+        # Round 2: the prompt should carry current_scene='tavern'
+        r2_xml = (
+            "001| <story>\n"
+            "002| <seg>Round two.</seg>\n"
+            "003| </story>"
+        )
+        gl.api_client = MockApiClient(response=r2_xml)
+        list(gl.stream_round())  # consume round 2
+
+        # Check Round 2's user message contains the scene
+        rn_messages = gl.api_client.last_messages
+        rn_content = rn_messages[-1]["content"]  # last user message
+        assert "(Current scene: tavern)" in rn_content
+
 
 class _FakeSaveManager:
     """Minimal save manager for pipeline tests — never writes to disk."""
