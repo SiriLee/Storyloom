@@ -254,14 +254,6 @@ const GameView = (function () {
                 if (data.node) GameState.currentNode = data.node;
                 if (data.state) GameState.stateVars = data.state;
                 GameState.roundCount = (GameState.roundCount || 0) + 1;
-                /* §7.7: graph mode ending — show VN adventure log button */
-                if (_gameMode === "graph" && _ending) {
-                    GraphRenderer.showEndChoice(function () {
-                        _stopDisplayLoop();
-                        SSEClient.close();
-                        Router.navigate("adventure-log/" + encodeURIComponent(_gameId));
-                    });
-                }
             },
         };
 
@@ -339,8 +331,21 @@ const GameView = (function () {
             /* Ending: all bridge_text displayed, show end choice
                (exec-flow.md §5.2 step 4-5: bridge_text must finish
                before adventure log prompt). */
-            if (_ending && !_endChoiceShown && _gameMode !== "graph") {
-                _showEndChoice();
+            /* Ending: queue drained → show end choice.
+               Text mode: green button.  Graph mode: VN overlay button. */
+            if (_ending && !_endChoiceShown) {
+                _endChoiceShown = true;
+                if (_gameMode === "graph") {
+                    _cancelLoading();
+                    GraphRenderer.showEndChoice(function () {
+                        _stopDisplayLoop();
+                        SSEClient.close();
+                        var logHash = "adventure-log/" + encodeURIComponent(_gameId);
+                        Router.navigate(logHash);
+                    });
+                } else {
+                    _showEndChoice();
+                }
                 return;
             }
             /* §7.7: unified 1 s debounce.  graph mode → dialog dots;
