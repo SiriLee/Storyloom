@@ -131,6 +131,7 @@ const GameView = (function () {
             _container.style.maxWidth = "";
             _container.style.padding = "0";
             _container.style.minHeight = "100vh";
+            _container.style.overflow = "hidden";  // §7.7: fixed viewport, no scrollbars
             GraphRenderer.init(_container);
             GraphRenderer.setTitle(_title);
             /* Typewriter controls pacing — completion triggers next tick */
@@ -305,6 +306,7 @@ const GameView = (function () {
             _container.style.maxWidth = "";
             _container.style.padding = "";
             _container.style.minHeight = "";
+            _container.style.overflow = "";
         }
         _lastAdvanceTime = 0;
         _cancelLoading();
@@ -386,6 +388,7 @@ const GameView = (function () {
                     GraphRenderer.assetUrl("background_img", event.data.assets.background_img)
                 );
             }
+            GraphRenderer.clearSprite();  // new scene → reset character
         } else if (event.type === "segment") {
             if (_gameMode === "graph") {
                 GraphRenderer.showSegment(event.text, event.char || null);
