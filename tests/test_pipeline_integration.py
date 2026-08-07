@@ -90,9 +90,16 @@ class GraphPipeline:
                 continue
             for event in parser.feed_line(line):
                 for processed in state_mgr.process(event):
-                    # CHOICE_END pause — not tested here
                     if state_mgr.needs_input:
-                        state_mgr.needs_input = False
+                        # Auto-resolve choice with key="1" (matches
+                        # stream_round() gen.send(key) pattern).
+                        results.append(
+                            dispatcher.dispatch_choice(state_mgr.choice_data)
+                        )
+                        for evt in state_mgr.apply_choice("1"):
+                            ui = dispatcher.dispatch(evt)
+                            if ui:
+                                results.append(ui)
                         continue
                     ui = dispatcher.consume_event(processed)
                     if ui:
@@ -221,6 +228,9 @@ class TestTextModeNoTasks:
                 continue
             for event in parser.feed_line(line):
                 for processed in state_mgr.process(event):
+                    if state_mgr.needs_input:
+                        state_mgr.apply_choice("1")
+                        continue
                     ui = dispatcher.consume_event(processed)
                     if ui:
                         results.append(ui)
@@ -487,3 +497,257 @@ class TestVerificationCriteria:
         assert "segment" in types
         assert "bridge" in types
         assert "story_end" in types
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 9. Prompt-driven E2E — Example 1 (The Drop) through full graph pipeline
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.fixture(scope="module")
+def example1_xml():
+    """Extract Example 1 XML from the graph-mode prompt (same as §7.5)."""
+    # Duplicate the extractor here to keep this file self-contained.
+    # test_graph_mode_pipeline.py owns the canonical extractor.
+    from storyloom.core.prompt_builder import GRAPH_ROUND1_PREFIX
+
+    marker = "## Example 1"
+    idx = GRAPH_ROUND1_PREFIX.find(marker)
+    assert idx != -1, "Example 1 not found in prompt"
+
+    rest = GRAPH_ROUND1_PREFIX[idx:]
+    lines = rest.split("\n")
+    xml_lines = []
+    in_example = False
+    for line in lines:
+        if line.startswith("001| "):
+            in_example = True
+        if in_example:
+            xml_lines.append(line)
+            if line.strip().startswith("0") and "</story>" in line:
+                break
+    return "\n".join(xml_lines)
+
+
+class TestExample1FullGraphPipeline:
+    """Example 1 (The Drop) — full graph pipeline with assets."""
+
+    @pytest.fixture(autouse=True)
+    def run_pipeline(self, pipeline, example1_xml):
+        self.results = pipeline.feed_xml(example1_xml)
+
+    # ── No errors ──────────────────────────────────────────────────
+
+    def test_no_parse_errors(self):
+        errors = [r for r in self.results if r["type"] == "error"]
+        assert errors == [], (
+            f"Unexpected errors: {[e.get('message') for e in errors]}"
+        )
+
+    def test_declare_not_in_results(self):
+        types = {r["type"] for r in self.results}
+        assert "declare" not in types
+
+    # ── Event type coverage ────────────────────────────────────────
+
+    def test_required_event_types_present(self):
+        types = {r["type"] for r in self.results}
+        assert "story_begin" in types
+        assert "story_end" in types
+        assert "scene" in types
+        assert "segment" in types
+        assert "bridge" in types
+
+    # ── SCENE → BACKGROUND asset ───────────────────────────────────
+
+    def test_scene_has_background_asset(self):
+        scenes = [r for r in self.results if r["type"] == "scene"]
+        assert len(scenes) >= 1, "Expected at least one SCENE event"
+        for s in scenes:
+            assert "assets" in s, f"SCENE missing assets: {s}"
+            assert s["assets"] == {AssetType.BACKGROUND.value: STUB_ASSET_ID}
+            assert "val" in s  # scene name preserved
+
+    def test_scene_val_is_grand_hotel_lobby(self):
+        scenes = [r for r in self.results if r["type"] == "scene"]
+        assert any(s.get("val") == "grand_hotel_lobby" for s in scenes)
+
+    # ── SEG with char → CHAR_PORTRAIT asset ────────────────────────
+
+    def test_char_segs_have_portrait_asset(self):
+        char_segs = [r for r in self.results
+                     if r["type"] == "segment" and "char" in r]
+        assert len(char_segs) >= 1, "Expected at least one <seg char='...'>"
+        for seg in char_segs:
+            assert "assets" in seg, (
+                f"SEG(char={seg.get('char')}) missing assets"
+            )
+            assert seg["assets"] == {AssetType.CHAR_PORTRAIT.value: STUB_ASSET_ID}
+
+    def test_char_seg_names_preserved(self):
+        char_segs = [r for r in self.results
+                     if r["type"] == "segment" and "char" in r]
+        names = {s["char"] for s in char_segs}
+        assert "Alex" in names
+        assert "Mira" in names
+        assert "agent" in names
+
+    def test_expression_variants_preserved(self):
+        """char='Mira.angry', char='Alex.sad' — expression suffixes kept."""
+        char_segs = [r for r in self.results
+                     if r["type"] == "segment" and "char" in r]
+        chars_with_expr = {s["char"] for s in char_segs if "." in s.get("char", "")}
+        assert "Mira.angry" in chars_with_expr
+        assert "Alex.sad" in chars_with_expr
+
+    # ── Narration SEG → no assets ──────────────────────────────────
+
+    def test_narration_segs_have_no_assets(self):
+        bare_segs = [r for r in self.results
+                     if r["type"] == "segment" and "char" not in r]
+        assert len(bare_segs) >= 1, "Expected narration segs without char"
+        for seg in bare_segs:
+            assert "assets" not in seg, (
+                f"Narration SEG should not have assets: text={seg.get('text', '')[:40]}"
+            )
+
+    # ── Position tracking ──────────────────────────────────────────
+
+    def test_pre_and_post_bridge_segs(self):
+        bridge_idx = next(
+            i for i, r in enumerate(self.results) if r["type"] == "bridge"
+        )
+        pre_segs = [r for r in self.results[:bridge_idx]
+                    if r["type"] == "segment"]
+        post_segs = [r for r in self.results[bridge_idx + 1:]
+                     if r["type"] == "segment"]
+        assert all(r["position"] == "pre" for r in pre_segs)
+        assert all(r["position"] == "post" for r in post_segs)
+
+    # ── All assets are STUB_ASSET_ID ───────────────────────────────
+
+    def test_all_assets_are_stub(self):
+        bound_ids = set()
+        for r in self.results:
+            for aid in r.get("assets", {}).values():
+                bound_ids.add(aid)
+        assert bound_ids == {STUB_ASSET_ID} if bound_ids else True
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 10. Prompt-driven E2E — Example 2 (The Last Archive) through full graph pipeline
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.fixture(scope="module")
+def example2_xml():
+    """Extract Example 2 XML from the graph-mode prompt."""
+    from storyloom.core.prompt_builder import GRAPH_ROUND1_PREFIX
+
+    marker = "## Example 2"
+    idx = GRAPH_ROUND1_PREFIX.find(marker)
+    assert idx != -1, "Example 2 not found in prompt"
+
+    rest = GRAPH_ROUND1_PREFIX[idx:]
+    lines = rest.split("\n")
+    xml_lines = []
+    in_example = False
+    for line in lines:
+        if line.startswith("001| "):
+            in_example = True
+        if in_example:
+            xml_lines.append(line)
+            if line.strip().startswith("0") and "</story>" in line:
+                break
+    return "\n".join(xml_lines)
+
+
+class TestExample2FullGraphPipeline:
+    """Example 2 (The Last Archive) — has SEG(char) but no SCENE/DECLARE."""
+
+    @pytest.fixture(autouse=True)
+    def run_pipeline(self, pipeline, example2_xml):
+        self.results = pipeline.feed_xml(example2_xml)
+
+    def test_no_parse_errors(self):
+        errors = [r for r in self.results if r["type"] == "error"]
+        assert errors == []
+
+    def test_no_scene_events(self):
+        """Example 2 intentionally excludes SCENE tags."""
+        scenes = [r for r in self.results if r["type"] == "scene"]
+        assert scenes == []
+
+    def test_char_segs_have_portrait_asset(self):
+        """Example 2 has SEG(char='Yara', 'Kai', ...) → portrait assets."""
+        char_segs = [r for r in self.results
+                     if r["type"] == "segment" and "char" in r]
+        assert len(char_segs) >= 1, "Expected <seg char='...'> in Example 2"
+        for seg in char_segs:
+            assert "assets" in seg, (
+                f"SEG(char={seg.get('char')}) missing assets"
+            )
+            assert seg["assets"] == {AssetType.CHAR_PORTRAIT.value: STUB_ASSET_ID}
+
+    def test_narration_segs_have_no_assets(self):
+        """Narration (no char) → no assets."""
+        bare_segs = [r for r in self.results
+                     if r["type"] == "segment" and "char" not in r]
+        assert len(bare_segs) >= 1
+        for seg in bare_segs:
+            assert "assets" not in seg
+
+    def test_declare_not_in_results(self):
+        types = {r["type"] for r in self.results}
+        assert "declare" not in types
+
+    def test_required_event_types_present(self):
+        types = {r["type"] for r in self.results}
+        assert "story_begin" in types
+        assert "story_end" in types
+        assert "segment" in types
+        assert "bridge" in types
+
+    def test_all_background_assets_only_in_scene(self):
+        """No SCENE events → no BACKGROUND assets anywhere."""
+        for r in self.results:
+            assets = r.get("assets", {})
+            assert AssetType.BACKGROUND.value not in assets, (
+                f"Event type={r['type']} should not have BACKGROUND asset"
+            )
+
+    def test_char_names_preserved(self):
+        char_segs = [r for r in self.results
+                     if r["type"] == "segment" and "char" in r]
+        names = {s["char"] for s in char_segs}
+        assert "Yara" in names
+        assert "Kai" in names
+
+    def test_expression_variants_branch_filtered(self):
+        """Yara.angry/Kai.smile are in branch='expose' — filtered by auto-choice
+        key='1' selecting branch='ally'.  Only basic char names appear."""
+        char_segs = [r for r in self.results
+                     if r["type"] == "segment" and "char" in r]
+        chars = {s["char"] for s in char_segs}
+        # ally branch: basic names only
+        assert "Yara" in chars
+        assert "Kai" in chars
+        # expose branch (filtered): expression variants absent
+        assert "Yara.angry" not in chars
+        assert "Kai.smile" not in chars
+
+    def test_pre_and_post_bridge_segs(self):
+        bridge_idx = next(
+            i for i, r in enumerate(self.results) if r["type"] == "bridge"
+        )
+        pre_segs = [r for r in self.results[:bridge_idx]
+                    if r["type"] == "segment"]
+        post_segs = [r for r in self.results[bridge_idx + 1:]
+                     if r["type"] == "segment"]
+        assert all(r["position"] == "pre" for r in pre_segs)
+        assert all(r["position"] == "post" for r in post_segs)
+
+    def test_all_assets_are_stub(self):
+        bound_ids = set()
+        for r in self.results:
+            for aid in r.get("assets", {}).values():
+                bound_ids.add(aid)
+        assert bound_ids.issubset({STUB_ASSET_ID})
