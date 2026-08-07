@@ -41,11 +41,13 @@
 
 .vn-bg {
   position: absolute; inset: 0; z-index: 0;
+  background: linear-gradient(135deg, #1a1a3e 0%, #16213e 50%, #0f3460 100%);
 }
 .vn-bg img {
   width: 100%; height: 100%; object-fit: cover;
   transition: opacity 0.6s ease;
 }
+.vn-bg img[src=""] { display: none; }
 
 /* ── Sprite Layer ────────────────────────────────────────────────── */
 
@@ -163,6 +165,8 @@
   line-height: 1.9;
   color: var(--text-primary);
   text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  contain: layout style;  /* prevent layout shifts during typewriter */
+  min-height: calc(var(--vn-font-size) * 1.9 * 3);  /* 3 lines minimum */
 }
 
 .vn-cursor {

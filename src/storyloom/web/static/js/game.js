@@ -407,7 +407,7 @@ const GameView = (function () {
             if (event.text) {
                 delay += event.text.length * (AUTO_CHAR_MS[_speed] || 50);
             } else {
-                delay += 1000;  // scene events: fixed 1.5s total
+                delay += 500;  // scene events: 1s total
             }
             _drainTimer = setTimeout(_displayTick, delay);
         } else {

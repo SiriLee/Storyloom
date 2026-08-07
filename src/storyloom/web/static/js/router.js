@@ -792,7 +792,9 @@
             saves.sort((a, b) => (b.saved_at || "").localeCompare(a.saved_at || ""));
 
             /* Exclude _init.json — it is the initial save, not a checkpoint. */
-            const checkpoints = saves.filter(s => s.filename !== "_init.json");
+            const checkpoints = saves.filter(s =>
+                s.filename !== "_init.json" && s.filename !== "_asset_roster.json"
+            );
 
             const list = document.getElementById("sv-cp-list");
             if (!checkpoints.length) {
