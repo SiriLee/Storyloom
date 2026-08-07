@@ -164,12 +164,15 @@ class AssetLibrary:
 
     # ── Maintenance ──────────────────────────────────────────────────
 
-    def clean(self, keep_count: int) -> int:
-        """Delete unused assets to keep total count at or below *keep_count*.
+    def clean(self, keep_count: int, asset_type: AssetType | None = None) -> int:
+        """Delete unused assets to keep count at or below *keep_count*.
 
         Assets with ``use_count > 0`` are **never** deleted.  Among
         ``use_count == 0`` assets, those with the **lowest** priority
         (by ``(use_count, serial)`` ascending) are deleted first.  (D45).
+
+        If *asset_type* is given, only that type is cleaned; otherwise
+        all types are cleaned.
 
         .. note::
 
@@ -184,9 +187,15 @@ class AssetLibrary:
             if keep_count < 0:
                 keep_count = 0
 
-            # Collect all assets with their priority key
+            # Collect assets — optionally filtered by type
+            types_to_scan = (
+                [asset_type] if asset_type is not None
+                else list(self._items.keys())
+            )
+
             all_assets: list[tuple[tuple, AssetType, str]] = []
-            for atype, type_items in self._items.items():
+            for atype in types_to_scan:
+                type_items = self._items.get(atype, {})
                 for aid, asset in type_items.items():
                     all_assets.append(((asset.use_count, asset.serial), atype, aid))
 

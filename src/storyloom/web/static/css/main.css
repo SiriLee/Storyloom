@@ -580,6 +580,340 @@ button.accent:hover, .btn-accent:hover {
     font-size: var(--font-md);
     color: var(--text-primary);
     margin-bottom: 0.15rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.2rem;
+}
+
+.credits-link {
+    color: var(--text-accent);
+    text-decoration: none;
+    transition: color var(--trans-normal);
+}
+
+.credits-link:hover {
+    text-decoration: underline;
+    color: var(--text-primary);
+}
+
+/* ── Asset Manager View ──────────────────────────────────────────── */
+/* Layout: left sidebar (type nav + clean btn) + right card list     */
+/* Pattern matches .sv-view / .settings-view                         */
+
+.am-view {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 4rem);
+    max-width: var(--content-width);
+    margin: 0 auto;
+    animation: fadeIn var(--trans-slow);
+}
+
+.am-header {
+    display: flex;
+    align-items: center;
+    padding: var(--space-md) var(--space-xs);
+    flex-shrink: 0;
+    gap: 0.6rem;
+}
+
+.am-title {
+    font-family: var(--font-mono);
+    font-size: var(--font-md);
+    color: var(--text-accent);
+    font-weight: normal;
+    flex: 1;
+}
+
+/* ── Body: sidebar + content ────────────────────────────────────── */
+
+.am-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
+/* ── Left sidebar ───────────────────────────────────────────────── */
+
+.am-sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 150px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border-color);
+    padding: var(--space-sm) 0;
+}
+
+.am-nav {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 0.2rem;
+    padding: 0 var(--space-xs);
+}
+
+.am-nav-item {
+    padding: 0.65rem 0.8rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--font-md);
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--trans-normal), color var(--trans-normal);
+}
+
+.am-nav-item:hover {
+    color: var(--text-primary);
+    background: rgba(78, 204, 163, 0.05);
+}
+
+.am-nav-item.active {
+    color: var(--text-accent);
+    background: rgba(78, 204, 163, 0.1);
+}
+
+/* ── Right content area ─────────────────────────────────────────── */
+
+.am-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* ── Toolbar (above card list, type label + clean button) ───────── */
+
+.am-toolbar {
+    display: flex;
+    align-items: center;
+    padding: var(--space-sm) var(--space-md);
+    flex-shrink: 0;
+    gap: 0.6rem;
+}
+
+.am-toolbar-label {
+    font-family: var(--font-mono);
+    font-size: var(--font-sm);
+    color: var(--text-secondary);
+    flex: 1;
+}
+
+.am-clean-btn {
+    padding: 0.35rem 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: var(--font-sm);
+    cursor: pointer;
+    transition: background var(--trans-normal), color var(--trans-normal),
+                border-color var(--trans-normal);
+    flex-shrink: 0;
+}
+
+.am-clean-btn:hover {
+    color: var(--text-accent);
+    border-color: var(--text-accent);
+    background: rgba(78, 204, 163, 0.08);
+}
+
+/* ── Loading / Empty ────────────────────────────────────────────── */
+
+.am-loading,
+.am-empty {
+    color: var(--text-secondary);
+    font-style: italic;
+    text-align: center;
+    padding: var(--space-3xl) 0;
+}
+
+/* ── Card list (right side) ─────────────────────────────────────── */
+
+.am-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-sm) var(--space-xs) var(--space-2xl);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.am-list::-webkit-scrollbar {
+    display: none;
+}
+
+/* ── Asset card (matches .sv-card) ─────────────────────────────── */
+
+.am-card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0.9rem 1.2rem;
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    cursor: pointer;
+    transition: background var(--trans-normal), box-shadow var(--trans-normal),
+                transform var(--trans-normal);
+    user-select: none;
+}
+
+.am-card:hover {
+    background: var(--button-hover);
+    box-shadow: var(--shadow-glow-sm);
+    transform: translateX(4px);
+}
+
+.am-card-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.am-card-label {
+    font-family: var(--font-mono);
+    font-size: var(--font-md);
+    color: var(--text-primary);
+    margin-bottom: 0.2rem;
+}
+
+.am-card-meta {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+}
+
+.am-card-meta span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    height: 1.3em;
+    transition: height var(--trans-slow);
+}
+
+.am-card:hover .am-card-meta span {
+    overflow: hidden;
+    white-space: normal;
+    text-overflow: clip;
+    height: auto;
+    max-height: 5em;
+}
+
+.am-card-usage {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-left: auto;
+    margin-right: 0.8rem;
+}
+
+.am-card-trash {
+    display: none;
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    margin-left: 0.8rem;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: #c0392b;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background var(--trans-normal), transform var(--trans-normal);
+    line-height: 1;
+}
+
+.am-card:hover .am-card-trash {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.am-card-trash:hover {
+    background: rgba(224, 85, 85, 0.15);
+    transform: scale(1.15);
+}
+
+.am-card-trash.disabled {
+    color: var(--text-secondary);
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.am-card-trash.disabled:hover {
+    background: transparent;
+    transform: none;
+}
+
+/* ── Image Viewer Overlay ──────────────────────────────────────── */
+
+.am-viewer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    animation: fadeIn var(--trans-normal);
+}
+
+.am-viewer-toolbar {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    gap: 0.8rem;
+    z-index: 10;
+}
+
+.am-viewer-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background var(--trans-normal), transform var(--trans-normal);
+    text-decoration: none;
+}
+
+.am-viewer-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: scale(1.1);
+}
+
+.am-viewer-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.am-viewer-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
 }
 
 /* ── Save List (placeholder for #saves navigation target) ───────── */

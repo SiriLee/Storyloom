@@ -46,7 +46,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from storyloom.config import DEFAULT_IMG_BASE_URL, DEFAULT_MEDIA_DIR, SUPPORTED_LANGUAGES
+from storyloom.config import DEFAULT_IMG_BASE_URL, DEFAULT_MEDIA_DIR, SUPPORTED_LANGUAGES, CLEANUP_KEEP_COUNT
 from storyloom.core.co_create import CoCreateError
 from storyloom.core.save_manager import SaveManager
 from storyloom.core.session import GameSession
@@ -646,6 +646,78 @@ async def game_adventure_log(game_id: str):
     if err is not None:
         return {"status": "error", "message": err}
     return {"status": "pending"}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Assets — browse, clean, delete
+# ═══════════════════════════════════════════════════════════════════
+
+
+@app.get("/api/assets")
+async def assets_list():
+    """List all assets grouped by type from the global asset library."""
+    from storyloom.assets import AssetLibrary, AssetType
+    lib = AssetLibrary.load(_MEDIA_DIR)
+    result: dict[str, dict[str, dict]] = {}
+    for atype in AssetType:
+        items = lib.list_by_type(atype)
+        if items:
+            result[atype.value] = {
+                aid: asset.to_dict() for aid, asset in items.items()
+            }
+    return {"types": result}
+
+
+@app.post("/api/assets/clean")
+async def assets_clean(keep_count: int = CLEANUP_KEEP_COUNT, type: str | None = None):
+    """Clean unused assets.
+
+    If *type* is given, only that :class:`AssetType` is cleaned.
+    Returns ``{deleted: N}`` — *deleted* is the number of assets removed.
+    """
+    from storyloom.assets import AssetLibrary, AssetType
+
+    atype = None
+    if type is not None:
+        try:
+            atype = AssetType(type)
+        except ValueError:
+            raise HTTPException(400, f"Unknown asset type: {type}")
+
+    lib = AssetLibrary.load(_MEDIA_DIR)
+    deleted = lib.clean(keep_count, asset_type=atype)
+    if deleted > 0:
+        lib.save()
+    return {"deleted": deleted}
+
+
+@app.delete("/api/assets/{asset_type}/{asset_id}")
+async def assets_delete(asset_type: str, asset_id: str):
+    """Delete a single asset.  Refuses if ``use_count > 0``."""
+    from storyloom.assets import AssetLibrary, AssetType
+
+    try:
+        atype = AssetType(asset_type)
+    except ValueError:
+        raise HTTPException(404, f"Unknown asset type: {asset_type}")
+
+    lib = AssetLibrary.load(_MEDIA_DIR)
+    asset = lib.get(atype, asset_id)
+    if asset is None:
+        raise HTTPException(404, f"Asset not found: {asset_type}/{asset_id}")
+
+    if asset.use_count > 0:
+        raise HTTPException(400, "Asset in use, cannot delete")
+
+    lib.remove(atype, asset_id)
+    lib.save()
+
+    # Also delete the file on disk
+    file_path = os.path.join(_MEDIA_DIR, asset.file_path)
+    if os.path.isfile(file_path):
+        os.remove(file_path)
+
+    return {"status": "deleted"}
 
 
 # ═══════════════════════════════════════════════════════════════════

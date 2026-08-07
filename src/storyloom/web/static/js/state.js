@@ -142,7 +142,7 @@ const SETTINGS = [
     {
         key: "img_remove_bg",
         type: "select",
-        label: "Background Removal",
+        label: "Sprite Cutout",
         options: [
             { value: "never", label: "Never" },
             { value: "auto", label: "Auto" },

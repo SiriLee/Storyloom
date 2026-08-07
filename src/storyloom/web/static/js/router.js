@@ -52,6 +52,7 @@
         "saves": renderSaveList,
         "settings": renderSettings,
         "adventure-log": renderAdventureLog,
+        "assets": renderAssetManager,
     };
 
     // ── Bootstrap ──────────────────────────────────────────────────
@@ -156,8 +157,8 @@
                     <button class="menu-btn" id="btn-settings">
                         ${esc(_("Settings"))}
                     </button>
-                    <button class="menu-btn" id="btn-credits">
-                        ${esc(_("Credits"))}
+                    <button class="menu-btn" id="btn-assets">
+                        ${esc(_("Asset Management"))}
                     </button>
                     <button class="menu-btn" id="btn-exit">
                         ${esc(_("Exit"))}
@@ -167,8 +168,6 @@
                 <!-- Continue panel: shown when "Continue" clicked, hidden initially -->
                 <div id="continue-panel" class="continue-panel hidden"></div>
 
-                <!-- Credits overlay: shown when "Credits" clicked, hidden initially -->
-                <div id="credits-overlay" class="settings-overlay hidden"></div>
             </div>
         `;
 
@@ -222,37 +221,10 @@
             navigate("settings");
         });
 
-        // ── Button 5: Credits (data-driven from credits.js) ────
+        // ── Button 5: Asset Management ─────────────────────────
 
-        document.getElementById("btn-credits").addEventListener("click", () => {
-            const overlay = document.getElementById("credits-overlay");
-            overlay.classList.remove("hidden");
-
-            const sections = CREDITS.sections.map(sec => `
-                <div class="credits-section">
-                    <h3>${esc(_(sec.title))}</h3>
-                    ${sec.people.map(p => `<p class="credits-name">${esc(p)}</p>`).join("")}
-                </div>
-            `).join("");
-
-            overlay.innerHTML = `
-                <div class="settings-panel">
-                    <h2>${esc(_("Credits"))}</h2>
-                    <p class="credits-app">${esc(_(CREDITS.app))}</p>
-                    <p class="text-muted" style="margin-bottom:1.5rem">${esc(_(CREDITS.tagline))}</p>
-                    ${sections}
-                    <button class="menu-btn settings-close" id="btn-credits-close">
-                        ${esc(_("Cancel"))}
-                    </button>
-                </div>
-            `;
-
-            overlay.addEventListener("click", (e) => {
-                if (e.target === overlay) overlay.classList.add("hidden");
-            });
-            document.getElementById("btn-credits-close").addEventListener("click", () => {
-                overlay.classList.add("hidden");
-            });
+        document.getElementById("btn-assets").addEventListener("click", () => {
+            navigate("assets");
         });
 
         // ── Button 6: Exit ────────────────────────────────────────
@@ -439,6 +411,20 @@
                 <div class="settings-content">
                     <div class="settings-form">
                         ${rows}
+                    </div>
+                    <!-- Credits (moved from main menu) -->
+                    <div class="settings-form" style="margin-top:2rem; padding-top:1.5rem; border-top:1px solid var(--border-color)">
+                        <h3 style="font-family:var(--font-mono); color:var(--text-accent); margin-bottom:1rem; text-align:center">
+                            ${esc(_("Credits"))}
+                        </h3>
+                        <div class="credits-section" style="text-align:center">
+                            <h3>${esc(_("Developers"))}</h3>
+                            <p class="credits-name">${CREDITS.developers.map(function(p) { return '<a class="credits-link" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.name) + '</a>'; }).join(" ")}</p>
+                        </div>
+                        <div class="credits-section" style="text-align:center">
+                            <h3>${esc(_("Contributors"))}</h3>
+                            <p class="credits-name">${CREDITS.contributors.map(function(p) { return '<a class="credits-link" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.name) + '</a>'; }).join(" ")}</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -881,6 +867,18 @@
 
         app.innerHTML = "";
         AdventureLogView.render(app, gameId, title);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       View: Asset Manager (#assets)
+       ──────────────────────────────────────────────────────────────
+       Left sidebar (type nav + "Auto Clean") + right card list.
+       Cards show name, description, use_count.  Click → image viewer.
+       Delegates to AssetManagerView.render() (assets.js).
+       ═══════════════════════════════════════════════════════════════════ */
+
+    function renderAssetManager() {
+        AssetManagerView.render(app);
     }
 
     /* ── Confirm Popup (delete confirmation) ───────────────────────── */

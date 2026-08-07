@@ -76,8 +76,8 @@ msgstr "图像 API 密钥"
 msgid "Image Model"
 msgstr "图像模型"
 
-msgid "Background Removal"
-msgstr "背景移除"
+msgid "Sprite Cutout"
+msgstr "立绘去底"
 
 msgid "Connection lost"
 msgstr "连接断开"
@@ -335,3 +335,43 @@ msgstr "慢"
 
 msgid "Fast"
 msgstr "快"
+
+# Asset management
+msgid "Asset Management"
+msgstr "素材管理"
+
+msgid "Clean Unused"
+msgstr "自动清理"
+
+msgid "In Use"
+msgstr "使用中"
+
+msgid "Asset in use, cannot delete"
+msgstr "素材使用中，无法删除"
+
+msgid "Cleanup complete."
+msgstr "清理完成"
+
+msgid "Cleanup complete, but many in-use assets remain. Try deleting old saves first."
+msgstr "清理完成，但使用中素材较多，建议删除存档再次尝试"
+
+msgid "Delete this asset?"
+msgstr "确定删除此素材？"
+
+msgid "Asset deleted."
+msgstr "素材已删除"
+
+msgid "No assets found"
+msgstr "暂无素材"
+
+msgid "Character Portrait"
+msgstr "角色立绘"
+
+msgid "Background Image"
+msgstr "背景图片"
+
+msgid "Developers"
+msgstr "开发者"
+
+msgid "Contributors"
+msgstr "贡献者"

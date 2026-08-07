@@ -552,3 +552,156 @@ class TestGameStart:
 
         res = client.post("/api/game/test-game-123/start")
         assert res.status_code == 400
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Asset API
+# ═══════════════════════════════════════════════════════════════════
+
+
+class TestAssets:
+    """Tests for GET /api/assets, POST /api/assets/clean,
+    DELETE /api/assets/{type}/{id}."""
+
+    @staticmethod
+    def _mock_media_dir(app_dir):
+        """Point the server module's cached _MEDIA_DIR at this fixture's
+        isolated media/ directory, and create the directory if missing."""
+        import storyloom.web.server as server_mod
+        media_dir = os.path.join(str(app_dir), "media")
+        os.makedirs(media_dir, exist_ok=True)
+        server_mod._MEDIA_DIR = media_dir
+        return media_dir
+
+    def test_list_assets_empty(self, client):
+        """When no _asset_lib.json exists, returns empty types dict."""
+        res = client.get("/api/assets")
+        assert res.status_code == 200
+        data = res.json()
+        assert "types" in data
+        assert data["types"] == {}
+
+    def test_list_assets_with_data(self, client, app_dir):
+        """When _asset_lib.json has entries, they are returned grouped."""
+        from storyloom.assets import AssetLibrary, AssetType
+
+        media_dir = self._mock_media_dir(app_dir)
+        lib = AssetLibrary(media_dir)
+        lib.add(AssetType.CHAR_PORTRAIT, "Hero", "Main character")
+        lib.add(AssetType.BACKGROUND, "Castle", "A dark castle")
+        lib.save()
+
+        res = client.get("/api/assets")
+        assert res.status_code == 200
+        data = res.json()
+        types = data["types"]
+        assert "char_portrait" in types
+        assert "background_img" in types
+        cp = types["char_portrait"]
+        assert len(cp) == 1
+        aid = list(cp.keys())[0]
+        assert cp[aid]["name"] == "Hero"
+        assert cp[aid]["use_count"] == 0
+
+    def test_clean_assets(self, client, app_dir):
+        """POST /api/assets/clean deletes unused assets."""
+        from storyloom.assets import AssetLibrary, AssetType
+
+        media_dir = self._mock_media_dir(app_dir)
+        lib = AssetLibrary(media_dir)
+        lib.add(AssetType.CHAR_PORTRAIT, "Unused")
+        lib.add(AssetType.CHAR_PORTRAIT, "AlsoUnused")
+        lib.save()
+
+        res = client.post("/api/assets/clean?keep_count=0")
+        assert res.status_code == 200
+        assert res.json()["deleted"] == 2
+
+        lib2 = AssetLibrary.load(media_dir)
+        assert len(lib2) == 0
+
+    def test_clean_assets_single_type(self, client, app_dir):
+        """POST /api/assets/clean?type=... only cleans that type."""
+        from storyloom.assets import AssetLibrary, AssetType
+
+        media_dir = self._mock_media_dir(app_dir)
+        lib = AssetLibrary(media_dir)
+        lib.add(AssetType.CHAR_PORTRAIT, "Hero")
+        lib.add(AssetType.BACKGROUND, "Castle")
+        lib.save()
+
+        res = client.post("/api/assets/clean?keep_count=0&type=char_portrait")
+        assert res.status_code == 200
+        assert res.json()["deleted"] == 1
+
+        lib2 = AssetLibrary.load(media_dir)
+        assert len(lib2) == 1  # only background remains
+        assert len(lib2.list_by_type(AssetType.CHAR_PORTRAIT)) == 0
+        assert len(lib2.list_by_type(AssetType.BACKGROUND)) == 1
+
+    def test_clean_assets_in_use_not_deleted(self, client, app_dir):
+        """Assets with use_count > 0 survive clean."""
+        from storyloom.assets import AssetLibrary, AssetType
+
+        media_dir = self._mock_media_dir(app_dir)
+        lib = AssetLibrary(media_dir)
+        a = lib.add(AssetType.CHAR_PORTRAIT, "InUse")
+        a.use_count = 3
+        lib.save()
+
+        res = client.post("/api/assets/clean?keep_count=0")
+        assert res.status_code == 200
+        assert res.json()["deleted"] == 0  # in-use asset survives
+
+        lib2 = AssetLibrary.load(media_dir)
+        assert len(lib2) == 1
+
+    def test_clean_assets_invalid_type(self, client):
+        """Invalid type string → 400."""
+        res = client.post("/api/assets/clean?type=invalid_type")
+        assert res.status_code == 400
+
+    def test_delete_asset(self, client, app_dir):
+        """DELETE an unused asset removes it and the file on disk."""
+        from storyloom.assets import AssetLibrary, AssetType
+
+        media_dir = self._mock_media_dir(app_dir)
+        os.makedirs(os.path.join(media_dir, "char_portrait"), exist_ok=True)
+        lib = AssetLibrary(media_dir)
+        asset = lib.add(AssetType.CHAR_PORTRAIT, "ToDelete")
+        file_path = os.path.join(media_dir, asset.file_path)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, "w") as f:
+            f.write("dummy")
+        lib.save()
+
+        res = client.delete(f"/api/assets/char_portrait/{asset.id}")
+        assert res.status_code == 200
+        assert res.json()["status"] == "deleted"
+
+        lib2 = AssetLibrary.load(media_dir)
+        assert lib2.get(AssetType.CHAR_PORTRAIT, asset.id) is None
+        assert not os.path.isfile(file_path)
+
+    def test_delete_asset_in_use_refused(self, client, app_dir):
+        """DELETE with use_count > 0 → 400."""
+        from storyloom.assets import AssetLibrary, AssetType
+
+        media_dir = self._mock_media_dir(app_dir)
+        lib = AssetLibrary(media_dir)
+        asset = lib.add(AssetType.CHAR_PORTRAIT, "InUse")
+        asset.use_count = 2
+        lib.save()
+
+        res = client.delete(f"/api/assets/char_portrait/{asset.id}")
+        assert res.status_code == 400
+
+    def test_delete_asset_not_found(self, client):
+        """DELETE non-existent asset → 404."""
+        res = client.delete("/api/assets/char_portrait/nonexistent")
+        assert res.status_code == 404
+
+    def test_delete_asset_invalid_type(self, client):
+        """DELETE with invalid type → 404."""
+        res = client.delete("/api/assets/invalid_type/some_id")
+        assert res.status_code == 404

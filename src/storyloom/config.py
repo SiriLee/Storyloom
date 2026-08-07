@@ -72,5 +72,8 @@ BG_REMOVAL_MODEL_SHA256 = (
     "309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8"
 )
 
+# ── Asset management ────────────────────────────────────────────
+CLEANUP_KEEP_COUNT = 50      # per-type keep target for auto-clean
+
 # ── Task framework (Phase 2) ────────────────────────────────────
 TASK_POOL_MAX_WORKERS = 4    # Thread 4 default pool size

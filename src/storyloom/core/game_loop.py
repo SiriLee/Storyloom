@@ -1295,6 +1295,7 @@ class GameLoop:
                 library.add(atype, aid,
                             "Stub " + ("Portrait" if atype == AssetType.CHAR_PORTRAIT else "Background"),
                             asset_id=aid)
+        library.save()
 
         self._process_factory = self._stub_process_factory()
         # -- §7.8 delete block end --
