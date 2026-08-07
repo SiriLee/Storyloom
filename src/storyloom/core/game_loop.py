@@ -1308,7 +1308,12 @@ class GameLoop:
             def _process(task):
                 time.sleep(0.01)
                 if task.task_type is TaskType.MATCH:
-                    task.result = local_name  # → EventDispatcher resolves via roster
+                    # §7.7: program match already failed in _enqueue_match
+                    # (otherwise task.process wouldn't be set).  Add a
+                    # roster entry so EventDispatcher can resolve the
+                    # local_name to an asset_id.
+                    roster.add(asset_type, local_name, "", target=target)
+                    task.result = local_name
                 else:  # GENERATE: fill the placeholder
                     roster.set_target(asset_type, local_name, target)
             return _process
