@@ -52,6 +52,7 @@ const GraphRenderer = (function () {
     let _history = [];           // {name, text}[]
     let _advanceCallback = null;  // called when user advances past text
     let _modeChangeCallback = null;  // called when auto/manual mode changes
+    let _pausedAuto = false;   // true when auto was paused for backlog/immersive/settings
 
     /* ── DOM helpers ────────────────────────────────────────────── */
     function $(sel) { return _container ? _container.querySelector(sel) : null; }
@@ -415,6 +416,8 @@ const GraphRenderer = (function () {
         var overlay = $("#vnBacklog");
         var list = $("#vnBacklogList");
         if (!overlay || !list) return;
+        /* Pause auto-advance while reading backlog */
+        if (_mode === "auto") { _pausedAuto = true; setAutoMode(false); }
         var html = "";
         for (var i = 0; i < _history.length; i++) {
             var h = _history[i];
@@ -429,7 +432,10 @@ const GraphRenderer = (function () {
 
     function hideBacklog() {
         var overlay = $("#vnBacklog");
-        if (overlay) overlay.style.display = "none";
+        if (!overlay) return;
+        var wasOpen = overlay.style.display === "flex";
+        overlay.style.display = "none";
+        if (wasOpen && _pausedAuto) { _pausedAuto = false; setAutoMode(true); }
     }
 
     /* ═══════════════════════════════════════════════════════════════
@@ -438,12 +444,17 @@ const GraphRenderer = (function () {
 
     function showSettings() {
         var overlay = $("#vnSettings");
-        if (overlay) overlay.style.display = "flex";
+        if (!overlay) return;
+        if (_mode === "auto") { _pausedAuto = true; setAutoMode(false); }
+        overlay.style.display = "flex";
     }
 
     function hideSettings() {
         var overlay = $("#vnSettings");
-        if (overlay) overlay.style.display = "none";
+        if (!overlay) return;
+        var wasOpen = overlay.style.display === "flex";
+        overlay.style.display = "none";
+        if (wasOpen && _pausedAuto) { _pausedAuto = false; setAutoMode(true); }
     }
 
     /* ═══════════════════════════════════════════════════════════════
@@ -469,12 +480,19 @@ const GraphRenderer = (function () {
            current typewriter finishes naturally. */
         if (_autoTimer) { clearTimeout(_autoTimer); _autoTimer = null; }
         if (_modeChangeCallback) _modeChangeCallback(on);
-        if (on && !_typing) {
+        /* Only auto-start the timer when text is already on screen
+           (typewriter completed).  If _currentText is empty the user
+           switched to auto before the first segment — let the typewriter
+           completion set the first autoTimer naturally. */
+        if (on && !_typing && _currentText) {
             _autoTimer = setTimeout(function () { _advance(); }, AUTO_BASE_MS);
         }
     }
 
     function setImmersive(on) {
+        /* Pause auto-advance on enter, restore on exit */
+        if (on && !_immersive && _mode === "auto") { _pausedAuto = true; setAutoMode(false); }
+        if (!on && _immersive && _pausedAuto) { _pausedAuto = false; setAutoMode(true); }
         _immersive = on;
         var topbar = $("#vnTopbar");
         var dialog = $("#vnDialog");
