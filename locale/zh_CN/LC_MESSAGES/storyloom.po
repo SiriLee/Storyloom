@@ -330,5 +330,17 @@ msgstr "文本"
 msgid "Graph"
 msgstr "图像"
 
+msgid "Slow"
+msgstr "慢"
+
+msgid "Fast"
+msgstr "快"
+
+msgid "Short"
+msgstr "短"
+
+msgid "Long"
+msgstr "长"
+
 msgid "Text Speed"
 msgstr "文字速度"
