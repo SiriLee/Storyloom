@@ -220,7 +220,18 @@ const GameView = (function () {
                 _wakeDisplay();
             },
             scene: (data) => {
-                /* §7.7: push to queue — _displayTick applies background */
+                /* §7.7: initial scene restoration (before any content)
+                   applies immediately — no queue slot, no pacing delay.
+                   Mid-game scene changes go through the normal queue. */
+                if (!_contentStarted && _gameMode === "graph") {
+                    if (data.assets && data.assets.background_img) {
+                        GraphRenderer.setBackground(
+                            GraphRenderer.assetUrl("background_img", data.assets.background_img)
+                        );
+                    }
+                    GraphRenderer.clearSprite();
+                    return;
+                }
                 _eventQueue.push({ type: "scene", data: data });
                 _wakeDisplay();
             },

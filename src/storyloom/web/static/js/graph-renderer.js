@@ -72,6 +72,7 @@ const GraphRenderer = (function () {
 
     function init(container) {
         _container = container;
+        _currentText = "";  // reset stale text from previous session
         _buildDOM();
         _bindEvents();
     }
