@@ -34,7 +34,7 @@
 
 const GraphRenderer = (function () {
     /* ── Tunable constants (§4) ─────────────────────────────────── */
-    const SPEEDS       = { slow: 25, normal: 15, fast: 8 };         // ms / char (typewriter)
+    const SPEEDS       = { slow: 25, normal: 15, fast: 5 };         // ms / char (typewriter)
     const AUTO_CHAR_MS = { short: 30, normal: 50, long: 70 };       // ms / char (auto-delay)
     const FONT_SIZES   = { small: "1.15rem", medium: "1.35rem", large: "1.55rem" };
     const AUTO_BASE_MS = 500;  // minimum auto-delay (ms)
