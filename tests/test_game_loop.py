@@ -1325,18 +1325,40 @@ class TestGameLoopGraphPipeline:
         assert isinstance(gl._task_pool, TaskPool)
 
     def test_mount_sets_process_factory(self, tmp_path):
-        """mount_graph_pipeline() stores a callable process_factory."""
+        """mount_graph_pipeline() stores a process_factory that accepts
+        (AssetType, str, GameAssetRoster) and returns a Task.process."""
         gl = self._make_gl()
         gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
         assert callable(gl._process_factory)
+        # Verify it returns a callable that accepts a Task
+        from storyloom.assets import AssetType
+        from storyloom.tasks import Task, TaskType
+        proc = gl._process_factory(AssetType.CHAR_PORTRAIT, "hero",
+                                   gl._roster)
+        assert callable(proc)
+        # proc should accept a Task argument
+        t = Task(TaskType.MATCH, 1, AssetType.CHAR_PORTRAIT)
+        proc(t)
+        t.complete()  # TaskPool calls complete() in finally; simulate here
+        assert t.result == "__stub__"
 
-    def test_mount_loads_empty_roster_when_no_file(self, tmp_path):
-        """mount_graph_pipeline() loads empty roster when _asset_roster.json
-        doesn't exist yet (deferred save — written on first DECLARE)."""
+    def test_mount_sets_roster_game_id(self, tmp_path):
+        """mount_graph_pipeline(game_id='test') → roster.game_id == 'test'."""
+        gl = self._make_gl()
+        gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
+        assert gl._roster.game_id == "test"
+
+    def test_mount_prepopulates_stub_entries(self, tmp_path):
+        """mount_graph_pipeline() adds __stub__ entries for each AssetType
+        so sync-match and async-match resolve during stub phase (§7.8 removes)."""
         gl = self._make_gl()
         gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
         assert gl._roster is not None
-        assert len(gl._roster) == 0
+        from storyloom.assets import AssetType
+        for atype in (AssetType.CHAR_PORTRAIT, AssetType.BACKGROUND):
+            item = gl._roster.lookup(atype, "__stub__")
+            assert item is not None, f"{atype.value} missing __stub__ entry"
+            assert item.target == "__stub__"
 
     def test_roster_is_none_before_mount(self):
         """Before mount_graph_pipeline(), _roster is None."""
@@ -1356,6 +1378,42 @@ class TestGameLoopGraphPipeline:
         # Text mode: story_begin, done (story_end flushed silently post-stream)
         assert "story_begin" in types
         assert "done" in types
+
+    def test_graph_mode_stream_round_binds_assets(self, tmp_path):
+        """Graph mode: stream_round() creates TaskGen, assets bound in UI dicts.
+
+        Verifies §7.6's core assertion: mount_graph_pipeline → stream_round()
+        → parser triggers TaskGen → EventDispatcher binds assets → UI dicts
+        carry 'assets' key.
+        """
+        from storyloom.assets import AssetType
+
+        gl = self._make_gl()
+        gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
+        gl.set_save_manager(_FakeSaveManager(str(tmp_path)))
+
+        # Replace mock with graph-mode XML (SCENE → MATCH task)
+        scene_xml = (
+            "001| <story>\n"
+            '002| <set var="SCENE" val="stub"/>\n'
+            '003| <seg>The tavern awaits.</seg>\n'
+            "004| </story>"
+        )
+        gl.api_client = MockApiClient(response=scene_xml)
+
+        gl.start_game()
+        gen = gl.stream_round()
+        events = list(gen)
+
+        # Extract UI dicts (skip token events)
+        ui_dicts = [e for e in events if isinstance(e, dict) and "type" in e]
+        types = {e["type"] for e in ui_dicts}
+        assert "scene" in types, f"Expected scene event in {types}"
+
+        # SCENE event must have BACKGROUND asset
+        scene = next(e for e in ui_dicts if e["type"] == "scene")
+        assert "assets" in scene, "SCENE missing assets in graph mode"
+        assert scene["assets"] == {AssetType.BACKGROUND.value: "__stub__"}
 
 
 class _FakeSaveManager:

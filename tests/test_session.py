@@ -156,12 +156,13 @@ class TestGameSessionLifecycle:
             assert gl._process_factory is not None
 
     def test_start_game_text_mode_does_not_mount(self):
-        """start_game(game_mode='text') → roster stays None."""
+        """start_game(game_mode='text') → all graph attrs stay None."""
         with tempfile.TemporaryDirectory() as root:
             session = GameSession(api_client=Mock(), saves_dir=root)
             gl, game_id = session.start_game(SAMPLE_RESULT, game_mode="text")
             assert gl._roster is None
             assert gl._task_pool is None
+            assert gl._process_factory is None
 
     def test_load_game_graph_mode_mounts_pipeline(self):
         """load_game reads config.mode='graph' → mount_graph_pipeline called."""
@@ -171,11 +172,31 @@ class TestGameSessionLifecycle:
             # Load back — should re-mount graph pipeline
             gl = session.load_game(game_id, "_init.json")
             assert gl._roster is not None
+            assert gl._task_pool is not None
+            assert gl._process_factory is not None
 
     def test_load_game_text_mode_does_not_mount(self):
-        """load_game reads config.mode='text' → roster stays None."""
+        """load_game reads config.mode='text' → all graph attrs stay None."""
         with tempfile.TemporaryDirectory() as root:
             session = GameSession(api_client=Mock(), saves_dir=root)
             _, game_id = session.start_game(SAMPLE_RESULT, game_mode="text")
             gl = session.load_game(game_id, "_init.json")
             assert gl._roster is None
+            assert gl._task_pool is None
+            assert gl._process_factory is None
+
+    def test_checkpoint_save_preserves_mode(self):
+        """start_game(graph) → to_save_dict() writes config.mode='graph'.
+        Loading that save data back → from_save_dict reads mode → graph."""
+        with tempfile.TemporaryDirectory() as root:
+            session = GameSession(api_client=Mock(), saves_dir=root)
+            gl, game_id = session.start_game(SAMPLE_RESULT, game_mode="graph")
+
+            # Simulate a checkpoint save
+            save_data = gl.to_save_dict()
+            assert save_data["config"]["mode"] == "graph"
+
+            # Load back from the save data (round-trip)
+            gl2 = session.load_game(game_id, "_init.json")
+            assert gl2._roster is not None
+            assert gl2._game_mode == "graph"

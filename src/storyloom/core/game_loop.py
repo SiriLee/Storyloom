@@ -1219,7 +1219,7 @@ class GameLoop:
         a TaskGenerator and injects it plus the shared task queue into
         the EventDispatcher.
         """
-        from storyloom.assets import AssetLibrary, GameAssetRoster
+        from storyloom.assets import AssetLibrary, AssetType, GameAssetRoster
         from storyloom.tasks import TaskPool
 
         self._game_mode = "graph"
@@ -1227,13 +1227,26 @@ class GameLoop:
         roster_path = os.path.join(saves_root, game_id, "_asset_roster.json")
         self._roster = GameAssetRoster.load(roster_path, library, game_id)
         self._task_pool = TaskPool()
+
+        # §7.6 stub: pre-populate roster with __stub__ entries so that
+        # sync-match and async-match both resolve.  §7.8 removes this.
+        for atype in (AssetType.CHAR_PORTRAIT, AssetType.BACKGROUND):
+            if library.get(atype, "__stub__") is None:
+                library.add(atype, "__stub__", "stub placeholder",
+                            asset_id="__stub__")
+            if self._roster.lookup(atype, "__stub__") is None:
+                self._roster.add(atype, "__stub__", "stub placeholder",
+                                 target="__stub__")
+
         self._process_factory = self._stub_process_factory()
 
     @staticmethod
     def _stub_process_factory():
-        """§7.6 stub — returns ``__stub__`` for all matches.
+        """§7.6 stub — returns ``__stub__`` for all MATCH results.
 
-        §7.8 replaces this with real LLM matching / image generation.
+        Relies on the caller having pre-populated the roster with a
+        ``__stub__`` entry per AssetType (done in ``mount_graph_pipeline``).
+        §7.8 replaces with real LLM matching / image generation.
         """
         import time
 

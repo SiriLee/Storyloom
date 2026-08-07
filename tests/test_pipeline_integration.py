@@ -599,6 +599,11 @@ class TestExample1FullGraphPipeline:
         assert "Mira.angry" in chars_with_expr
         assert "Alex.sad" in chars_with_expr
 
+    def test_options_event_present(self):
+        """Auto-choice produces 'options' UI event with choices data."""
+        opts = [r for r in self.results if r["type"] == "options"]
+        assert len(opts) >= 1, "Expected at least one 'options' event"
+
     # ── Narration SEG → no assets ──────────────────────────────────
 
     def test_narration_segs_have_no_assets(self):
@@ -733,6 +738,14 @@ class TestExample2FullGraphPipeline:
         # expose branch (filtered): expression variants absent
         assert "Yara.angry" not in chars
         assert "Kai.smile" not in chars
+
+    def test_options_events_present(self):
+        """Example 2 has two choices → two 'options' UI events."""
+        opts = [r for r in self.results if r["type"] == "options"]
+        assert len(opts) == 2, (
+            f"Expected 2 options events (confront_style + deal_choice), "
+            f"got {len(opts)}"
+        )
 
     def test_pre_and_post_bridge_segs(self):
         bridge_idx = next(

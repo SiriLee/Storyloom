@@ -558,10 +558,42 @@ class TestStreamParserTaskGenTrigger:
         mock.enqueue.assert_not_called()
 
     def test_seg_empty_char_does_not_trigger(self):
-        """<seg char=''> → no enqueue (empty = no portrait, §4.1)."""
+        """<seg char=''> → no enqueue AND no 'char' in payload
+        (empty = no portrait, §4.1 — same as absent)."""
         parser, mock = self._parser_with_mock()
         events = parser.feed_line('<seg char="">narration</seg>')
         assert len(events) == 1
+        mock.enqueue.assert_not_called()
+        assert "char" not in events[0].payload
+        mock.enqueue.assert_not_called()
+
+    # ── Post-bridge suppression (§3.1, §4.1) ─────────────────────
+
+    def test_scene_after_bridge_does_not_trigger_enqueue(self):
+        """Post-bridge SCENE → format error, enqueue NOT called."""
+        parser, mock = self._parser_with_mock()
+        parser.feed_line("<bridge/>")
+        events = parser.feed_line('<set var="SCENE" val="tavern"/>')
+        assert events == []
+        mock.enqueue.assert_not_called()
+
+    def test_declare_after_bridge_does_not_trigger_enqueue(self):
+        """Post-bridge DECLARE → format error, enqueue NOT called."""
+        parser, mock = self._parser_with_mock()
+        parser.feed_line("<bridge/>")
+        events = parser.feed_line(
+            '<declare kind="CHAR" name="ghost">desc</declare>')
+        assert events == []
+        mock.enqueue.assert_not_called()
+
+    def test_declare_invalid_kind_does_not_trigger_enqueue(self):
+        """DECLARE kind='BGM' → PARSE_ERROR, enqueue NOT called
+        (kind validation happens before the enqueue call)."""
+        parser, mock = self._parser_with_mock()
+        events = parser.feed_line(
+            '<declare kind="BGM" name="theme">epic</declare>')
+        assert len(events) == 1
+        assert events[0].type == EventType.PARSE_ERROR
         mock.enqueue.assert_not_called()
 
     # ── Non-media events ──────────────────────────────────────────
