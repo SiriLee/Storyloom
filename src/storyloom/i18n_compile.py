@@ -212,3 +212,19 @@ def generate_js_dict(locale_dir: str, output_path: str) -> None:
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n")
+
+
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path as _Path
+
+    _project = _Path(__file__).resolve().parents[2]
+    _locale = _project / "locale"
+    _web_js = _project / "src" / "storyloom" / "web" / "static" / "js"
+
+    compiled = compile_all(str(_locale))
+    print(f"[i18n] Compiled {len(compiled)} .mo file(s)")
+
+    js_out = _web_js / "i18n-dict.js"
+    generate_js_dict(str(_locale), str(js_out))
+    print(f"[i18n] Generated {js_out}")
