@@ -200,3 +200,86 @@ class TestGameSessionLifecycle:
             gl2 = session.load_game(game_id, "_init.json")
             assert gl2._roster is not None
             assert gl2._game_mode == "graph"
+
+
+# ═══════════════════════════════════════════════════════════════════
+# §7.7: prebuild_assets()
+# ═══════════════════════════════════════════════════════════════════
+
+
+# ═══════════════════════════════════════════════════════════════════
+# §7.8c DELETE BLOCK START — removed when prebuild_assets() replaced
+# ═══════════════════════════════════════════════════════════════════
+
+class TestPrebuildAssets:
+    """§7.7: material pre-build — temporary stub, §7.8c replaces with AI."""
+
+    # Self-contained test data — does not depend on SAMPLE_RESULT
+    _DATA = {
+        "story_config": {"title": "test"},
+        "characters": [
+            {"name": "Kael", "description": "A warrior"},
+            {"name": "Lira", "description": "A mage"},
+        ],
+        "locations": [
+            {"name": "Forest", "description": "Dark woods"},
+            {"name": "Castle", "description": "Ancient fortress"},
+        ],
+        "variables": [],
+        "outline": [],
+        "outline_text": "",
+    }
+
+    def test_prebuild_seeds_roster_from_story_config(self, tmp_path):
+        """prebuild_assets() calls _init_stub_roster and persists roster."""
+        from storyloom.assets import AssetType
+
+        api = _test_api_client()
+        session = GameSession(api, saves_dir=str(tmp_path))
+        data = dict(self._DATA)  # copy — start_game mutates it
+
+        gl, game_id = session.start_game(data, game_mode="graph")
+        assert gl._roster is not None
+
+        result = session.prebuild_assets(game_id)
+        assert result == {"status": "ok"}
+
+        # prebuild_assets() loads a new GameLoop internally — use it
+        gl2 = session.game_loop
+        assert gl2 is not None
+        roster = gl2._roster
+        assert roster.lookup(AssetType.CHAR_PORTRAIT, "Kael").target == "stub_default_portrait"
+        assert roster.lookup(AssetType.CHAR_PORTRAIT, "Lira").target == "stub_default_portrait"
+        assert roster.lookup(AssetType.BACKGROUND, "Forest").target == "stub_default_background"
+        assert roster.lookup(AssetType.BACKGROUND, "Castle").target == "stub_default_background"
+
+        import os as _os
+        roster_path = _os.path.join(session._saves_root, game_id, "_asset_roster.json")
+        assert _os.path.isfile(roster_path)
+
+    def test_prebuild_idempotent(self, tmp_path):
+        """Calling prebuild twice is safe."""
+        api = _test_api_client()
+        session = GameSession(api, saves_dir=str(tmp_path))
+
+        gl, game_id = session.start_game(dict(self._DATA), game_mode="graph")
+        assert gl._roster is not None
+
+        first = session.prebuild_assets(game_id)
+        second = session.prebuild_assets(game_id)
+        assert first == second == {"status": "ok"}
+
+    def test_prebuild_text_mode_is_noop(self, tmp_path):
+        """prebuild_assets() on text-mode game returns ok (roster is None)."""
+        api = _test_api_client()
+        session = GameSession(api, saves_dir=str(tmp_path))
+
+        gl, game_id = session.start_game(dict(self._DATA), game_mode="text")
+        assert gl._roster is None
+
+        data = session.prebuild_assets(game_id)
+        assert data == {"status": "ok"}
+
+# ═══════════════════════════════════════════════════════════════════
+# §7.8c DELETE BLOCK END
+# ═══════════════════════════════════════════════════════════════════

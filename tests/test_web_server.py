@@ -429,6 +429,95 @@ class TestCoCreateAbort:
 
 
 # ═══════════════════════════════════════════════════════════════════
+# §7.8c DELETE BLOCK START — endpoint replaced when AI pre-build added
+# ═══════════════════════════════════════════════════════════════════
+
+
+class TestCoCreatePrebuild:
+    def test_prebuild_returns_ok(self, client, app_dir):
+        """POST /api/co-create/prebuild → calls prebuild_assets, returns ok."""
+        from storyloom.web.server import _game_session
+
+        with patch.object(_game_session, "prebuild_assets",
+                          return_value={"status": "ok"}):
+            res = client.post("/api/co-create/prebuild",
+                              json={"game_id": "test-game-123"})
+
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "ok"
+
+
+# ═══════════════════════════════════════════════════════════════════
+# §7.8c DELETE BLOCK END
+# ═══════════════════════════════════════════════════════════════════
+
+
+# ═══════════════════════════════════════════════════════════════════
+# §7.7: Saves — game_mode in response
+# ═══════════════════════════════════════════════════════════════════
+
+
+class TestSaveGameMode:
+    def test_save_load_includes_game_mode_graph(self, client, app_dir):
+        """POST /api/saves/{id}/load/{file} → game_mode from config.mode."""
+        import os as _os
+        import json as _json
+
+        # Override saves root so the server finds our test save.
+        # Module-level _game_session was bound at import time to a
+        # different temp dir — patch it per-test.
+        from storyloom.web.server import _game_session
+        saves_root = _os.path.join(str(app_dir), "saves")
+        with patch.object(_game_session, "_saves_root", saves_root):
+            game_id = "test-gm-graph"
+            save_dir = _os.path.join(saves_root, game_id)
+            _os.makedirs(save_dir, exist_ok=True)
+            init_data = {
+                "version": 3,
+                "metadata": {"title": "T", "created_at": "", "updated_at": ""},
+                "config": {"temperature": None, "mode": "graph"},
+                "story_config": {"title": "T"},
+                "characters": [], "locations": [], "variables": [],
+                "state_vars": {}, "outline": [],
+                "progress": {"current_node": "", "checkpoint_snapshots": {}},
+            }
+            with open(_os.path.join(save_dir, "_init.json"), "w") as f:
+                _json.dump(init_data, f)
+
+            res = client.post(f"/api/saves/{game_id}/load/_init.json")
+            assert res.status_code == 200
+            assert res.json()["game_mode"] == "graph"
+
+    def test_save_load_defaults_to_text(self, client, app_dir):
+        """Save without config.mode → game_mode defaults to 'text'."""
+        import os as _os
+        import json as _json
+
+        from storyloom.web.server import _game_session
+        saves_root = _os.path.join(str(app_dir), "saves")
+        with patch.object(_game_session, "_saves_root", saves_root):
+            game_id = "test-gm-text"
+            save_dir = _os.path.join(saves_root, game_id)
+            _os.makedirs(save_dir, exist_ok=True)
+            init_data = {
+                "version": 3,
+                "metadata": {"title": "T", "created_at": "", "updated_at": ""},
+                "config": {"temperature": None},
+                "story_config": {"title": "T"},
+                "characters": [], "locations": [], "variables": [],
+                "state_vars": {}, "outline": [],
+                "progress": {"current_node": "", "checkpoint_snapshots": {}},
+            }
+            with open(_os.path.join(save_dir, "_init.json"), "w") as f:
+                _json.dump(init_data, f)
+
+            res = client.post(f"/api/saves/{game_id}/load/_init.json")
+            assert res.status_code == 200
+            assert res.json()["game_mode"] == "text"
+
+
+# ═══════════════════════════════════════════════════════════════════
 # Game: start (Round 1)
 # ═══════════════════════════════════════════════════════════════════
 
