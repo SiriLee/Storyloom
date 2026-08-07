@@ -6,6 +6,155 @@
 
 ---
 
+## 2026-08-07（周五）
+
+> **概述**：§7.6 Pipeline 集成收尾 + §7.7 图模式 UI 全栈实现 + 素材管理 UI 起步。一天内完成从 spec 撰写到可玩 VN 原型的完整闭环——后端 event→task 管道、前端 graph-renderer.js 渲染模块、游戏模式选择器、队列共享架构、自动/手动速度系统、场景过渡动画、最终审计与 33 项 bug 修复。共 61 commits，51 files，+9443/-282 lines，测试从 744 增至 847（+103）。
+
+### §7.6 Pipeline 集成 — Event→Task 管道上线
+
+**背景**：`graph-mode-spec/design.md` §3-4 定义 StreamParser→TaskGenerator→TaskPool 管道，§7.6 要求将其接入真实 GameLoop 流程。此前 §7.4 stub 框架和 §7.5 parser 扩展已就位，但 GameLoop 尚未调用 `consume_event()`。
+
+**决策**（commits `475c6e3` → `05937d6` → `9888ebb` → `c739c41` → `8c320ed` → `450ea13` → `052f081` → `8de6c63`）：
+
+1. **场景跨轮次连续性测试**（`475c6e3`）：Round 1→StateManager→Round 2 链条——验证 SCENE 事件在跨轮次时正确保留 `current_scene`
+
+2. **§7.6 Pipeline 集成**（`9888ebb`）：GameLoop 的 `stream_round()` 调用 `consume_event()` 处理 SCENE/DECLARE 图像事件，TaskGenerator 产出 Task→TaskPool 异步执行→结果通过 `assets` key 传播到 UI dict
+
+3. **Prompt 驱动 E2E 测试**（`c739c41`）：`tests/test_pipeline_integration.py`（766 行）——完整模拟 LLM 返回图像标签→parser→TaskGenerator→TaskPool→EventDispatcher 全链路
+
+4. **§7.6 Review 硬化**（`8c320ed`）：11 项 source review findings 修复——GENERATE stub 行为、注释准确性、幂等性边缘情况
+
+5. **Graph-mode PromptBuilder 接入**（`052f081`）：`build_round1_graph()` / `build_continue_graph()` 接入 GameLoop，图模式与文本模式共享 `stream_round()` 主循环
+
+6. **配置常量化**（`8de6c63`）：`DEFAULT_MEDIA_DIR` / `DEFAULT_SAVES_DIR` 加入 `config.py`——消除硬编码路径
+
+### §7.7 图模式 UI — 从 Spec 到可玩原型
+
+**背景**：Phase 2 图模式最后一环——将引擎侧的图像事件管道对接到用户可见的视觉小说界面。需要全新的前端渲染模块（graph-renderer.js）、样式系统（graph.css）、游戏模式选择与传递机制。
+
+#### Spec 撰写（commits `183bada` → `b62a3b7`，7 commits）
+
+1. **§7.7 UI 设计 spec**（`183bada`）：定义 VN 界面布局、事件类型映射、模式传递链
+2. **迭代修订**（`8dc8c42`→`bcb30b2`→`2cc6954`→`158c9b2`→`780bf0b`）：补充 e2e 流程、事件处理、素材预构建、结局流程、i18n spec、手动素材库设计
+3. **TDD 实现计划**（`b62a3b7`）：10 任务 15 文件
+
+#### 后端实现（commits `0cbda7f` → `15c3a6c`）
+
+1. **Stub 名册初始化**（`0cbda7f`, `96f9166`, `ff09880`）：`_init_stub_roster()` 从 `story_config` 提取角色名→预注册到 GameAssetRoster，替换硬编码 `__stub__` 占位符
+
+2. **Static 路由**（`48d1ca9`）：FastAPI mount `/media/` 静态目录，`game_mode` 加入 API 响应
+
+3. **素材预构建两阶段分离**（`15c3a6c`）：`/api/generate`（故事生成）→ `/api/prebuild`（素材预构建）——各自有引擎信号，解决前端无法区分生成失败和素材失败的问题
+
+#### 前端实现
+
+4. **前端基础设施**（`6d248c8`）：路由占位、CSS/JS 加载、模块入口
+
+5. **graph.css**（`b2decb0`）：视觉小说样式表——固定视口、角色立绘层、场景背景层、打字机文本框、选择面板、沉浸模式
+
+6. **graph-renderer.js**（`b82f8e7`）：VN 渲染模块——事件消费者（`showSegment`, `showScene`, `showChoices`, `showEnding`）、打字机效果、自动/手动模式、素材管理（`applyBackground`, `applySprite`, `clearSprite`）、回看面板、沉浸模式
+
+7. **Graph mode 集成**（`e5aef7e`）：`game.js` 按 `game_mode` 分支到 `TextRenderer` 或 `GraphRenderer`；`router.js` 添加 `/play/graph` 路由；`co-create.js` 传递模式参数
+
+#### 队列共享与 UX 迭代（commits `2a36e58` → `4cc94ea`）
+
+8. **Save 端点 game_mode**（`2a36e58`）：save/load 端点写入/读取 `game_mode`，客户端 `localStorage` 存储
+
+9. **移除重复代码**（`13f987d`）：`graph-renderer.js` 中重复的 `_flattenChoices` → 统一用 `TextRenderer._flattenChoices`
+
+10. **测试硬化**（`b9423d4`, `5573949`）：3 个覆盖率缺口修复 + 服务端预构建/save game_mode 测试
+
+11. **加载指示器统一**（`d2c43a3`）：1s 加载动画，graph 模式新增重试按钮
+
+12. **游戏模式选择器**（`ea077bc`）：设置页面新增"游戏模式"下拉框——文本冒险 / 视觉小说（graph）
+
+13. **模式标签 i18n**（`00bb295`）：Graph/Text 模式名走 gettext
+
+14. **样式隔离**（`2f013e7`）：graph.css 全局样式 → scoped 到 `.vn-scene`，防止污染文本模式页面
+
+15. **队列共享架构**（`b5468a9`）：文本和图模式共用 `_eventQueue` + `_displayTick`，仅渲染函数不同——核心设计决策（详见 [[2026-08-07-7-7-ui-implementation-session]]）
+
+16. **SCENE 事件走队列**（`0fb026a`, `212d5a5`）：SCENE 从 SSE handler 直接应用改为入队→`_displayTick` 消费——与文本段同步（`6ba0300` 后续修复了 `clearSprite` 被 assets block 误包裹的问题）
+
+17. **场景过渡动画**（`cdb3aeb`）：crossfade 过渡 + pacing 对齐
+
+18. **长度自适应自动延迟**（`4cc94ea`）：根据文本长度动态计算 display time
+
+19. **速度分档统一**（`e36d65a`）：3 档——慢(50ms/字)/中(15ms/字)/快(5ms/字)——共享常量，文本和 graph 模式一致
+
+#### 最终审计与 33 项修复（commits `1549615` → `c59d8d2`）
+
+20. **视口固定**（`1549615`, `d637b48`）：`position: fixed` 防止双滚动条；assets 应用时机从 SSE handler 移到 `_displayTick`
+
+21. **i18n 补全**（`9d22b34`）：设置标签缺失项补充
+
+22. **UX 打磨**（`215a318`）：场景延迟、存档筛选、文字稳定性、背景占位图
+
+23. **背景渐变**（`340601e`）：默认 placeholder 背景调暗
+
+24. **清除立绘修复**（`6ba0300`）：`clearSprite()` 移到 assets block 外部
+
+25. **Mode 同步**（`40d2ac5`）：P1 修复——`graph-renderer.js._mode` 和 `game.js._mode` 双变量不同步导致自动模式永久卡死。新增 `onModeChange` 回调
+
+26. **3 项 P2 打磨**（`9fa01d4`）：graph-renderer 小问题修复
+
+27. **自动模式首段跳过**（`083bc02`）：P2 修复——`_currentText` 为空时不设 autoTimer，防止 timer 在打字机运行中触发跳过
+
+28. **Stub MATCH 修复**（`18faedd`）：P2 修复——MATCH stub 路径不加入名册导致 LLM 即兴角色立绘消失
+
+29. **打字机速度调整**（`e4b9139`）：快档 8→5 ms/字
+
+30. **设置面板简化**（`08a3dc5`, `0281ddf`）：移除"文字速度"（打字机硬编码中速）；"自动延迟"→"显示速度"（快/中/慢），按钮顺序慢→中→快
+
+31. **i18n 编译**（`e83dbb9`, `a734215`）：编译 .po→.mo + JS i18n dict；`i18n_compile.py` 新增 `__main__` 入口
+
+32. **场景持久化**（`262ef94`）：`to_save_dict()`/`from_save_dict()` 写/读 `current_scene`；首轮 yield SCENE 恢复背景
+
+33. **Overlay 简化**（`5351193`）：`showBacklog/showSettings/setImmersive(true)` 直接切手动不恢复——移除 `_pausedAuto` 标志
+
+34. **Init 状态重置**（`c59d8d2`）：P2 修复——`_currentText` 在 `init()` 时重置，初始 scene 绕过队列直接应用
+
+**重要经验教训**（详见 [[2026-08-07-7-7-ui-implementation-session]]、[[2026-08-07-7-7-final-audit-and-fixes]]）：
+- 队列消费者（`_displayTick`）和打字机（`onAdvance`）职责边界必须清晰——打字机是纯展示层
+- 不能改 `onAdvance` 回调指向——会破坏自动模式
+- 跨模块状态同步使用回调模式（`onAdvance`, `onModeChange`）
+- CSS 变量和 JS 常量不硬编码
+- graph-renderer.js 的模块级变量在 `init()` 时必须手动重置
+
+### 素材管理 UI 起步
+
+**背景**：[[2026-08-07-7-7-final-audit-and-fixes]] 指出下一阶段为素材管理——浏览/管理 `media/` 下素材、`_asset_lib.json` CRUD、`use_count` 清理。用户直接开始了实现。
+
+**决策**（commit `9d8b7aa`）：
+- 14 files，+1029/-60 lines
+- 后端：`/api/assets` CRUD 端点（`server.py` +74 行），`_library.py` 新增 API
+- 前端：`assets.js`（298 行）素材浏览/管理界面，`main.css`（334 行）素材面板样式
+- 路由：`router.js` 重构——支持 `/assets` 页面
+- i18n：zh_CN/zh_TW .po 各 +44 行
+- 测试：`test_web_server.py` +153 行
+
+**依据**：
+- commits: `9d8b7aa`
+- memory: [[2026-08-07-7-7-final-audit-and-fixes]] §下一阶段
+- `docs/graph-mode-spec/design.md`：§2.2 (AssetLibrary)、§9 (存储与文件)
+
+### 关键数据
+
+| 指标 | 值 |
+|------|-----|
+| 今日 commits | 61 |
+| 文件变更 | 51 files, +9443/-282 |
+| 测试数量 | 744 → 847 (+103) |
+| 新建文件 | `graph-renderer.js`, `graph.css`, `assets.js`, `main.css`, `test_pipeline_integration.py` 等 |
+| 两日合计（8/6-8/7） | 84 commits, ~78 files, ~+12.7k lines |
+
+**依据**：
+- memory: [[2026-08-07-7-7-ui-implementation-session]]、[[2026-08-07-7-7-final-audit-and-fixes]]
+- 61 commits on 2026-08-07 (see `git log --since=2026-08-07`)
+- pytest: 847 passed
+
+---
+
 ## 2026-08-06（周四）
 
 > **概述**：Phase 2 引擎侧核心实现日——§7.4 Task 框架 stub + §7.5 StreamParser 图模式扩展 + graph-mode PromptBuilder 三模块落地。同步完成 prompt-design 基线文档、两轮 test hardening、§7.5 E2E pipeline 测试。共 23 commits，27 files，+3216/-107 lines，测试从 720 增至 744。
