@@ -204,25 +204,14 @@ const GameView = (function () {
             token: () => { /* silent — reserved for typewriter effect */ },
             segment: (data) => {
                 _contentStarted = true;
-                /* §7.7: assets applied immediately (visual layers).
-                   No char → clear sprite (design.md §4.1: char="" means no portrait). */
-                if (_gameMode === "graph") {
-                    if (data.assets && data.assets.background_img) {
-                        GraphRenderer.setBackground(
-                            GraphRenderer.assetUrl("background_img", data.assets.background_img)
-                        );
-                    }
-                    if (data.char) {
-                        if (data.assets && data.assets.char_portrait) {
-                            GraphRenderer.setSprite(
-                                GraphRenderer.assetUrl("char_portrait", data.assets.char_portrait)
-                            );
-                        }
-                    } else {
-                        GraphRenderer.clearSprite();
-                    }
-                }
-                _eventQueue.push({ type: "segment", text: data.text, char: data.char || null });
+                /* §7.7: push text + assets to queue.  _displayTick applies
+                   both together so sprite changes sync with dialogue. */
+                _eventQueue.push({
+                    type: "segment",
+                    text: data.text,
+                    char: data.char || null,
+                    assets: data.assets || null,
+                });
                 _wakeDisplay();
             },
             scene: (data) => {
@@ -391,6 +380,21 @@ const GameView = (function () {
             GraphRenderer.clearSprite();  // new scene → reset character
         } else if (event.type === "segment") {
             if (_gameMode === "graph") {
+                /* Apply assets in sync with text display */
+                if (event.assets) {
+                    if (event.assets.background_img) {
+                        GraphRenderer.setBackground(
+                            GraphRenderer.assetUrl("background_img", event.assets.background_img)
+                        );
+                    }
+                    if (event.char && event.assets.char_portrait) {
+                        GraphRenderer.setSprite(
+                            GraphRenderer.assetUrl("char_portrait", event.assets.char_portrait)
+                        );
+                    } else if (!event.char) {
+                        GraphRenderer.clearSprite();
+                    }
+                }
                 GraphRenderer.showSegment(event.text, event.char || null);
                 return;  // typewriter controls its own pacing
             }

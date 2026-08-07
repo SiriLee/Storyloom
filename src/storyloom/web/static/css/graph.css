@@ -34,7 +34,7 @@
 /* ── Scene Container ─────────────────────────────────────────────── */
 
 .vn-scene {
-  position: absolute; inset: 0;
+  position: fixed; inset: 0;  /* fill viewport, ignore parent constraints */
 }
 
 /* ── Background Layer ────────────────────────────────────────────── */
