@@ -1631,13 +1631,16 @@ class TestInitStubRoster:
         ])
 
         self._call_init(roster, config)
-        # Manually change description to simulate modification
-        roster.lookup(AssetType.CHAR_PORTRAIT, "Aldric").local_description = "Modified"
+        # Manually change both mutable fields to simulate modification
+        item = roster.lookup(AssetType.CHAR_PORTRAIT, "Aldric")
+        item.local_description = "Modified"
+        item.target = "other_asset"
         # Second call — must skip (already exists)
         self._call_init(roster, config)
 
-        item = roster.lookup(AssetType.CHAR_PORTRAIT, "Aldric")
-        assert item.local_description == "Modified"  # not overwritten
+        item2 = roster.lookup(AssetType.CHAR_PORTRAIT, "Aldric")
+        assert item2.local_description == "Modified"   # not overwritten
+        assert item2.target == "other_asset"            # not overwritten
 
     def test_empty_config_no_error(self, tmp_path):
         """Empty or missing characters/locations → no error."""

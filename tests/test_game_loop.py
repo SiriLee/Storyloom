@@ -1341,8 +1341,21 @@ class TestGameLoopGraphPipeline:
         # §7.7: MATCH task.result = local_name (not __stub__).
         # EventDispatcher resolves via roster.lookup(type, result).target.
         proc(t)
-        t.complete()  # TaskPool calls complete() in finally; simulate here
-        assert t.result == "hero"  # factory returns the local_name passed in
+        t.complete()
+        assert t.result == "hero"
+
+        # §7.7: GENERATE → set_target to correct stub asset ID
+        g = Task(TaskType.GENERATE, 0, AssetType.CHAR_PORTRAIT)
+        # Simulate TaskGenerator creating a placeholder first
+        gl._roster.add(AssetType.CHAR_PORTRAIT, "new_hero",
+                       "New character", target=None)
+        proc2 = gl._process_factory(AssetType.CHAR_PORTRAIT, "new_hero",
+                                    gl._roster)
+        proc2(g)
+        g.complete()
+        item = gl._roster.lookup(AssetType.CHAR_PORTRAIT, "new_hero")
+        assert item is not None
+        assert item.target == "stub_default_portrait"
 
     def test_mount_sets_roster_game_id(self, tmp_path):
         """mount_graph_pipeline(game_id='test') → roster.game_id == 'test'."""
@@ -1431,6 +1444,38 @@ class TestGameLoopGraphPipeline:
         scene = next(e for e in ui_dicts if e["type"] == "scene")
         assert "assets" in scene, "SCENE missing assets in graph mode"
         assert scene["assets"] == {AssetType.BACKGROUND.value: "stub_default_background"}
+
+    def test_graph_mode_stream_round_binds_char_portrait(self, tmp_path):
+        """§7.7: SEG with char → CHAR_PORTRAIT MATCH → asset binding."""
+        from storyloom.assets import AssetType
+
+        gl = self._make_gl()
+        gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
+        gl.set_save_manager(_FakeSaveManager(str(tmp_path)))
+
+        # Simulate _init_stub_roster for the char name
+        gl._roster.add(AssetType.CHAR_PORTRAIT, "Aldric",
+                       "A wise mage", target="stub_default_portrait")
+
+        seg_xml = (
+            "001| <story>\n"
+            '002| <seg char="Aldric">We should not be here.</seg>\n'
+            "003| </story>"
+        )
+        gl.api_client = MockApiClient(response=seg_xml)
+
+        gl.start_game()
+        gen = gl.stream_round()
+        events = list(gen)
+
+        ui_dicts = [e for e in events if isinstance(e, dict) and "type" in e]
+        segs = [e for e in ui_dicts if e["type"] == "segment"]
+        assert len(segs) >= 1, f"Expected segment event, got types: { {e['type'] for e in ui_dicts} }"
+
+        seg = segs[0]
+        assert seg.get("char") == "Aldric"
+        assert "assets" in seg, "SEG missing assets in graph mode"
+        assert seg["assets"] == {AssetType.CHAR_PORTRAIT.value: "stub_default_portrait"}
 
     def test_graph_mode_uses_graph_prompt_round1(self, tmp_path):
         """Graph mode start_game() → build_round1_graph, not build_round1."""
