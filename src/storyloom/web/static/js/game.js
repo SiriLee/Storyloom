@@ -223,12 +223,9 @@ const GameView = (function () {
                 _wakeDisplay();
             },
             scene: (data) => {
-                /* §7.7: standalone SCENE event — update background layer */
-                if (_gameMode === "graph" && data.assets && data.assets.background_img) {
-                    GraphRenderer.setBackground(
-                        GraphRenderer.assetUrl("background_img", data.assets.background_img)
-                    );
-                }
+                /* §7.7: push to queue — _displayTick applies background */
+                _eventQueue.push({ type: "scene", data: data });
+                _wakeDisplay();
             },
             bridge: () => {
                 _eventQueue.push({ type: "bridge" });
@@ -342,7 +339,7 @@ const GameView = (function () {
             /* Ending: all bridge_text displayed, show end choice
                (exec-flow.md §5.2 step 4-5: bridge_text must finish
                before adventure log prompt). */
-            if (_ending && !_endChoiceShown) {
+            if (_ending && !_endChoiceShown && _gameMode !== "graph") {
                 _showEndChoice();
                 return;
             }
@@ -369,6 +366,17 @@ const GameView = (function () {
         _cancelLoading();
         Display.hideLoading();
         const event = _eventQueue.shift();
+
+        if (event.type === "scene") {
+            /* §7.7: apply background immediately, no pacing — continue */
+            if (_gameMode === "graph" && event.data.assets && event.data.assets.background_img) {
+                GraphRenderer.setBackground(
+                    GraphRenderer.assetUrl("background_img", event.data.assets.background_img)
+                );
+            }
+            _drainTimer = setTimeout(_displayTick, 0);
+            return;
+        }
 
         if (event.type === "segment") {
             if (_gameMode === "graph") {
