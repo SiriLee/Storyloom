@@ -391,9 +391,10 @@ const GameView = (function () {
                         GraphRenderer.setSprite(
                             GraphRenderer.assetUrl("char_portrait", event.assets.char_portrait)
                         );
-                    } else if (!event.char) {
-                        GraphRenderer.clearSprite();
                     }
+                }
+                if (!event.char) {
+                    GraphRenderer.clearSprite();
                 }
                 GraphRenderer.showSegment(event.text, event.char || null);
                 return;  // typewriter controls its own pacing
