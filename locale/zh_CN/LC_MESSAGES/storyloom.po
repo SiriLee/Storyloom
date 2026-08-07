@@ -324,5 +324,11 @@ msgstr "正在准备你的世界"
 msgid "Game Mode"
 msgstr "游戏模式"
 
+msgid "Text"
+msgstr "文本"
+
+msgid "Graph"
+msgstr "图像"
+
 msgid "Text Speed"
 msgstr "文字速度"
