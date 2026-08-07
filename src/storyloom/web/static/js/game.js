@@ -22,6 +22,7 @@ const GameView = (function () {
     /* ── Internal state ──────────────────────────────────────────── */
     let _container = null;
     let _gameId = null;
+    let _gameMode = "text";    // §7.7: "text" | "graph"
     let _title = "";
 
     /* Display settings (defaults per user spec) */
@@ -69,9 +70,10 @@ const GameView = (function () {
      *  @param {Element} container — DOM element to render into
      *  @param {string} gameId
      *  @param {string} title — story name for the top bar */
-    async function render(container, gameId, title) {
+    async function render(container, gameId, title, gameMode) {
         _container = container;
         _gameId = gameId;
+        _gameMode = gameMode || "text";  // §7.7: from server config, not hardcoded
         _title = title;
         _ending = false;
         _endChoiceShown = false;
@@ -121,6 +123,16 @@ const GameView = (function () {
        ═══════════════════════════════════════════════════════════════ */
 
     function _buildDOM() {
+        /* §7.7: graph mode — delegate to GraphRenderer */
+        if (_gameMode === "graph") {
+            GraphRenderer.init(_container);
+            GraphRenderer.setTitle(_title);
+            /* Bind VN exit button */
+            var exitBtn = _container.querySelector("#vnBtnExit");
+            if (exitBtn) exitBtn.addEventListener("click", _handleExit);
+            return;
+        }
+
         _container.innerHTML = `
             <div class="game-view">
                 <!-- Top bar -->
@@ -184,19 +196,53 @@ const GameView = (function () {
             token: () => { /* silent — reserved for typewriter effect */ },
             segment: (data) => {
                 _contentStarted = true;
-                _eventQueue.push({ type: "segment", text: data.text });
-                _wakeDisplay();
+                if (_gameMode === "graph") {
+                    /* §7.7: direct rendering — no queue */
+                    if (data.assets) {
+                        if (data.assets.background_img) {
+                            GraphRenderer.setBackground(
+                                "/media/background_img/" + data.assets.background_img + ".png"
+                            );
+                        }
+                        if (data.assets.char_portrait) {
+                            GraphRenderer.setSprite(
+                                "/media/char_portrait/" + data.assets.char_portrait + ".png"
+                            );
+                        }
+                    }
+                    GraphRenderer.showSegment(data.text, data.char || null);
+                } else {
+                    _eventQueue.push({ type: "segment", text: data.text });
+                    _wakeDisplay();
+                }
             },
             bridge: () => {
                 _eventQueue.push({ type: "bridge" });
                 _wakeDisplay();
             },
             options: (data) => {
-                /* Defer to display loop — when the queue is naturally
-                   empty (all pre-choice segments displayed at normal
-                   pace), _displayTick will show the choices. */
-                _optionsPending = data;
-                _wakeDisplay();
+                if (_gameMode === "graph") {
+                    /* §7.7: show choices immediately via VN overlay */
+                    GraphRenderer.showChoices(data.choices || [], async (key) => {
+                        var flat = Display.flattenChoices(data.choices || []);
+                        var selected = flat.find(function (o) { return o.key === key; });
+                        if (selected) {
+                            GraphRenderer.showSegment(selected.label, null);
+                        }
+                        try {
+                            await SSEClient.sendChoice(_gameId, key);
+                        } catch (err) {
+                            Display.showErrorModal(
+                                _("Choice send failed: ") + err.message,
+                                function () { /* retry: re-show choices */ },
+                                function () { Router.navigate("menu"); }
+                            );
+                        }
+                    });
+                } else {
+                    _optionsPending = data;
+                    _wakeDisplay();
+                }
             },
             state: (data) => {
                 if (data.vars) GameState.stateVars = data.vars;
@@ -215,6 +261,14 @@ const GameView = (function () {
                 if (data.node) GameState.currentNode = data.node;
                 if (data.state) GameState.stateVars = data.state;
                 GameState.roundCount = (GameState.roundCount || 0) + 1;
+                /* §7.7: graph mode ending — show VN adventure log button */
+                if (_gameMode === "graph" && _ending) {
+                    GraphRenderer.showEndChoice(function () {
+                        _stopDisplayLoop();
+                        SSEClient.close();
+                        Router.navigate("adventure-log/" + encodeURIComponent(_gameId));
+                    });
+                }
             },
         };
 
@@ -259,6 +313,7 @@ const GameView = (function () {
     function _stopDisplayLoop() {
         _displayRunning = false;
         _isPolling = false;
+        if (_gameMode === "graph") GraphRenderer.destroy();  // §7.7
         _lastAdvanceTime = 0;
         _cancelLoading();
         if (_advanceResolve) { _advanceResolve(); _advanceResolve = null; }

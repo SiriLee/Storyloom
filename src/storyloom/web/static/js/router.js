@@ -651,7 +651,8 @@
 
         /* Clear the app shell — GameView builds its own DOM */
         app.innerHTML = "";
-        GameView.render(app, gameId, title);
+        var gameMode = GameState.gameMode || "text";  // §7.7
+        GameView.render(app, gameId, title, gameMode);
     }
 
     /* ═══════════════════════════════════════════════════════════════

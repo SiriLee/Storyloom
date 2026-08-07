@@ -147,6 +147,7 @@ const CoCreateView = (function () {
 
             // Step 2: Store game_id + story config for the preview page
             GameState.gameId = genData.game_id;
+            GameState.gameMode = genData.game_mode || "text";  // §7.7
             GameState.storyConfig = genData.story_config;
 
             // Step 3: Navigate to the game preview (transition) page
@@ -173,6 +174,7 @@ const CoCreateView = (function () {
 
             // Step 2: Store game_id + story config for the preview page
             GameState.gameId = genData.game_id;
+            GameState.gameMode = genData.game_mode || "text";  // §7.7
             GameState.storyConfig = genData.story_config;
 
             // Step 3: Navigate to the game preview (transition) page
