@@ -46,7 +46,7 @@ const GameView = (function () {
     let _advanceResolve = null;  // resolve when user clicks / Space / Enter
     let _lastAdvanceTime = 0;    // debounce OS key repeat (ms timestamp)
     let _keydownHandler = null;  // named ref for cleanup
-    let _loadingTimer = null;    // delayed loading indicator (500 ms debounce)
+    let _loadingTimer = null;    // delayed loading indicator (1 s debounce, §7.7 unified)
     let _optionsPending = null;  // options event data awaiting display
 
     /* Ending flag — set when ending event received */
@@ -223,22 +223,25 @@ const GameView = (function () {
             options: (data) => {
                 if (_gameMode === "graph") {
                     /* §7.7: show choices immediately via VN overlay */
-                    GraphRenderer.showChoices(data.choices || [], async (key) => {
-                        var flat = Display.flattenChoices(data.choices || []);
-                        var selected = flat.find(function (o) { return o.key === key; });
-                        if (selected) {
-                            GraphRenderer.showSegment(selected.label, null);
-                        }
-                        try {
-                            await SSEClient.sendChoice(_gameId, key);
-                        } catch (err) {
-                            Display.showErrorModal(
-                                _("Choice send failed: ") + err.message,
-                                function () { /* retry: re-show choices */ },
-                                function () { Router.navigate("menu"); }
-                            );
-                        }
-                    });
+                    var _showGraphChoices = function () {
+                        GraphRenderer.showChoices(data.choices || [], async (key) => {
+                            var flat = Display.flattenChoices(data.choices || []);
+                            var selected = flat.find(function (o) { return o.key === key; });
+                            if (selected) {
+                                GraphRenderer.showSegment(selected.label, null);
+                            }
+                            try {
+                                await SSEClient.sendChoice(_gameId, key);
+                            } catch (err) {
+                                Display.showErrorModal(
+                                    _("Choice send failed: ") + err.message,
+                                    _showGraphChoices,  // retry: re-show same choices
+                                    function () { Router.navigate("menu"); }
+                                );
+                            }
+                        });
+                    };
+                    _showGraphChoices();
                 } else {
                     _optionsPending = data;
                     _wakeDisplay();
@@ -345,14 +348,18 @@ const GameView = (function () {
                 _showEndChoice();
                 return;
             }
-            /* Debounced loading — only show after 500 ms of genuine
-               wait (TTFT / inter-round), not pacing gaps. */
+            /* §7.7: unified 1 s debounce.  graph mode → dialog dots;
+               text mode → story-area dots. */
             if (!_loadingTimer) {
                 _loadingTimer = setTimeout(() => {
                     if (_displayRunning && _eventQueue.length === 0) {
-                        Display.showLoading();
+                        if (_gameMode === "graph") {
+                            GraphRenderer.showLoading();
+                        } else {
+                            Display.showLoading();
+                        }
                     }
-                }, 500);
+                }, 1000);
             }
             _isPolling = true;
             _drainTimer = setTimeout(_displayTick, 150);
@@ -403,7 +410,8 @@ const GameView = (function () {
     function _wakeDisplay() {
         if (!_displayRunning) return;
         _cancelLoading();
-        Display.hideLoading();
+        if (_gameMode === "graph") GraphRenderer.hideLoading();  // §7.7
+        else Display.hideLoading();
         if (_isPolling) {
             _isPolling = false;
             if (_drainTimer) { clearTimeout(_drainTimer); _drainTimer = null; }

@@ -240,6 +240,21 @@ const GraphRenderer = (function () {
         if (container) container.innerHTML = "";
     }
 
+    /* ── Loading indicator ──────────────────────────────────────── */
+
+    function showLoading() {
+        var el = $("#vnText");
+        if (!el || el.textContent) return;  // don't overwrite existing text
+        el.innerHTML = '<span style="color:var(--text-secondary);font-style:italic">'
+            + _("Loading") + '<span class="cc-dots"><span>.</span><span>.</span><span>.</span></span></span>';
+    }
+
+    function hideLoading() {
+        var el = $("#vnText");
+        // Only clear if it's the loading placeholder (text set by showLoading)
+        if (el && el.querySelector(".cc-dots")) el.textContent = "";
+    }
+
     /* ═══════════════════════════════════════════════════════════════
        Typewriter
        ═══════════════════════════════════════════════════════════════ */
@@ -479,6 +494,8 @@ const GraphRenderer = (function () {
         setBackground: setBackground,
         setSprite: setSprite,
         clearSprite: clearSprite,
+        showLoading: showLoading,
+        hideLoading: hideLoading,
         showSegment: showSegment,
         showChoices: showChoices,
         clearChoices: clearChoices,
