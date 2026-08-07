@@ -51,6 +51,7 @@ const GraphRenderer = (function () {
     let _currentText = "";       // for auto-delay calculation
     let _history = [];           // {name, text}[]
     let _advanceCallback = null;  // called when user advances past text
+    let _modeChangeCallback = null;  // called when auto/manual mode changes
 
     /* ── DOM helpers ────────────────────────────────────────────── */
     function $(sel) { return _container ? _container.querySelector(sel) : null; }
@@ -360,6 +361,10 @@ const GraphRenderer = (function () {
         _advanceCallback = callback;
     }
 
+    function onModeChange(callback) {
+        _modeChangeCallback = callback;
+    }
+
     /* ═══════════════════════════════════════════════════════════════
        Choices
        ═══════════════════════════════════════════════════════════════ */
@@ -457,6 +462,7 @@ const GraphRenderer = (function () {
                 : '<polygon points="6,4 20,12 6,20"/>';
         }
         _stopTimers();
+        if (_modeChangeCallback) _modeChangeCallback(on);
         if (on && !_typing) {
             _autoTimer = setTimeout(function () { _advance(); }, AUTO_BASE_MS);
         }
@@ -539,6 +545,7 @@ const GraphRenderer = (function () {
         setAutoMode: setAutoMode,
         setImmersive: setImmersive,
         onAdvance: onAdvance,
+        onModeChange: onModeChange,
         setTitle: setTitle,
     };
 })();

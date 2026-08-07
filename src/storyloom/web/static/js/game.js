@@ -136,6 +136,11 @@ const GameView = (function () {
             GraphRenderer.setTitle(_title);
             /* Typewriter controls pacing — completion triggers next tick */
             GraphRenderer.onAdvance(function () { _displayTick(); });
+            /* Sync game.js._mode with VN auto button so scene/bridge
+               events respect the VN auto/manual setting (§7.7). */
+            GraphRenderer.onModeChange(function (auto) {
+                _mode = auto ? "auto" : "manual";
+            });
             var exitBtn = _container.querySelector("#vnBtnExit");
             if (exitBtn) exitBtn.addEventListener("click", _handleExit);
             return;
