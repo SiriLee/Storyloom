@@ -396,6 +396,61 @@ class TestTextModeUnaffected:
         assert "{scene_line}" not in ROUND_TEMPLATE
         assert "{bridge_text}" in ROUND_TEMPLATE
 
+    def test_scene_continuity_across_rounds(self, empty_gs):
+        """scene_line bridges scenes between rounds.
+
+        Round 1 processes Example 1 → current_scene set to grand_hotel_lobby.
+        Round 2 calls build_round_n_graph with that scene → reflected in prompt.
+        Without a scene → instruction to set one.
+        """
+        from storyloom.core.prompt_builder import PromptBuilder
+
+        # Simulate Round 1: feed Example 1 through StateManager
+        sm = StateManager(empty_gs)
+        parser = StreamParser()
+        events = _feed_xml(parser, _extract_example_xml(1))
+        for e in events:
+            list(sm.process(e))
+
+        # After Round 1, StateManager knows the scene
+        assert sm.current_scene == "grand_hotel_lobby"
+
+        # Round 2 prompt reflects the scene from Round 1
+        round2 = PromptBuilder.build_round_n_graph(
+            outline_text="ch1 [active]",
+            current_node="ch1",
+            goal="Continue",
+            state_vars={"GLOBAL": {}},
+            variables=[],
+            bridge_text="He walked away.",
+            current_scene=sm.current_scene,
+        )
+        assert "(Current scene: grand_hotel_lobby)" in round2
+
+        # Round 2 with no scene → instruction
+        round2_none = PromptBuilder.build_round_n_graph(
+            outline_text="ch1 [active]",
+            current_node="ch1",
+            goal="Continue",
+            state_vars={"GLOBAL": {}},
+            variables=[],
+            bridge_text="He walked away.",
+            current_scene=None,
+        )
+        assert "(No scene is set" in round2_none
+
+        # Round 1 always produces "not set" instruction
+        round1 = PromptBuilder.build_round1_graph(
+            story_config={"language": "en"},
+            outline_text="ch1 [active]",
+            current_node="ch1",
+            goal="Start",
+            state_vars={"GLOBAL": {}},
+        )
+        assert "(No scene is set" in round1
+        # scene_line specifically has the instruction, not the example content
+        assert "Current scene:" not in round1
+
     def test_text_mode_builders_still_work(self):
         """build_round1 / build_round_n still return valid strings."""
         from storyloom.core.prompt_builder import PromptBuilder
