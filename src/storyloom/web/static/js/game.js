@@ -27,15 +27,15 @@ const GameView = (function () {
 
     /* Display settings (defaults per user spec) */
     let _mode = "manual";       // "manual" | "auto"
-    let _speed = 1;             // 0.75 | 1 | 2 | 3  (1x = 2.0s per segment)
+    let _speed = "normal";     // "slow" | "normal" | "fast" (§7.7 unified 3-tier)
     let _fontSize = "medium";   // "small" | "medium" | "large"
     let _lineSpacing = 1.0;     // 0.75 | 1.0 | 1.25
 
-    /* §7.7: auto-delay proportional to text length (common VN convention).
-       delay = BASE_PAUSE + text.length * ms-per-char.  */
-    const AUTO_BASE_MS = 500;                              // minimum pause
-    const AUTO_CHAR_MS = { 0.75: 80, 1: 50, 2: 30, 3: 15 };  // per speed
-    const ADVANCE_DEBOUNCE_MS = 200;  // minimum ms between manual advances
+    /* §7.7: auto-delay proportional to text length.  Values match
+       graph-renderer.js AUTO_CHAR_MS. */
+    const AUTO_BASE_MS = 500;
+    const AUTO_CHAR_MS = { slow: 70, normal: 50, fast: 30 };
+    const ADVANCE_DEBOUNCE_MS = 200;
 
     /* Queue buffer for paced display (exec-flow.md §4.5).
        Receiver (SSE handlers) pushes; display loop (_displayTick)
@@ -716,7 +716,9 @@ const GameView = (function () {
 
     function _loadDisplayPrefs() {
         const savedSpeed = localStorage.getItem("storyloom-game-speed");
-        if (savedSpeed) _speed = Number(savedSpeed);
+        if (savedSpeed === "slow" || savedSpeed === "normal" || savedSpeed === "fast") {
+            _speed = savedSpeed;
+        }
 
         const savedFont = localStorage.getItem("storyloom-game-font");
         if (savedFont) _fontSize = savedFont;

@@ -325,14 +325,13 @@ const Display = (function () {
                 id: "setting-speed",
                 label: _("Speed"),
                 options: [
-                    { val: 0.75, label: "0.75x" },
-                    { val: 1,    label: "1x" },
-                    { val: 2,    label: "2x" },
-                    { val: 3,    label: "3x" },
+                    { val: "slow",   label: _("Slow") },
+                    { val: "normal", label: _("Medium") },
+                    { val: "fast",   label: _("Fast") },
                 ],
                 getVal: getSpeed,
                 onChange: onSpeed,
-                parseVal: Number,
+                parseVal: function (v) { return v; },
             },
             {
                 id: "setting-font",
