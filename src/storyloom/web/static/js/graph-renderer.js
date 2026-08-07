@@ -23,7 +23,7 @@
      setTitle(title)                — set topbar title
      onAdvance(callback)            — set callback for manual advance
 
-   Tunable constants (§4): SPEEDS, AUTO_DELAYS, FONT_SIZES — no hardcoded
+   Tunable constants (§4): SPEEDS, AUTO_CHAR_MS, FONT_SIZES — no hardcoded
    magic numbers.  All UI strings via _() (i18n).
 
    Authority:
@@ -34,9 +34,10 @@
 
 const GraphRenderer = (function () {
     /* ── Tunable constants (§4) ─────────────────────────────────── */
-    const SPEEDS       = { slow: 25, normal: 15, fast: 8 };        // ms / char
-    const AUTO_DELAYS  = { short: 1.0, normal: 2.0, long: 3.5 };   // seconds
+    const SPEEDS       = { slow: 25, normal: 15, fast: 8 };         // ms / char (typewriter)
+    const AUTO_CHAR_MS = { short: 30, normal: 50, long: 70 };       // ms / char (auto-delay)
     const FONT_SIZES   = { small: "1.15rem", medium: "1.35rem", large: "1.55rem" };
+    const AUTO_BASE_MS = 500;  // minimum auto-delay (ms)
 
     /* ── Internal state ─────────────────────────────────────────── */
     let _container = null;
@@ -46,7 +47,8 @@ const GraphRenderer = (function () {
     let _typeTimer = null;
     let _autoTimer = null;
     let _charDelay = SPEEDS.normal;
-    let _autoDelay = AUTO_DELAYS.normal;
+    let _autoCharMs = AUTO_CHAR_MS.normal;
+    let _currentText = "";       // for auto-delay calculation
     let _history = [];           // {name, text}[]
     let _advanceCallback = null;  // called when user advances past text
 
@@ -142,9 +144,9 @@ const GraphRenderer = (function () {
                         <div class="vn-setting-row">
                             <span class="vn-setting-label">${_("Auto Delay")}</span>
                             <div class="vn-setting-options" id="vnSettingAuto">
-                                <button class="vn-setting-opt" data-val="${AUTO_DELAYS.short}">${_("Short")}</button>
-                                <button class="vn-setting-opt active" data-val="${AUTO_DELAYS.normal}">${_("Medium")}</button>
-                                <button class="vn-setting-opt" data-val="${AUTO_DELAYS.long}">${_("Long")}</button>
+                                <button class="vn-setting-opt" data-val="${AUTO_CHAR_MS.short}">${_("Short")}</button>
+                                <button class="vn-setting-opt active" data-val="${AUTO_CHAR_MS.normal}">${_("Medium")}</button>
+                                <button class="vn-setting-opt" data-val="${AUTO_CHAR_MS.long}">${_("Long")}</button>
                             </div>
                         </div>
                         <div class="vn-setting-row">
@@ -194,7 +196,7 @@ const GraphRenderer = (function () {
 
         /* Settings handlers — O(1) delegated click */
         _bindSettingClicks("vnSettingSpeed", function (val) { _charDelay = parseInt(val); });
-        _bindSettingClicks("vnSettingAuto", function (val) { _autoDelay = parseFloat(val); });
+        _bindSettingClicks("vnSettingAuto", function (val) { _autoCharMs = parseInt(val); });
         _bindSettingClicks("vnSettingFont", function (val) {
             document.documentElement.style.setProperty("--vn-font-size", val);
         });
@@ -287,6 +289,7 @@ const GraphRenderer = (function () {
        ═══════════════════════════════════════════════════════════════ */
 
     function showSegment(text, charName) {
+        _currentText = text;  // §7.7: store for auto-delay calculation
         /* Name tag */
         var nameTag = $("#vnNameTag");
         if (nameTag) {
@@ -321,7 +324,8 @@ const GraphRenderer = (function () {
                 _typing = false;
                 if (ctc) ctc.classList.add("visible");
                 if (_mode === "auto") {
-                    _autoTimer = setTimeout(function () { _advance(); }, _autoDelay * 1000);
+                    var delay = AUTO_BASE_MS + _currentText.length * _autoCharMs;
+                    _autoTimer = setTimeout(function () { _advance(); }, delay);
                 }
             }
         }
@@ -454,7 +458,7 @@ const GraphRenderer = (function () {
         }
         _stopTimers();
         if (on && !_typing) {
-            _autoTimer = setTimeout(function () { _advance(); }, _autoDelay * 1000);
+            _autoTimer = setTimeout(function () { _advance(); }, AUTO_BASE_MS);
         }
     }
 

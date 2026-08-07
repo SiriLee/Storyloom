@@ -31,8 +31,10 @@ const GameView = (function () {
     let _fontSize = "medium";   // "small" | "medium" | "large"
     let _lineSpacing = 1.0;     // 0.75 | 1.0 | 1.25
 
-    /* Speed → delay mapping (1x = 2.0s base) */
-    const SPEED_DELAY = { 0.75: 2667, 1: 2000, 2: 1000, 3: 667 };
+    /* §7.7: auto-delay proportional to text length (common VN convention).
+       delay = BASE_PAUSE + text.length * ms-per-char.  */
+    const AUTO_BASE_MS = 500;                              // minimum pause
+    const AUTO_CHAR_MS = { 0.75: 80, 1: 50, 2: 30, 3: 15 };  // per speed
     const ADVANCE_DEBOUNCE_MS = 200;  // minimum ms between manual advances
 
     /* Queue buffer for paced display (exec-flow.md §4.5).
@@ -394,7 +396,13 @@ const GameView = (function () {
 
         /* ── Pacing (for scene events + text-mode segments) ─── */
         if (_mode === "auto") {
-            _drainTimer = setTimeout(_displayTick, SPEED_DELAY[_speed] || 2000);
+            var delay = AUTO_BASE_MS;
+            if (event.text) {
+                delay += event.text.length * (AUTO_CHAR_MS[_speed] || 50);
+            } else {
+                delay += 1000;  // scene events: fixed 1.5s total
+            }
+            _drainTimer = setTimeout(_displayTick, delay);
         } else {
             _waitForUserAdvance().then(() => {
                 if (!_displayRunning) return;
@@ -466,7 +474,7 @@ const GameView = (function () {
             SSEClient.sendChoice(_gameId, key).then(() => {
                 /* Restart display loop (identical for both modes) */
                 if (_mode === "auto") {
-                    _drainTimer = setTimeout(_displayTick, SPEED_DELAY[_speed] || 2000);
+                    _drainTimer = setTimeout(_displayTick, AUTO_BASE_MS + 500);
                 } else {
                     _waitForUserAdvance().then(() => {
                         if (!_displayRunning) return;
