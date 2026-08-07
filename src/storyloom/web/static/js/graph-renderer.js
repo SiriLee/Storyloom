@@ -52,7 +52,6 @@ const GraphRenderer = (function () {
     let _history = [];           // {name, text}[]
     let _advanceCallback = null;  // called when user advances past text
     let _modeChangeCallback = null;  // called when auto/manual mode changes
-    let _pausedAuto = false;   // true when auto was paused for backlog/immersive/settings
 
     /* ── DOM helpers ────────────────────────────────────────────── */
     function $(sel) { return _container ? _container.querySelector(sel) : null; }
@@ -407,8 +406,7 @@ const GraphRenderer = (function () {
         var overlay = $("#vnBacklog");
         var list = $("#vnBacklogList");
         if (!overlay || !list) return;
-        /* Pause auto-advance while reading backlog */
-        if (_mode === "auto") { _pausedAuto = true; setAutoMode(false); }
+        setAutoMode(false);  // always switch to manual
         var html = "";
         for (var i = 0; i < _history.length; i++) {
             var h = _history[i];
@@ -423,10 +421,7 @@ const GraphRenderer = (function () {
 
     function hideBacklog() {
         var overlay = $("#vnBacklog");
-        if (!overlay) return;
-        var wasOpen = overlay.style.display === "flex";
-        overlay.style.display = "none";
-        if (wasOpen && _pausedAuto) { _pausedAuto = false; setAutoMode(true); }
+        if (overlay) overlay.style.display = "none";
     }
 
     /* ═══════════════════════════════════════════════════════════════
@@ -436,16 +431,13 @@ const GraphRenderer = (function () {
     function showSettings() {
         var overlay = $("#vnSettings");
         if (!overlay) return;
-        if (_mode === "auto") { _pausedAuto = true; setAutoMode(false); }
+        setAutoMode(false);  // always switch to manual
         overlay.style.display = "flex";
     }
 
     function hideSettings() {
         var overlay = $("#vnSettings");
-        if (!overlay) return;
-        var wasOpen = overlay.style.display === "flex";
-        overlay.style.display = "none";
-        if (wasOpen && _pausedAuto) { _pausedAuto = false; setAutoMode(true); }
+        if (overlay) overlay.style.display = "none";
     }
 
     /* ═══════════════════════════════════════════════════════════════
@@ -481,9 +473,7 @@ const GraphRenderer = (function () {
     }
 
     function setImmersive(on) {
-        /* Pause auto-advance on enter, restore on exit */
-        if (on && !_immersive && _mode === "auto") { _pausedAuto = true; setAutoMode(false); }
-        if (!on && _immersive && _pausedAuto) { _pausedAuto = false; setAutoMode(true); }
+        if (on) setAutoMode(false);  // entering immersive → manual
         _immersive = on;
         var topbar = $("#vnTopbar");
         var dialog = $("#vnDialog");
@@ -500,6 +490,11 @@ const GraphRenderer = (function () {
     function _onKeyDown(e) {
         if (e.key === " " || e.key === "Enter") {
             e.preventDefault();
+            /* Don't advance when an overlay is open */
+            var bl = $("#vnBacklog");
+            var st = $("#vnSettings");
+            if ((bl && bl.style.display === "flex") ||
+                (st && st.style.display === "flex")) return;
             if (_immersive) { setImmersive(false); return; }
             if (_mode === "manual") _advance();
         }
