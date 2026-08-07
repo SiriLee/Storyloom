@@ -125,9 +125,12 @@ const GameView = (function () {
     function _buildDOM() {
         /* §7.7: graph mode — delegate to GraphRenderer */
         if (_gameMode === "graph") {
+            /* §7.7: VN scene fills viewport — override #app constraints */
+            _container.style.maxWidth = "";
+            _container.style.padding = "0";
+            _container.style.minHeight = "100vh";
             GraphRenderer.init(_container);
             GraphRenderer.setTitle(_title);
-            /* Bind VN exit button */
             var exitBtn = _container.querySelector("#vnBtnExit");
             if (exitBtn) exitBtn.addEventListener("click", _handleExit);
             return;
@@ -317,6 +320,11 @@ const GameView = (function () {
         _displayRunning = false;
         _isPolling = false;
         if (_gameMode === "graph") GraphRenderer.destroy();  // §7.7
+        if (_container) {
+            _container.style.maxWidth = "";
+            _container.style.padding = "";
+            _container.style.minHeight = "";
+        }
         _lastAdvanceTime = 0;
         _cancelLoading();
         if (_advanceResolve) { _advanceResolve(); _advanceResolve = null; }
