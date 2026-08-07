@@ -75,7 +75,19 @@ class GameSession:
         init_data = self._build_init_dict(data, created_at, game_mode=game_mode)
         SaveManager(game_dir).save(init_data)  # cp_title=None → _init.json
 
-        return self.load_game(game_id, "_init.json"), game_id
+        gl = self.load_game(game_id, "_init.json")
+
+        # §7.7: graph mode — seed roster from story_config for program match
+        # §7.8c DELETE BLOCK START
+        if game_mode == "graph" and gl._roster is not None:
+            from storyloom.core.game_loop import _init_stub_roster
+            _init_stub_roster(gl._roster, data)
+            # Persist roster to disk so subsequent loads find the entries
+            roster_path = os.path.join(self._saves_root, game_id, "_asset_roster.json")
+            gl._roster.save(roster_path)
+        # §7.8c DELETE BLOCK END
+
+        return gl, game_id
 
     def load_game(self, game_id: str, filename: str) -> GameLoop:
         """Load a save file and return a ready-to-play ``GameLoop``.

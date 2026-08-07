@@ -1317,41 +1317,6 @@ class GameLoop:
     # -- §7.8 delete block end --
 
     # ── Observer ──────────────────────────────────────────────────
-
-
-# ═══════════════════════════════════════════════════════════════════
-# §7.8c DELETE BLOCK START — replaced by real AI pre-build
-# ═══════════════════════════════════════════════════════════════════
-
-def _init_stub_roster(roster, story_config):
-    """Seed roster from story_config so program match hits real names.
-
-    For each character → CHAR_PORTRAIT entry (target=stub_default_portrait).
-    For each location  → BACKGROUND entry   (target=stub_default_background).
-    Idempotent — skips if local_name already exists.
-
-    §7.8c replaces this with real AI pre-build (LLM selection + image
-    generation for each story_config entity).
-    """
-    from storyloom.assets import AssetType
-
-    for char in story_config.get("characters", []):
-        name = char.get("name", "")
-        if name and roster.lookup(AssetType.CHAR_PORTRAIT, name) is None:
-            roster.add(AssetType.CHAR_PORTRAIT, name,
-                       char.get("description", ""),
-                       target="stub_default_portrait")
-    for loc in story_config.get("locations", []):
-        name = loc.get("name", "")
-        if name and roster.lookup(AssetType.BACKGROUND, name) is None:
-            roster.add(AssetType.BACKGROUND, name,
-                       loc.get("description", ""),
-                       target="stub_default_background")
-
-# ═══════════════════════════════════════════════════════════════════
-# §7.8c DELETE BLOCK END
-# ═══════════════════════════════════════════════════════════════════
-
     def _notify(self, record: RoundRecord) -> None:
         """Notify all observers of a completed round.
 
@@ -1582,3 +1547,37 @@ def _init_stub_roster(roster, story_config):
         waiting / timeout" (this property is ``None``).
         """
         return self._adv_error
+
+
+# ═══════════════════════════════════════════════════════════════════
+# §7.8c DELETE BLOCK START — replaced by real AI pre-build
+# ═══════════════════════════════════════════════════════════════════
+
+def _init_stub_roster(roster, story_config):
+    """Seed roster from story_config so program match hits real names.
+
+    For each character → CHAR_PORTRAIT entry (target=stub_default_portrait).
+    For each location  → BACKGROUND entry   (target=stub_default_background).
+    Idempotent — skips if local_name already exists.
+
+    §7.8c replaces this with real AI pre-build (LLM selection + image
+    generation for each story_config entity).
+    """
+    from storyloom.assets import AssetType
+
+    for char in story_config.get("characters", []):
+        name = char.get("name", "")
+        if name and roster.lookup(AssetType.CHAR_PORTRAIT, name) is None:
+            roster.add(AssetType.CHAR_PORTRAIT, name,
+                       char.get("description", ""),
+                       target="stub_default_portrait")
+    for loc in story_config.get("locations", []):
+        name = loc.get("name", "")
+        if name and roster.lookup(AssetType.BACKGROUND, name) is None:
+            roster.add(AssetType.BACKGROUND, name,
+                       loc.get("description", ""),
+                       target="stub_default_background")
+
+# ═══════════════════════════════════════════════════════════════════
+# §7.8c DELETE BLOCK END
+# ═══════════════════════════════════════════════════════════════════

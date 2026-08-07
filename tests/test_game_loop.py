@@ -1338,9 +1338,11 @@ class TestGameLoopGraphPipeline:
         assert callable(proc)
         # proc should accept a Task argument
         t = Task(TaskType.MATCH, 1, AssetType.CHAR_PORTRAIT)
+        # §7.7: MATCH task.result = local_name (not __stub__).
+        # EventDispatcher resolves via roster.lookup(type, result).target.
         proc(t)
         t.complete()  # TaskPool calls complete() in finally; simulate here
-        assert t.result == "__stub__"
+        assert t.result == "hero"  # factory returns the local_name passed in
 
     def test_mount_sets_roster_game_id(self, tmp_path):
         """mount_graph_pipeline(game_id='test') → roster.game_id == 'test'."""
@@ -1348,17 +1350,25 @@ class TestGameLoopGraphPipeline:
         gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
         assert gl._roster.game_id == "test"
 
-    def test_mount_prepopulates_stub_entries(self, tmp_path):
-        """mount_graph_pipeline() adds __stub__ entries for each AssetType
-        so sync-match and async-match resolve during stub phase (§7.8 removes)."""
+    def test_mount_registers_stub_assets_in_library(self, tmp_path):
+        """§7.7: mount_graph_pipeline() registers real stub assets in the
+        AssetLibrary (not roster).  Roster entries are seeded later by
+        _init_stub_roster() from story_config.  (§7.8 replaces both)."""
         gl = self._make_gl()
         gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
         assert gl._roster is not None
         from storyloom.assets import AssetType
-        for atype in (AssetType.CHAR_PORTRAIT, AssetType.BACKGROUND):
-            item = gl._roster.lookup(atype, "__stub__")
-            assert item is not None, f"{atype.value} missing __stub__ entry"
-            assert item.target == "__stub__"
+        # Access the library via the roster (mount_graph_pipeline creates it)
+        lib = gl._roster._library
+        for atype, aid in (
+            (AssetType.CHAR_PORTRAIT, "stub_default_portrait"),
+            (AssetType.BACKGROUND, "stub_default_background"),
+        ):
+            asset = lib.get(atype, aid)
+            assert asset is not None, f"{atype.value}/{aid} missing from library"
+            assert asset.id == aid
+        # Roster should be empty (no __stub__ entries — replaced by §7.7)
+        assert len(gl._roster) == 0
 
     def test_roster_is_none_before_mount(self):
         """Before mount_graph_pipeline(), _roster is None."""
@@ -1382,9 +1392,9 @@ class TestGameLoopGraphPipeline:
     def test_graph_mode_stream_round_binds_assets(self, tmp_path):
         """Graph mode: stream_round() creates TaskGen, assets bound in UI dicts.
 
-        Verifies §7.6's core assertion: mount_graph_pipeline → stream_round()
-        → parser triggers TaskGen → EventDispatcher binds assets → UI dicts
-        carry 'assets' key.
+        §7.7: mounts pipeline → seeds roster (simulates _init_stub_roster) →
+        stream_round → parser triggers TaskGen → EventDispatcher binds assets
+        → UI dicts carry 'assets' key with real stub asset IDs.
         """
         from storyloom.assets import AssetType
 
@@ -1392,10 +1402,17 @@ class TestGameLoopGraphPipeline:
         gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
         gl.set_save_manager(_FakeSaveManager(str(tmp_path)))
 
+        # §7.7: simulate _init_stub_roster — add a BACKGROUND entry matching
+        # the SCENE val="test_scene" used in the mock XML below.  This lets
+        # program match succeed → Task.result="test_scene" → EventDispatcher
+        # resolves via roster.lookup → target="stub_default_background".
+        gl._roster.add(AssetType.BACKGROUND, "test_scene",
+                       "Test scene", target="stub_default_background")
+
         # Replace mock with graph-mode XML (SCENE → MATCH task)
         scene_xml = (
             "001| <story>\n"
-            '002| <set var="SCENE" val="stub"/>\n'
+            '002| <set var="SCENE" val="test_scene"/>\n'
             '003| <seg>The tavern awaits.</seg>\n'
             "004| </story>"
         )
@@ -1410,10 +1427,10 @@ class TestGameLoopGraphPipeline:
         types = {e["type"] for e in ui_dicts}
         assert "scene" in types, f"Expected scene event in {types}"
 
-        # SCENE event must have BACKGROUND asset
+        # SCENE event must have BACKGROUND asset with real stub ID
         scene = next(e for e in ui_dicts if e["type"] == "scene")
         assert "assets" in scene, "SCENE missing assets in graph mode"
-        assert scene["assets"] == {AssetType.BACKGROUND.value: "__stub__"}
+        assert scene["assets"] == {AssetType.BACKGROUND.value: "stub_default_background"}
 
     def test_graph_mode_uses_graph_prompt_round1(self, tmp_path):
         """Graph mode start_game() → build_round1_graph, not build_round1."""
