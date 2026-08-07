@@ -15,11 +15,17 @@ Usage::
             handle(event)
 """
 
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass, field
 from enum import Enum, auto
+from typing import TYPE_CHECKING
 
 from storyloom.config import SCENE_VAR_NAME
+
+if TYPE_CHECKING:
+    from storyloom.tasks import TaskGenerator
 
 
 # ── Event ──────────────────────────────────────────────────────────
@@ -135,7 +141,7 @@ class StreamParser:
     — that is StateManager's responsibility per design.md §3.2.
     """
 
-    def __init__(self):
+    def __init__(self, task_gen: TaskGenerator | None = None):
         # ── Parse state machine ───────────────────────────────────
         self._in_story = False
         self._in_branch: str | None = None
@@ -147,10 +153,11 @@ class StreamParser:
         # ── Counters ──────────────────────────────────────────────
         self._line_count = 0
 
-        # ── TaskGenerator ref (Phase 2) ───────────────────────────
-        # Set by pipeline coordinator in §7.6.  None in text mode.
-        # When set, DECLARE events trigger task_gen.enqueue().
-        self._task_gen: object | None = None
+        # ── TaskGenerator ref (§7.6) ──────────────────────────────
+        # Injected by pipeline coordinator.  None in text mode.
+        # When set, image-tag events trigger task_gen.enqueue()
+        # (DECLARE / SCENE / SEG with char) per §3.1 dashed arrow.
+        self._task_gen: TaskGenerator | None = task_gen
 
         # ── Pending choice accumulator ────────────────────────────
         # Needed to build choice_data at CHOICE_END.  This is a
@@ -357,8 +364,11 @@ class StreamParser:
             if char_val:  # non-empty only — "" same as absent
                 payload["char"] = char_val
 
-            return [Event(type=EventType.SEGMENT, line=self._line_count,
-                          payload=payload)]
+            event = Event(type=EventType.SEGMENT, line=self._line_count,
+                          payload=payload)
+            if self._task_gen is not None and char_val:
+                self._task_gen.enqueue(event)
+            return [event]
 
         m = _RE_OPT.match(clean)
         if m:
@@ -417,7 +427,7 @@ class StreamParser:
                         f" (line {self._line_count})"
                     )
                     return []
-                return [Event(
+                event = Event(
                     type=EventType.SCENE,
                     line=self._line_count,
                     payload={
@@ -426,7 +436,10 @@ class StreamParser:
                         "position": self._position,
                         "branch": self._in_branch,
                     },
-                )]
+                )
+                if self._task_gen is not None:
+                    self._task_gen.enqueue(event)
+                return [event]
 
             if self._post_bridge:
                 self._format_errors.append(
@@ -543,18 +556,14 @@ class StreamParser:
         return self._in_checkpoint
 
     @property
-    def task_gen(self) -> object | None:
-        """TaskGenerator reference (Phase 2).  ``None`` in text mode.
+    def task_gen(self) -> TaskGenerator | None:
+        """TaskGenerator reference (§7.6).  ``None`` in text mode.
 
-        Set by the pipeline coordinator in §7.6.  When set, DECLARE
-        events are synchronously dispatched to ``task_gen.enqueue()``
-        per design.md §3.1 (dashed trigger arrow).
+        Injected at construction by the pipeline coordinator.  When set,
+        image-tag events trigger ``task_gen.enqueue()`` per design.md
+        §3.1 (dashed trigger arrow).
         """
         return self._task_gen
-
-    @task_gen.setter
-    def task_gen(self, tg: object | None) -> None:
-        self._task_gen = tg
 
     @property
     def format_errors(self) -> list[str]:

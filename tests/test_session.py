@@ -145,3 +145,37 @@ class TestGameSessionLifecycle:
             init_path = os.path.join(root, game_id, "_init.json")
             saved = json.loads(open(init_path).read())
             assert saved["config"]["mode"] == "graph"
+
+    def test_start_game_graph_mode_mounts_pipeline(self):
+        """start_game(game_mode='graph') calls mount_graph_pipeline."""
+        with tempfile.TemporaryDirectory() as root:
+            session = GameSession(api_client=Mock(), saves_dir=root)
+            gl, game_id = session.start_game(SAMPLE_RESULT, game_mode="graph")
+            assert gl._roster is not None
+            assert gl._task_pool is not None
+            assert gl._process_factory is not None
+
+    def test_start_game_text_mode_does_not_mount(self):
+        """start_game(game_mode='text') → roster stays None."""
+        with tempfile.TemporaryDirectory() as root:
+            session = GameSession(api_client=Mock(), saves_dir=root)
+            gl, game_id = session.start_game(SAMPLE_RESULT, game_mode="text")
+            assert gl._roster is None
+            assert gl._task_pool is None
+
+    def test_load_game_graph_mode_mounts_pipeline(self):
+        """load_game reads config.mode='graph' → mount_graph_pipeline called."""
+        with tempfile.TemporaryDirectory() as root:
+            session = GameSession(api_client=Mock(), saves_dir=root)
+            _, game_id = session.start_game(SAMPLE_RESULT, game_mode="graph")
+            # Load back — should re-mount graph pipeline
+            gl = session.load_game(game_id, "_init.json")
+            assert gl._roster is not None
+
+    def test_load_game_text_mode_does_not_mount(self):
+        """load_game reads config.mode='text' → roster stays None."""
+        with tempfile.TemporaryDirectory() as root:
+            session = GameSession(api_client=Mock(), saves_dir=root)
+            _, game_id = session.start_game(SAMPLE_RESULT, game_mode="text")
+            gl = session.load_game(game_id, "_init.json")
+            assert gl._roster is None

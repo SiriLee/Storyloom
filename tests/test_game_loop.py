@@ -1292,3 +1292,75 @@ class TestBranchSetControl:
         _run_round(gl, choice_key="1")
         # Choice branch "fight" should stick — BRANCH set not applied
         assert gl.current_branch == "fight"
+
+
+# ── §7.6: GameLoop graph-mode pipeline assembly ────────────────────
+
+class TestGameLoopGraphPipeline:
+    """mount_graph_pipeline() sets up roster + task_pool + process_factory."""
+
+    @staticmethod
+    def _make_gl(**kwargs):
+        """Minimal GameLoop for assembly tests — no API calls."""
+        mock = MockApiClient(response="001| <story>\n002| </story>")
+        return GameLoop(
+            story_config=SAMPLE_STORY_CONFIG,
+            api_client=mock,
+            game_state=GameState(SAMPLE_VARIABLES),
+            **kwargs,
+        )
+
+    def test_mount_sets_roster(self, tmp_path):
+        """mount_graph_pipeline() creates roster and stores it."""
+        gl = self._make_gl()
+        gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
+        from storyloom.assets import GameAssetRoster
+        assert isinstance(gl._roster, GameAssetRoster)
+
+    def test_mount_sets_task_pool(self, tmp_path):
+        """mount_graph_pipeline() creates TaskPool and stores it."""
+        gl = self._make_gl()
+        gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
+        from storyloom.tasks import TaskPool
+        assert isinstance(gl._task_pool, TaskPool)
+
+    def test_mount_sets_process_factory(self, tmp_path):
+        """mount_graph_pipeline() stores a callable process_factory."""
+        gl = self._make_gl()
+        gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
+        assert callable(gl._process_factory)
+
+    def test_mount_loads_empty_roster_when_no_file(self, tmp_path):
+        """mount_graph_pipeline() loads empty roster when _asset_roster.json
+        doesn't exist yet (deferred save — written on first DECLARE)."""
+        gl = self._make_gl()
+        gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
+        assert gl._roster is not None
+        assert len(gl._roster) == 0
+
+    def test_roster_is_none_before_mount(self):
+        """Before mount_graph_pipeline(), _roster is None."""
+        gl = self._make_gl()
+        assert gl._roster is None
+        assert gl._task_pool is None
+        assert gl._process_factory is None
+
+    def test_text_mode_stream_round_creates_text_dispatcher(self, tmp_path):
+        """Text mode: stream_round() creates EventDispatcher without queue/roster."""
+        gl = self._make_gl()
+        gl.set_save_manager(_FakeSaveManager(str(tmp_path)))
+        gl.start_game()
+        gen = gl.stream_round()
+        events = list(gen)
+        types = {e["type"] for e in events if isinstance(e, dict)}
+        # Text mode: story_begin, done (story_end flushed silently post-stream)
+        assert "story_begin" in types
+        assert "done" in types
+
+
+class _FakeSaveManager:
+    """Minimal save manager for pipeline tests — never writes to disk."""
+    def __init__(self, root: str):
+        self._root = root
+    def save(self, data, cp_title=None):
+        return "test_save.json"

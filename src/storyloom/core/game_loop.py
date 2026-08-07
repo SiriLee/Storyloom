@@ -6,13 +6,15 @@ LLM-suggested state changes (local source of truth).
 """
 
 import copy
+import os
 import queue
 import re
 import threading
 import time
+from collections import deque
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from storyloom.config import SAVE_VERSION, STREAM_STALL_TIMEOUT_SEC, GLOBAL_SCOPE
 from storyloom.io.api_client import ApiClient
@@ -27,6 +29,10 @@ from storyloom.parser.stream_parser import (
 )
 from storyloom.core.state_manager import StateManager
 from storyloom.core.event_dispatcher import EventDispatcher
+
+if TYPE_CHECKING:
+    from storyloom.assets import GameAssetRoster
+    from storyloom.tasks import TaskPool
 
 
 @dataclass
@@ -507,6 +513,16 @@ class GameLoop:
         self._adv_error: str | None = None
         self._adv_retry_prompt: str | None = None
 
+        # ── Graph-mode pipeline (§7.6) ──────────────────────────────
+        # Set by mount_graph_pipeline().  None in text mode.
+        # stream_round() reads these to decide whether to create TaskGen
+        # and inject task_queue + roster into EventDispatcher.
+        self._game_mode: str = "text"  # written to every save file
+        # and inject task_queue + roster into EventDispatcher.
+        self._roster: GameAssetRoster | None = None
+        self._task_pool: TaskPool | None = None
+        self._process_factory: Callable | None = None
+
         # Pending API state — every round's Phase 5 launches the *next*
         # round's API call in a daemon thread and stores the result queue
         # here.  stream_round() drains this queue.  All rounds are
@@ -719,7 +735,19 @@ class GameLoop:
         # generator yield.
 
         lb = LineBuffer()
-        parser = StreamParser()
+
+        # ── §7.6: graph mode assembles TaskGen + injects into parser & dispatcher.
+        # Text mode: roster is None → task_gen=None, task_queue=None → Phase 1 path.
+        if self._roster is not None:
+            from storyloom.tasks import TaskGenerator
+            task_queue: deque[object] | None = deque()
+            task_gen = TaskGenerator(task_queue, self._roster,
+                                     self._process_factory, self._task_pool)
+        else:
+            task_queue = None
+            task_gen = None
+        parser = StreamParser(task_gen=task_gen)
+
         state_mgr = StateManager(game_state=self.game_state)
         state_mgr.set_outline(self._outline_nodes)
         state_mgr.set_save_callback(
@@ -732,9 +760,7 @@ class GameLoop:
             current_node=self.current_node,
             goal=self.goal,
         )
-        # §7.4: text mode — no task_queue, no roster.
-        # §7.6: graph mode injects task_queue + roster for consume_event alignment.
-        dispatcher = EventDispatcher()
+        dispatcher = EventDispatcher(task_queue, self._roster)
 
         collected: list[str] = []
         ttft: float | None = None
@@ -1097,6 +1123,7 @@ class GameLoop:
             },
             "config": {
                 "temperature": getattr(self, "_temperature", None),
+                "mode": self._game_mode,
             },
             "story_config": canonical_sc,
             "characters": copy.deepcopy(self.characters),
@@ -1160,10 +1187,11 @@ class GameLoop:
 
         gl._checkpoint_snapshots = dict(progress.get("checkpoint_snapshots", {}))
 
-        # Restore temperature
+        # Restore config — temperature, mode (§7.6)
         config = data.get("config", {})
         if "temperature" in config:
             gl._temperature = config["temperature"]
+        gl._game_mode = config.get("mode", "text")  # absent in pre-§7.6 saves
 
         # Restore created_at (preserve original creation timestamp)
         metadata = data.get("metadata", {})
@@ -1175,6 +1203,47 @@ class GameLoop:
     def set_save_manager(self, save_manager) -> None:
         """Configure auto-save on checkpoint."""
         self._save_manager = save_manager
+
+    # ── Graph-mode pipeline (§7.6) ───────────────────────────────────
+
+    def mount_graph_pipeline(self, game_id: str, saves_root: str) -> None:
+        """Create and store graph-mode pipeline dependencies.
+
+        Called by GameSession after construction but before
+        ``stream_round()``.  Creates the per-game roster (loaded from
+        ``_asset_roster.json``, or empty if no file), the Thread 4
+        task pool, and a stub process factory (§7.8 replaces with real
+        LLM matching / image generation).
+
+        ``stream_round()`` reads ``self._roster`` — when set, it creates
+        a TaskGenerator and injects it plus the shared task queue into
+        the EventDispatcher.
+        """
+        from storyloom.assets import AssetLibrary, GameAssetRoster
+        from storyloom.tasks import TaskPool
+
+        self._game_mode = "graph"
+        library = AssetLibrary("media")
+        roster_path = os.path.join(saves_root, game_id, "_asset_roster.json")
+        self._roster = GameAssetRoster.load(roster_path, library, game_id)
+        self._task_pool = TaskPool()
+        self._process_factory = self._stub_process_factory()
+
+    @staticmethod
+    def _stub_process_factory():
+        """§7.6 stub — returns ``__stub__`` for all matches.
+
+        §7.8 replaces this with real LLM matching / image generation.
+        """
+        import time
+
+        def _factory(asset_type, local_name, roster):
+            def _process(task):
+                time.sleep(0.01)
+                task.result = "__stub__"
+            return _process
+
+        return _factory
 
     # ── Observer ──────────────────────────────────────────────────
 

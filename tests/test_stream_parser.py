@@ -217,10 +217,10 @@ class TestDeclareParsing:
         assert events == []
         assert any("declare" in e.lower() for e in parser.format_errors)
 
-    def test_declare_dispatches_to_task_gen(self, parser):
+    def test_declare_dispatches_to_task_gen(self):
         """DECLARE triggers task_gen.enqueue() synchronously."""
         dispatched = []
-        parser.task_gen = _FakeTaskGen(dispatched)
+        parser = StreamParser(task_gen=_FakeTaskGen(dispatched))
         parser.feed_line("<story>")
         events = parser.feed_line(
             '<declare kind="CHAR" name="ghost">a ghost</declare>')
@@ -470,3 +470,157 @@ class TestStreamParserEdgeCases:
         parser.feed_line("<bridge/>")
         parser.feed_line('<set var="x" val="1"/>')
         assert any("set" in e.lower() for e in parser.format_errors)
+
+
+# ── §7.6: StreamParser TaskGen trigger ─────────────────────────────
+
+class TestStreamParserTaskGenTrigger:
+    """Parser triggers task_gen.enqueue() for image events (§3.1, §3.2, §4.1)."""
+
+    @staticmethod
+    def _parser_with_mock():
+        """Return (parser, mock_task_gen) with story already opened."""
+        from unittest.mock import Mock
+        mock = Mock()
+        parser = StreamParser(task_gen=mock)
+        parser.feed_line("<story>")
+        return parser, mock
+
+    # ── DECLARE ───────────────────────────────────────────────────
+
+    def test_declare_triggers_enqueue(self):
+        """DECLARE → task_gen.enqueue() called, returns []."""
+        parser, mock = self._parser_with_mock()
+        events = parser.feed_line(
+            '<declare kind="CHAR" name="ghost">a ghost</declare>'
+        )
+        assert events == []
+        mock.enqueue.assert_called_once()
+        event = mock.enqueue.call_args[0][0]
+        assert event.type == EventType.DECLARE
+        assert event.payload["kind"] == "CHAR"
+        assert event.payload["name"] == "ghost"
+        assert event.payload["desc"] == "a ghost"
+
+    def test_declare_scene_kind_triggers_enqueue(self):
+        """DECLARE kind='SCENE' → enqueue with BACKGROUND-relevant payload."""
+        parser, mock = self._parser_with_mock()
+        parser.feed_line(
+            '<declare kind="SCENE" name="crypt">ancient crypt</declare>'
+        )
+        mock.enqueue.assert_called_once()
+        event = mock.enqueue.call_args[0][0]
+        assert event.payload["kind"] == "SCENE"
+
+    # ── SCENE ─────────────────────────────────────────────────────
+
+    def test_scene_triggers_enqueue(self):
+        """<set var='SCENE' val='...'> → enqueue called AND Event returned."""
+        parser, mock = self._parser_with_mock()
+        events = parser.feed_line('<set var="SCENE" val="tavern"/>')
+        assert len(events) == 1
+        assert events[0].type == EventType.SCENE
+        mock.enqueue.assert_called_once()
+        event = mock.enqueue.call_args[0][0]
+        assert event.type == EventType.SCENE
+        assert event.payload["val"] == "tavern"
+
+    def test_scene_enqueue_with_branch_context(self):
+        """SCENE inside <branch> → enqueue event carries branch name."""
+        parser, mock = self._parser_with_mock()
+        parser.feed_line('<branch name="hero">')
+        events = parser.feed_line('<set var="SCENE" val="tavern"/>')
+        assert events[0].payload["branch"] == "hero"
+        mock.enqueue.assert_called_once()
+        assert mock.enqueue.call_args[0][0].payload["branch"] == "hero"
+
+    # ── SEGMENT with char ─────────────────────────────────────────
+
+    def test_seg_with_char_triggers_enqueue(self):
+        """<seg char='...'> → enqueue called AND Event returned."""
+        parser, mock = self._parser_with_mock()
+        events = parser.feed_line('<seg char="hero">Hello</seg>')
+        assert len(events) == 1
+        assert events[0].type == EventType.SEGMENT
+        assert events[0].payload["char"] == "hero"
+        mock.enqueue.assert_called_once()
+        event = mock.enqueue.call_args[0][0]
+        assert event.type == EventType.SEGMENT
+        assert event.payload["char"] == "hero"
+
+    def test_seg_without_char_does_not_trigger(self):
+        """<seg> without char attribute → no enqueue call."""
+        parser, mock = self._parser_with_mock()
+        events = parser.feed_line("<seg>narration</seg>")
+        assert len(events) == 1
+        assert events[0].type == EventType.SEGMENT
+        assert "char" not in events[0].payload
+        mock.enqueue.assert_not_called()
+
+    def test_seg_empty_char_does_not_trigger(self):
+        """<seg char=''> → no enqueue (empty = no portrait, §4.1)."""
+        parser, mock = self._parser_with_mock()
+        events = parser.feed_line('<seg char="">narration</seg>')
+        assert len(events) == 1
+        mock.enqueue.assert_not_called()
+
+    # ── Non-media events ──────────────────────────────────────────
+
+    def test_set_does_not_trigger(self):
+        """<set var='x' ...> (not SCENE) → no enqueue."""
+        parser, mock = self._parser_with_mock()
+        events = parser.feed_line('<set var="trust" op="+" val="10"/>')
+        assert len(events) == 1
+        assert events[0].type == EventType.SET
+        mock.enqueue.assert_not_called()
+
+    def test_bridge_does_not_trigger(self):
+        """<bridge/> → no enqueue."""
+        parser, mock = self._parser_with_mock()
+        events = parser.feed_line("<bridge/>")
+        assert events[0].type == EventType.BRIDGE
+        mock.enqueue.assert_not_called()
+
+    def test_choice_does_not_trigger(self):
+        """<choice>/<opt>/</choice> → no enqueue."""
+        parser, mock = self._parser_with_mock()
+        parser.feed_line('<choice id="q">')
+        parser.feed_line('<opt key="1" branch="a">A</opt>')
+        parser.feed_line("</choice>")
+        mock.enqueue.assert_not_called()
+
+    # ── task_gen=None ─────────────────────────────────────────────
+
+    def test_task_gen_none_no_crash(self):
+        """task_gen=None → all events normal, no crash, no enqueue call."""
+        parser = StreamParser(task_gen=None)
+        parser.feed_line("<story>")
+
+        # DECLARE: silently dropped (no enqueue target)
+        assert parser.feed_line(
+            '<declare kind="CHAR" name="ghost">desc</declare>'
+        ) == []
+
+        # SCENE: event returned normally
+        events = parser.feed_line('<set var="SCENE" val="tavern"/>')
+        assert len(events) == 1
+        assert events[0].type == EventType.SCENE
+
+        # SEG with char: event returned normally
+        events = parser.feed_line('<seg char="hero">Hi</seg>')
+        assert len(events) == 1
+        assert events[0].type == EventType.SEGMENT
+
+    # ── Constructor ───────────────────────────────────────────────
+
+    def test_constructor_default_task_gen_none(self):
+        """StreamParser() → task_gen is None."""
+        parser = StreamParser()
+        assert parser.task_gen is None
+
+    def test_constructor_stores_task_gen(self):
+        """StreamParser(task_gen=mock) → task_gen property returns mock."""
+        from unittest.mock import Mock
+        mock = Mock()
+        parser = StreamParser(task_gen=mock)
+        assert parser.task_gen is mock

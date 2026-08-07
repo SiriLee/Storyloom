@@ -101,6 +101,13 @@ class GameSession:
         sm = SaveManager(os.path.join(self._saves_root, game_id))
         gl = GameLoop.from_save_dict(data, self._api_client)
         gl.set_save_manager(sm)
+
+        # ── §7.6: graph mode — mount Task pipeline ──────────────────
+        # Mode is stored in every save file (config.mode).  from_save_dict
+        # reads it into gl._game_mode so checkpoint loads work identically.
+        if gl._game_mode == "graph":
+            gl.mount_graph_pipeline(game_id, self._saves_root)
+
         self._game_loop = gl
         # Track last played so "Continue" can find this save in O(1).
         title = data.get("metadata", {}).get(
