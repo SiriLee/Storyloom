@@ -46,7 +46,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from storyloom.config import DEFAULT_IMG_BASE_URL, SUPPORTED_LANGUAGES
+from storyloom.config import DEFAULT_IMG_BASE_URL, DEFAULT_MEDIA_DIR, SUPPORTED_LANGUAGES
 from storyloom.core.co_create import CoCreateError
 from storyloom.core.save_manager import SaveManager
 from storyloom.core.session import GameSession
@@ -83,6 +83,13 @@ _api_client = ApiClient(cfg)
 _game_session = GameSession(_api_client, saves_dir=os.path.join(_APP_DIR, "saves"))
 
 app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
+
+# §7.7: graph mode — serve media assets
+_MEDIA_PATH = "/" + DEFAULT_MEDIA_DIR
+_MEDIA_DIR = os.environ.get("STORYLOOM_MEDIA_DIR",
+                            os.path.join(_APP_DIR, DEFAULT_MEDIA_DIR))
+if os.path.isdir(_MEDIA_DIR):
+    app.mount(_MEDIA_PATH, StaticFiles(directory=_MEDIA_DIR), name=DEFAULT_MEDIA_DIR)
 
 
 @app.get("/")
@@ -298,6 +305,7 @@ def co_create_generate():
     return {
         "status": "ok",
         "game_id": game_id,
+        "game_mode": cfg.game_mode,
         "story_config": result["story_config"],
         "outline_text": result["outline_text"],
     }
@@ -323,6 +331,7 @@ def co_create_retry_generate():
     return {
         "status": "ok",
         "game_id": game_id,
+        "game_mode": cfg.game_mode,
         "story_config": result["story_config"],
         "outline_text": result["outline_text"],
     }
@@ -370,6 +379,7 @@ async def game_start(game_id: str):
     return {
         "status": "ok",
         "game_id": game_id,
+        "game_mode": cfg.game_mode,
         "round_count": gl.round_count,
         "current_node": gl.current_node,
         "story_config": sc,
