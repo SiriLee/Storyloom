@@ -245,6 +245,9 @@ async function initConfig() {
         if (data.img_remove_bg) {
             localStorage.setItem(SETTINGS_STORE + "img_remove_bg", data.img_remove_bg);
         }
+        if (data.game_mode) {
+            localStorage.setItem(SETTINGS_STORE + "game_mode", data.game_mode);
+        }
     } catch (err) {
         console.warn("initConfig: server unreachable, using localStorage", err);
     }
