@@ -326,7 +326,7 @@ const GraphRenderer = (function () {
         var overlay = $("#vnChoices");
         if (!box || !overlay) return;
 
-        var flat = _flattenChoices(choices);
+        var flat = Display.flattenChoices(choices);
         var html = "";
         for (var i = 0; i < flat.length; i++) {
             var c = flat[i];
@@ -353,43 +353,6 @@ const GraphRenderer = (function () {
         var overlay = $("#vnChoices");
         if (overlay) overlay.style.display = "none";
         _choiceCallback = null;
-    }
-
-    /** Flatten engine choices to {key, label, enabled, reason}[].
-     *  Matches Display.flattenChoices() in display.js.  */
-    function _flattenChoices(choices) {
-        var result = [];
-        var idx = 0;
-        for (var ci = 0; ci < choices.length; ci++) {
-            var c = choices[ci];
-            var labels = c.labels || [];
-            var enabled = c.enabled || [];
-            for (var i = 0; i < labels.length; i++) {
-                idx++;
-                var isEnabled = i < enabled.length ? enabled[i] : true;
-                var reason = "";
-                if (!isEnabled) {
-                    var branches = c.branches || [];
-                    var conditions = c.conditions || {};
-                    var branch = branches[i] || "";
-                    var cond = conditions[branch] || "";
-                    if (cond) {
-                        var match = cond.match(/^\s*([\p{L}\p{N}_]+)\s*(==|!=|>=|<=|>|<)\s*(.+?)\s*$/u);
-                        if (match) {
-                            var varName = match[1];
-                            var current = GameState.stateVars[varName];
-                            if (current !== undefined) {
-                                reason = _("Requires {cond}, current: {val}")
-                                    .replace("{cond}", cond).replace("{val}", String(current));
-                            }
-                        }
-                        if (!reason) reason = _("Requires {cond}").replace("{cond}", cond);
-                    }
-                }
-                result.push({ key: String(idx), label: labels[i], enabled: isEnabled, reason: reason });
-            }
-        }
-        return result;
     }
 
     /* ═══════════════════════════════════════════════════════════════
