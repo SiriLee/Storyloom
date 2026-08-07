@@ -707,6 +707,7 @@ async def save_load(game_id: str, filename: str):
     # checkpoint_snapshots).  After load the counter always starts at 0.
     return {
         "game_id": game_id,
+        "game_mode": data.get("config", {}).get("mode", "text"),  # §7.7
         "story_config": data.get("story_config", {}),
         "metadata": data.get("metadata", {}),
         "round_count": 0,
@@ -742,6 +743,7 @@ async def save_start(game_id: str, filename: str):
     progress = data.get("progress", {})
     return {
         "game_id": game_id,
+        "game_mode": data.get("config", {}).get("mode", "text"),  # §7.7
         "story_config": data.get("story_config", {}),
         "metadata": data.get("metadata", {}),
         "round_count": 0,

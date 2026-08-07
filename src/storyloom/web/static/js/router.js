@@ -197,6 +197,7 @@
                     `/api/saves/${encodeURIComponent(lp.game_id)}/start/${encodeURIComponent(lp.save_file)}`
                 );
                 GameState.gameId = res.game_id;
+                GameState.gameMode = res.game_mode || "text";  // §7.7
                 GameState.roundCount = res.round_count || 0;
                 GameState.currentNode = res.current_node || null;
                 GameState.storyConfig = res.story_config || {};
@@ -570,6 +571,7 @@
         const filename = GameState.saveFile || "_init.json";
         API.post(`/api/saves/${encodeURIComponent(gameId)}/start/${encodeURIComponent(filename)}`)
             .then(data => {
+                GameState.gameMode = data.game_mode || "text";  // §7.7
                 const config = data.story_config || {};
                 _renderPreviewContent(config);
             })
@@ -765,6 +767,7 @@
                     `/api/saves/${encodeURIComponent(gameId)}/start/_init.json`
                 );
                 GameState.gameId = data.game_id;
+                GameState.gameMode = data.game_mode || "text";  // §7.7
                 GameState.roundCount = data.round_count || 0;
                 GameState.currentNode = data.current_node || null;
                 GameState.storyConfig = data.story_config || {};
@@ -820,6 +823,7 @@
                             `/api/saves/${encodeURIComponent(gameId)}/start/${encodeURIComponent(filename)}`
                         );
                         GameState.gameId = data.game_id;
+                        GameState.gameMode = data.game_mode || "text";  // §7.7
                         GameState.roundCount = data.round_count || 0;
                         GameState.currentNode = data.current_node || null;
                         GameState.storyConfig = data.story_config || {};
