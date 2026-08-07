@@ -88,6 +88,7 @@ const GraphRenderer = (function () {
         }
         _history = [];
         _advanceCallback = null;
+        _modeChangeCallback = null;
     }
 
     /* ── DOM construction ───────────────────────────────────────── */
@@ -422,6 +423,7 @@ const GraphRenderer = (function () {
                  + '<div class="vn-backlog-text">' + h.text + '</div></div>';
         }
         list.innerHTML = html;
+        list.scrollTop = list.scrollHeight;  // show newest entries first
         overlay.style.display = "flex";
     }
 
@@ -461,7 +463,11 @@ const GraphRenderer = (function () {
                 ? '<rect x="7" y="5" width="3" height="14" rx="0.5"/><rect x="14" y="5" width="3" height="14" rx="0.5"/>'
                 : '<polygon points="6,4 20,12 6,20"/>';
         }
-        _stopTimers();
+        /* Cancel stale auto-advance timer but leave typewriter intact —
+           toggling mode while text is appearing should not kill the
+           typewriter mid-stream.  The new mode takes effect after the
+           current typewriter finishes naturally. */
+        if (_autoTimer) { clearTimeout(_autoTimer); _autoTimer = null; }
         if (_modeChangeCallback) _modeChangeCallback(on);
         if (on && !_typing) {
             _autoTimer = setTimeout(function () { _advance(); }, AUTO_BASE_MS);
