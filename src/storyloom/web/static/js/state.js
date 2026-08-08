@@ -149,6 +149,15 @@ const SETTINGS = [
             { value: "always", label: "Always" },
         ],
     },
+    {
+        key: "img_generation_enabled",
+        type: "select",
+        label: "Image Generation",
+        options: [
+            { value: "true", label: "Enabled" },
+            { value: "false", label: "Disabled" },
+        ],
+    },
 ];
 
 /** Get the current value of a setting by key.
@@ -193,6 +202,7 @@ async function saveConfig() {
         img_api_base_url: getSetting("img_api_base_url"),
         img_api_model: getSetting("img_api_model"),
         img_remove_bg: getSetting("img_remove_bg"),
+        img_generation_enabled: getSetting("img_generation_enabled") !== "false",
     };
     /* Only send api_key if the user typed a real one — an empty or
        masked value means "keep the existing key on disk". */
@@ -244,6 +254,10 @@ async function initConfig() {
         }
         if (data.img_remove_bg) {
             localStorage.setItem(SETTINGS_STORE + "img_remove_bg", data.img_remove_bg);
+        }
+        if (data.img_generation_enabled !== undefined) {
+            localStorage.setItem(SETTINGS_STORE + "img_generation_enabled",
+                data.img_generation_enabled ? "true" : "false");
         }
         if (data.game_mode) {
             localStorage.setItem(SETTINGS_STORE + "game_mode", data.game_mode);

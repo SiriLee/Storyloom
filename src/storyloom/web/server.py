@@ -127,6 +127,7 @@ async def get_config():
         "img_api_base_url": cfg.img_api_base_url or DEFAULT_IMG_BASE_URL,
         "img_api_model": cfg.img_api_model,
         "img_remove_bg": cfg.img_remove_bg,
+        "img_generation_enabled": cfg.img_generation_enabled,
     }
 
 
@@ -140,6 +141,7 @@ class ConfigUpdate(BaseModel):
     img_api_base_url: str | None = None
     img_api_model: str | None = None
     img_remove_bg: str | None = None
+    img_generation_enabled: bool | None = None
 
 
 @app.post("/api/config")
@@ -181,6 +183,8 @@ async def update_config(body: ConfigUpdate):
                 f"got {body.img_remove_bg!r}",
             )
         cfg.img_remove_bg = body.img_remove_bg
+    if body.img_generation_enabled is not None:
+        cfg.img_generation_enabled = body.img_generation_enabled
     cfg.save()
     return {"status": "ok"}
 
