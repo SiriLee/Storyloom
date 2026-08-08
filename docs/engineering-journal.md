@@ -6,6 +6,105 @@
 
 ---
 
+## 2026-08-08（周六）
+
+> **概述**：§7.8a LLM Match 全栈实现 + §7.8b LLM Generate 全栈实现 + CI/CD 基础设施 + 系统素材工具链收尾。MatchProcessor 和 GenerateProcessor 是两个独立的 LLM 驱动任务处理器，分别负责素材匹配和素材生成选择，构成图模式素材管道的最后两块拼图。thinking presets 从任务模块抽离到 I/O 层作为共享基础设施。共 **43 commits**，**29 files**，**+3992/-412 lines**，测试从 847 增至 **993**（+146）。
+
+### §7.8a MatchProcessor — LLM 素材匹配
+
+**背景**：`graph-mode-spec/design.md` §5.4 定义 MATCH 任务需要 LLM 从 roster 中选择最佳素材。此前只有 stub 实现（无操作），需要一个完整的 LLM 驱动匹配器：支持 thinking 预设、两阶段重试、解析容错、静默降级。
+
+**决策**（commits `c86bacb` → `5d02b51` → `dbfc64e` → `0d5c902` → `f6fdc59` → `c6fdce6` → `c4d5553`，7 commits）：
+
+1. **MatchProcessor 实现**（`c86bacb`）：`src/storyloom/tasks/_llm_match.py`（261 行）——实现 `__call__(asset_type, local_name, roster)` 协议。两阶段匹配：禁用 thinking → 轻量 thinking → 静默降级。解析容错三级：JSON → 子串扫描 → None（无需 "first entry" fallback）。范围仅限 roster，不查 AssetLibrary（per design.md §5.4）。
+
+2. **TaskGenerator 接口拆分**（`c86bacb`）：`__init__` 改为接受 `match_processor=` 和 `generate_processor=`（替代旧的 `process_factory=`），两者默认 `None`——无处理器时任务同步完成为 no-op。
+
+3. **Thinking Presets 抽离**（`dbfc64e`, `0d5c902`）：从 `_llm_match.py` 内联实现 → `src/storyloom/io/thinking.py`（168 行）——I/O 层的规范位置。9 个模型家族：deepseek、claude、gemini、qwen、glm、gpt（OpenAI）、kimi（Moonshot）、grok（xAI）、doubao（ByteDance）。全部验证自官方 API 文档（2026-08）。
+
+4. **Thinking 预设修正**（`0d5c902`）：Qwen 格式从 `enable_thinking` 修正为 `thinking_enabled`（与官方文档一致）。已知限制以代码注释记录：Claude ≥4.7 `budget_tokens→400`，Gemini 2.5 Pro `thinking_budget=0→400`，gpt-5-mini `reasoning_effort="none"→400`。
+
+5. **Match 提示词定稿**（`f6fdc59`）：四种素材类型各自系统提示词 + 统一用户消息模板。新增 `docs/graph-mode-spec/prompt-design-llm-match.md`（72 行）。
+
+6. **提示词实验室脚本**（`c6fdce6`）：`tests/prompt_lab/test_llm_match.py`（274 行）——11 个测试用例，流式 TTFT 测量，中文场景覆盖。
+
+7. **GameLoop 集成**（`c4d5553`）：`game_loop.py:757-760` 创建 MatchProcessor 并传入 TaskGenerator——完成 §7.8a 全链路。
+
+**测试**：`tests/test_llm_match.py`（733 行，54 tests）——ThinkingPresets（16）、BuildMatchMessages（9）、ParseMatchResponse（8）、MatchProcessor（14）、Integration（2）。
+
+**依据**：`graph-mode-spec/design.md` §5.4；[[2026-08-08-7.8a-llm-match-implementation]]；prompt-design-llm-match.md。
+
+### §7.8b GenerateProcessor — LLM 素材生成选择
+
+**背景**：当 MatchProcessor 找不到匹配素材时，需要 LLM 决定是回退到已有素材（forced match）还是触发 AI 图像生成。`graph-mode-spec/design.md` §7.8b 定义了 GENERATE 任务的双模式：正常选择 + forced 选择（MatchProcessor 失败后的回退）。
+
+**决策**（commits `abbe87a` → `ebc360c` → `e54b5f8` → `29ed172` → `456c114` → `301ca22` → `88ac329` → `441b087` → `9371b17` → `6c293ab` → `713110a`，11 commits）：
+
+1. **提示词设计文档**（`abbe87a`）：`docs/graph-mode-spec/prompt-design-llm-generate.md`（150 行）——定义三组提示词模板：正常选择（CHAR_PORTRAIT / SCENE_BG / DECORATIVE）、forced 选择（LLM must choose）、AI 图像生成（CHAR_PORTRAIT / SCENE_BG）。
+
+2. **配置常量化**（`ebc360c`）：`GENERATE_LIBRARY_TOP_N`（global library top-N 截断）、`GENERATE_REF_IMAGE_COUNT`（参考图数量）加入 `config.py`。
+
+3. **normalize_background 迁移**（`e54b5f8`）：从 `scripts/_sysgen_utils.py` → `src/storyloom/io/img_utils.py`——进入生产代码路径，供 GenerateProcessor 的图像 pipeline 使用。新增 `test_img_utils.py` 测试（82 行）。
+
+4. **GenerateProcessor 实现**（`29ed172`）：`src/storyloom/tasks/_llm_generate.py`（609 行）——核心结构：
+   - `_select_normal()` — 正常模式：LLM 自由选择（可选 AI 生成）
+   - `_select_forced()` — 强制模式：LLM 必须选择（MatchProcessor 失败后）
+   - `_collect_reference_images()` — 收集参考图（从 roster target 获取图片数据，推导 MIME 类型）
+   - `_generate_image()` — 调用 ImgApiClient 生成图像
+   - `_post_generate()` — 注册到 AssetLibrary + roster.set_target()
+   - 解析容错：JSON → fallback（随机 library top-1）
+
+5. **GameLoop 集成**（`456c114`）：`game_loop.py` 创建 GenerateProcessor 并传入 TaskGenerator，完成 §7.8b 全链路。
+
+6. **§7.8b 审计修复**（`301ca22`）：移除 dead `media_dir` 参数，补充 test coverage 缺口。
+
+7. **Bug 修复链**（`88ac329` → `713110a`）：
+   - `88ac329`：添加 Task import，消除 `_select_forced` 中重复的 LLM 调用逻辑
+   - `441b087`：reference image 的 MIME 类型从实际图片格式推导（非硬编码）
+   - `9371b17`：使用 `AssetType.default_extension` 作为 MIME fallback
+   - `713110a`：`_post_generate` 中 `roster.set_target()` 后持久化 AssetLibrary——防止素材注册丢失
+
+**测试**：`tests/test_llm_generate.py`（1075 行，51 tests）。
+
+**依据**：`graph-mode-spec/design.md` §7.8b；`config.py` GENERATE 常量；prompt-design-llm-generate.md；test_llm_generate.py。
+
+### CI/CD 基础设施
+
+**背景**：项目此前无 CI，测试仅在本地运行。需要自动化的测试验证 + 动态徽章展示。
+
+**决策**（commits `1632647` → `a9f2d13` → `467a0ed` → `ca19d6c`，4 commits）：
+
+1. **README 架构图**（`1632647`）：mermaid 流程图替代纯文本描述
+2. **硬编码徽章移除**（`a9f2d13`）：删除 README 中手动维护的 tests badge
+3. **GitHub Actions 测试工作流**（`467a0ed`）：`.github/workflows/test.yml`（73 行）——`ubuntu-latest`，Python 3.11，pytest 全量 + 动态徽章（`badges/tests-badge.svg`）
+4. **CI 修复**（`ca19d6c`）：修复 CI 中 `pytest: command not found`——改用 `python -m pytest`
+
+**依据**：`.github/workflows/test.yml`。
+
+### 系统素材工具链收尾
+
+**背景**：系统素材（预置背景/立绘）需要完整的生成→打包→分发工具链，集成到 PyInstaller 构建流程。
+
+**决策**（commits `f925c44` → `376e5c5`，含中间修复，~10 commits）：
+
+1. **Prompt 源 + Manifest 生成器**（`f925c44`）：`system_media_src/` 目录结构——提示词模板 + `generate_manifest.py` 清单生成器
+2. **素材生成脚本**（`1a9dad6`）：`generate_single_asset.py`（单素材）+ `generate_system_assets.py`（批量）——从 manifest 读取预设，调用 ImgApiClient 生成
+3. **批量修复**（`bdba432`）：修复双重 UserConfig 实例化、`--only`/`--start` 参数交互、模型预设扩展
+4. **Aspect Ratio 强制**（`7a9c376`）：所有背景预设强制 16:9 + 后裁剪安全网
+5. **打包脚本重写**（`8f58bec`, `7a8b2b9`, `376e5c5`）：`pack_system_media.sh`（155 行）替代废弃的 `setup_system_media.sh`——生成 ZIP 包→`build.sh` PyInstaller 集成
+6. **ImgApiClient 重构**（`f0133f3`）：`img_remove_bg` → `portrait_remove_bg`（语义明确），`remove_bg` 参数改为显式传入
+
+**依据**：`pack_system_media.sh`；`build.sh`；`config.py`。
+
+### UI 改进
+
+1. **图像生成开关**（`1c60839`, `446e7d8`）：设置页面新增 `img_generation_enabled` 复选框 + 可折叠 API 设置组——控制是否允许 AI 图像生成（成本控制）
+2. **README 文档**（`d6ff233`）：补充 `[bg]` extra 标签使用说明 + 模型下载链接
+
+**依据**：UserConfig `img_generation_enabled`；web UI settings。
+
+---
+
 ## 2026-08-07（周五）
 
 > **概述**：§7.6 Pipeline 集成收尾 + §7.7 图模式 UI 全栈实现 + 素材管理 UI 起步。一天内完成从 spec 撰写到可玩 VN 原型的完整闭环——后端 event→task 管道、前端 graph-renderer.js 渲染模块、游戏模式选择器、队列共享架构、自动/手动速度系统、场景过渡动画、最终审计与 33 项 bug 修复。共 61 commits，51 files，+9443/-282 lines，测试从 744 增至 847（+103）。
