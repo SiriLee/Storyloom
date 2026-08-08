@@ -415,7 +415,7 @@ def _collect_reference_images(
     target (not None).  The current DECLARE's own entry is excluded.
 
     Returns:
-        List of base64 data URL strings (``data:image/png;base64,...``),
+        List of base64 data URL strings (MIME type derived from asset type),
         or empty list if the model doesn't support references or no
         suitable images exist.
     """
