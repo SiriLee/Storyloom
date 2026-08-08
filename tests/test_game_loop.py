@@ -1328,19 +1328,16 @@ class TestGameLoopGraphPipeline:
 
     def test_mount_sets_process_factory(self, tmp_path):
         """mount_graph_pipeline() stores callable match_processor (MatchProcessor
-        for MATCH) and generate_processor (stub for GENERATE, until §7.8b).
-        MatchProcessor needs roster entries + a JSON response from the mock."""
+        for MATCH) and generate_processor (GenerateProcessor for GENERATE)."""
         gl = self._make_gl()
-        # mount_graph_pipeline wires MatchProcessor(self.api_client) for match.
-        # The mock already has chat() that returns self.response — set it to
-        # valid JSON so MatchProcessor's _parse_match_response can extract a name.
         gl.api_client.response = '{"selected": "hero"}'
         gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
         assert callable(gl._match_processor)
         assert callable(gl._generate_processor)
-        # Verify both return a Task.process closure
+
         from storyloom.assets import AssetType
         from storyloom.tasks import Task, TaskType
+
         # MATCH: needs roster entries for MatchProcessor to work
         gl._roster.add(AssetType.CHAR_PORTRAIT, "hero",
                        "A brave knight in silver armor")
@@ -1352,17 +1349,20 @@ class TestGameLoopGraphPipeline:
         assert t.completed is True
         assert t.result == "hero"
 
-        # GENERATE: still uses stub until §7.8b
+        # GENERATE: §7.8b — GenerateProcessor.  Use 'global' scope to avoid
+        # triggering AI image generation (which would need a real API).
+        # The mock must return a valid asset_id from the system catalog.
+        gl.api_client.response = '{"scope": "global", "selected": "sys_adult_female"}'
         g = Task(TaskType.GENERATE, 0, AssetType.CHAR_PORTRAIT)
         gl._roster.add(AssetType.CHAR_PORTRAIT, "new_hero",
                        "New character", target=None)
         proc2 = gl._generate_processor(AssetType.CHAR_PORTRAIT, "new_hero",
                                        gl._roster)
         proc2(g)
-        g.complete()  # stub does not call complete() — caller does
+        assert g.completed is True
         item = gl._roster.lookup(AssetType.CHAR_PORTRAIT, "new_hero")
         assert item is not None
-        assert item.target == "stub_default_portrait"
+        assert item.target is not None  # GenerateProcessor fills the placeholder
 
     def test_mount_sets_roster_game_id(self, tmp_path):
         """mount_graph_pipeline(game_id='test') → roster.game_id == 'test'."""
@@ -1370,24 +1370,17 @@ class TestGameLoopGraphPipeline:
         gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
         assert gl._roster.game_id == "test"
 
-    def test_mount_registers_stub_assets_in_library(self, tmp_path):
-        """§7.7: mount_graph_pipeline() registers real stub assets in the
-        AssetLibrary (not roster).  Roster entries are seeded later by
-        _init_stub_roster() from story_config.  (§7.8 replaces both)."""
+    def test_mount_registers_system_assets(self, tmp_path):
+        """§7.8: mount_graph_pipeline() imports system assets into the library."""
         gl = self._make_gl()
         gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
         assert gl._roster is not None
         from storyloom.assets import AssetType
-        # Access the library via the roster (mount_graph_pipeline creates it)
         lib = gl._roster._library
-        for atype, aid in (
-            (AssetType.CHAR_PORTRAIT, "stub_default_portrait"),
-            (AssetType.BACKGROUND, "stub_default_background"),
-        ):
-            asset = lib.get(atype, aid)
-            assert asset is not None, f"{atype.value}/{aid} missing from library"
-            assert asset.id == aid
-        # Roster should be empty (no __stub__ entries — replaced by §7.7)
+        # System assets should be imported (system_media/ exists in project)
+        char_assets = lib.list_by_type(AssetType.CHAR_PORTRAIT)
+        assert len(char_assets) > 0, "System CHAR_PORTRAIT assets should be imported"
+        # Roster should be empty at mount time
         assert len(gl._roster) == 0
 
     def test_roster_is_none_before_mount(self):
@@ -1422,12 +1415,12 @@ class TestGameLoopGraphPipeline:
         gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
         gl.set_save_manager(_FakeSaveManager(str(tmp_path)))
 
-        # §7.7: simulate _init_stub_roster — add a BACKGROUND entry matching
-        # the SCENE val="test_scene" used in the mock XML below.  This lets
-        # program match succeed → Task.result="test_scene" → EventDispatcher
-        # resolves via roster.lookup → target="stub_default_background".
+        # Add a BACKGROUND asset to the library and a roster entry referencing it.
+        lib = gl._roster._library
+        bg_id = "bg_test_01"
+        lib.add(AssetType.BACKGROUND, "Test BG", "", asset_id=bg_id)
         gl._roster.add(AssetType.BACKGROUND, "test_scene",
-                       "Test scene", target="stub_default_background")
+                       "Test scene", target=bg_id)
 
         # Replace mock with graph-mode XML (SCENE → MATCH task)
         scene_xml = (
@@ -1450,7 +1443,7 @@ class TestGameLoopGraphPipeline:
         # SCENE event must have BACKGROUND asset with real stub ID
         scene = next(e for e in ui_dicts if e["type"] == "scene")
         assert "assets" in scene, "SCENE missing assets in graph mode"
-        assert scene["assets"] == {AssetType.BACKGROUND.value: "stub_default_background"}
+        assert scene["assets"] == {AssetType.BACKGROUND.value: bg_id}
 
     def test_graph_mode_stream_round_binds_char_portrait(self, tmp_path):
         """§7.7: SEG with char → CHAR_PORTRAIT MATCH → asset binding."""
@@ -1460,9 +1453,12 @@ class TestGameLoopGraphPipeline:
         gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
         gl.set_save_manager(_FakeSaveManager(str(tmp_path)))
 
-        # Simulate _init_stub_roster for the char name
+        # Add a CHAR_PORTRAIT asset to the library and a roster entry referencing it.
+        lib = gl._roster._library
+        char_id = "char_test_01"
+        lib.add(AssetType.CHAR_PORTRAIT, "Test Char", "", asset_id=char_id)
         gl._roster.add(AssetType.CHAR_PORTRAIT, "Aldric",
-                       "A wise mage", target="stub_default_portrait")
+                       "A wise mage", target=char_id)
 
         seg_xml = (
             "001| <story>\n"
@@ -1482,7 +1478,7 @@ class TestGameLoopGraphPipeline:
         seg = segs[0]
         assert seg.get("char") == "Aldric"
         assert "assets" in seg, "SEG missing assets in graph mode"
-        assert seg["assets"] == {AssetType.CHAR_PORTRAIT.value: "stub_default_portrait"}
+        assert seg["assets"] == {AssetType.CHAR_PORTRAIT.value: char_id}
 
     def test_graph_mode_uses_graph_prompt_round1(self, tmp_path):
         """Graph mode start_game() → build_round1_graph, not build_round1."""

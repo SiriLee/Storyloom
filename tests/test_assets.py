@@ -1970,11 +1970,11 @@ class TestRosterThreadSafety:
 # ═══════════════════════════════════════════════════════════════════
 
 class TestInitStubRoster:
-    """Tests for _init_stub_roster() — §7.7 temporary roster seeding.
+    """Tests for _init_stub_roster() — §7.8b placeholder seeding.
 
-    Per design.md §8.2: seeds roster from story_config characters/locations
-    so program match (O(1) exact lookup) hits real names.
-    Marked as §7.8c DELETE BLOCK — replaced by real AI pre-build.
+    Seeds roster from story_config characters/locations as placeholders
+    (target=None).  GenerateProcessor fills them on first DECLARE.
+    §7.8c replaces this with real AI pre-build.
     """
 
     @staticmethod
@@ -1985,29 +1985,14 @@ class TestInitStubRoster:
         }
 
     @staticmethod
-    def _make_library(tmp_path):
-        """Create a library pre-populated with stub assets (mirrors mount_graph_pipeline)."""
-        from storyloom.assets import AssetLibrary, AssetType
-        lib = AssetLibrary(str(tmp_path))
-        for atype, aid in (
-            (AssetType.CHAR_PORTRAIT, "stub_default_portrait"),
-            (AssetType.BACKGROUND, "stub_default_background"),
-        ):
-            if lib.get(atype, aid) is None:
-                lib.add(atype, aid,
-                        "Stub " + ("Portrait" if atype == AssetType.CHAR_PORTRAIT else "Background"),
-                        asset_id=aid)
-        return lib
-
-    @staticmethod
     def _call_init(roster, story_config):
         from storyloom.core.game_loop import _init_stub_roster
         _init_stub_roster(roster, story_config)
 
     def test_seeds_characters_as_char_portrait(self, tmp_path):
-        """Each character → CHAR_PORTRAIT entry with target=stub_default_portrait."""
-        from storyloom.assets import GameAssetRoster, AssetType
-        lib = self._make_library(tmp_path)
+        """Each character → CHAR_PORTRAIT entry as placeholder (target=None)."""
+        from storyloom.assets import GameAssetRoster, AssetType, AssetLibrary
+        lib = AssetLibrary(str(tmp_path))
         roster = GameAssetRoster("test_game", lib)
         config = self._make_config(characters=[
             {"name": "Aldric", "description": "A wise mage"},
@@ -2018,17 +2003,17 @@ class TestInitStubRoster:
 
         aldric = roster.lookup(AssetType.CHAR_PORTRAIT, "Aldric")
         assert aldric is not None
-        assert aldric.target == "stub_default_portrait"
+        assert aldric.target is None  # placeholder until GenerateProcessor fills it
         assert aldric.local_description == "A wise mage"
 
         elara = roster.lookup(AssetType.CHAR_PORTRAIT, "Elara")
         assert elara is not None
-        assert elara.target == "stub_default_portrait"
+        assert elara.target is None
 
     def test_seeds_locations_as_background(self, tmp_path):
-        """Each location → BACKGROUND entry with target=stub_default_background."""
-        from storyloom.assets import GameAssetRoster, AssetType
-        lib = self._make_library(tmp_path)
+        """Each location → BACKGROUND entry as placeholder (target=None)."""
+        from storyloom.assets import GameAssetRoster, AssetType, AssetLibrary
+        lib = AssetLibrary(str(tmp_path))
         roster = GameAssetRoster("test_game", lib)
         config = self._make_config(locations=[
             {"name": "Library", "description": "Ancient dusty library"},
@@ -2039,16 +2024,16 @@ class TestInitStubRoster:
 
         lib_entry = roster.lookup(AssetType.BACKGROUND, "Library")
         assert lib_entry is not None
-        assert lib_entry.target == "stub_default_background"
+        assert lib_entry.target is None  # placeholder
 
         forest_entry = roster.lookup(AssetType.BACKGROUND, "Forest")
         assert forest_entry is not None
-        assert forest_entry.target == "stub_default_background"
+        assert forest_entry.target is None
 
     def test_idempotent_does_not_overwrite(self, tmp_path):
         """Calling twice must not overwrite existing entries."""
-        from storyloom.assets import GameAssetRoster, AssetType
-        lib = self._make_library(tmp_path)
+        from storyloom.assets import GameAssetRoster, AssetType, AssetLibrary
+        lib = AssetLibrary(str(tmp_path))
         roster = GameAssetRoster("test_game", lib)
         config = self._make_config(characters=[
             {"name": "Aldric", "description": "Original"},
@@ -2077,8 +2062,8 @@ class TestInitStubRoster:
 
     def test_skips_empty_names(self, tmp_path):
         """Characters/locations with empty name are skipped."""
-        from storyloom.assets import GameAssetRoster, AssetType
-        lib = self._make_library(tmp_path)
+        from storyloom.assets import GameAssetRoster, AssetType, AssetLibrary
+        lib = AssetLibrary(str(tmp_path))
         roster = GameAssetRoster("test_game", lib)
         config = self._make_config(characters=[
             {"name": "", "description": "No name"},

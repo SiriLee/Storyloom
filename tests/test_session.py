@@ -248,10 +248,11 @@ class TestPrebuildAssets:
         gl2 = session.game_loop
         assert gl2 is not None
         roster = gl2._roster
-        assert roster.lookup(AssetType.CHAR_PORTRAIT, "Kael").target == "stub_default_portrait"
-        assert roster.lookup(AssetType.CHAR_PORTRAIT, "Lira").target == "stub_default_portrait"
-        assert roster.lookup(AssetType.BACKGROUND, "Forest").target == "stub_default_background"
-        assert roster.lookup(AssetType.BACKGROUND, "Castle").target == "stub_default_background"
+        # §7.8b: placeholders (target=None) — GenerateProcessor fills on first DECLARE
+        assert roster.lookup(AssetType.CHAR_PORTRAIT, "Kael").target is None
+        assert roster.lookup(AssetType.CHAR_PORTRAIT, "Lira").target is None
+        assert roster.lookup(AssetType.BACKGROUND, "Forest").target is None
+        assert roster.lookup(AssetType.BACKGROUND, "Castle").target is None
 
         import os as _os
         roster_path = _os.path.join(session._saves_root, game_id, "_asset_roster.json")

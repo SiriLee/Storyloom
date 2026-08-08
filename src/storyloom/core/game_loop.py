@@ -1284,100 +1284,34 @@ class GameLoop:
         self._task_pool = TaskPool()
 
         # ── System assets (§7.8 framework) ──────────────────────────
-        system_catalog: dict | None = None
         if os.path.isdir(DEFAULT_SYSTEM_MEDIA_DIR):
             try:
-                lib_imported = library.import_system_assets(
-                    DEFAULT_SYSTEM_MEDIA_DIR
-                )
-                # Build a frozen snapshot for process_factory closures
-                system_catalog = {
-                    atype: library.list_by_type(atype)
-                    for atype in AssetType
-                }
+                library.import_system_assets(DEFAULT_SYSTEM_MEDIA_DIR)
             except Exception:
                 # system_media/ exists but is broken — skip, don't block
                 pass
 
-        # -- §7.8 delete block start: stub pre-population + stub factory --
-        # §7.7: register real stub assets in the library so roster.add()
-        # with target="stub_default_*" succeeds.  Roster entries themselves
-        # are seeded by _init_stub_roster() from story_config.
-        _STUB_PORTRAIT_ID = "stub_default_portrait"
-        _STUB_BG_ID = "stub_default_background"
+        from storyloom.io._types import RemoveBgPolicy
+        from storyloom.io.img_api_client import ImgApiClient
+        from storyloom.tasks import GenerateProcessor, MatchProcessor
 
-        for atype, aid in (
-            (AssetType.CHAR_PORTRAIT, _STUB_PORTRAIT_ID),
-            (AssetType.BACKGROUND, _STUB_BG_ID),
-        ):
-            if library.get(atype, aid) is None:
-                library.add(atype, aid,
-                            "Stub " + ("Portrait" if atype == AssetType.CHAR_PORTRAIT else "Background"),
-                            asset_id=aid)
-
-        library.save()
-
-        from storyloom.tasks import MatchProcessor
         self._match_processor = MatchProcessor(self.api_client)
-        self._generate_processor = self._stub_process_factory(
-            system_catalog=system_catalog,
+
+        from storyloom.user_config import UserConfig
+        raw_cfg = getattr(self.api_client, '_cfg', None)
+        if raw_cfg is None or not isinstance(raw_cfg, UserConfig):
+            raw_cfg = UserConfig()
+        portrait_policy = RemoveBgPolicy(raw_cfg.portrait_remove_bg)
+        img_enabled = raw_cfg.img_generation_enabled
+
+        self._generate_processor = GenerateProcessor(
+            api_client=self.api_client,
+            img_client_portrait=ImgApiClient(raw_cfg, remove_bg=portrait_policy),
+            img_client_background=ImgApiClient(raw_cfg, remove_bg=RemoveBgPolicy.NEVER),
+            library=library,
+            img_generation_enabled=img_enabled,
+            media_dir=DEFAULT_MEDIA_DIR,
         )
-        # -- §7.8 delete block end --
-
-    # -- §7.8 delete block start: _stub_process_factory --
-    @staticmethod
-    def _stub_process_factory(*, img_generation_enabled: bool = True,
-                              portrait_remove_bg: str = "auto",
-                              system_catalog: dict | None = None):
-        """§7.6 stub — MATCH passes through local_name; GENERATE fills placeholder.
-
-        Per design.md §4.3: EventDispatcher calls ``roster.lookup(type,
-        task.result).target`` to get the asset_id for URL construction.
-        MATCH sets result=local_name so lookup finds the roster entry created
-        by _init_stub_roster() → target=stub_default_*.
-
-        GENERATE sets target on the placeholder created by TaskGenerator.
-
-        Args:
-            img_generation_enabled: §7.8 framework — when False, LLM selection
-                degrades to forced selection from system catalog.
-            portrait_remove_bg: §7.8 framework — background removal policy
-                for character portraits only.  Converted to
-                ``RemoveBgPolicy`` when constructing ``ImgApiClient``.
-                Background images always use ``RemoveBgPolicy.NEVER``
-                regardless of this setting.
-            system_catalog: §7.8 framework — snapshot of system assets
-                for forced-selection fallback.
-
-        §7.8 deletes this entire method and replaces with real LLM matching.
-        """
-        import time
-        from storyloom.assets import AssetType
-        from storyloom.tasks import TaskType
-
-        _TARGET = {
-            AssetType.CHAR_PORTRAIT: "stub_default_portrait",
-            AssetType.BACKGROUND: "stub_default_background",
-        }
-
-        def _factory(asset_type, local_name, roster):
-            target = _TARGET.get(asset_type, "stub_default_background")
-
-            def _process(task):
-                time.sleep(0.01)
-                if task.task_type is TaskType.MATCH:
-                    # §7.7: program match already failed in _enqueue_match
-                    # (otherwise task.process wouldn't be set).  Add a
-                    # roster entry so EventDispatcher can resolve the
-                    # local_name to an asset_id.
-                    roster.add(asset_type, local_name, "", target=target)
-                    task.result = local_name
-                else:  # GENERATE: fill the placeholder
-                    roster.set_target(asset_type, local_name, target)
-            return _process
-
-        return _factory
-    # -- §7.8 delete block end --
 
     # ── Observer ──────────────────────────────────────────────────
     def _notify(self, record: RoundRecord) -> None:
@@ -1617,10 +1551,12 @@ class GameLoop:
 # ═══════════════════════════════════════════════════════════════════
 
 def _init_stub_roster(roster, story_config):
-    """Seed roster from story_config so program match hits real names.
+    """Seed roster placeholders from story_config.
 
-    For each character → CHAR_PORTRAIT entry (target=stub_default_portrait).
-    For each location  → BACKGROUND entry   (target=stub_default_background).
+    Characters → CHAR_PORTRAIT, locations → BACKGROUND.  All entries
+    start as placeholders (target=None) — the GenerateProcessor fills
+    them when the Director LLM issues DECLARE during the first round.
+
     Idempotent — skips if local_name already exists.
 
     §7.8c replaces this with real AI pre-build (LLM selection + image
@@ -1633,13 +1569,13 @@ def _init_stub_roster(roster, story_config):
         if name and roster.lookup(AssetType.CHAR_PORTRAIT, name) is None:
             roster.add(AssetType.CHAR_PORTRAIT, name,
                        char.get("description", ""),
-                       target="stub_default_portrait")
+                       target=None)
     for loc in story_config.get("locations", []):
         name = loc.get("name", "")
         if name and roster.lookup(AssetType.BACKGROUND, name) is None:
             roster.add(AssetType.BACKGROUND, name,
                        loc.get("description", ""),
-                       target="stub_default_background")
+                       target=None)
 
 # ═══════════════════════════════════════════════════════════════════
 # §7.8c DELETE BLOCK END
