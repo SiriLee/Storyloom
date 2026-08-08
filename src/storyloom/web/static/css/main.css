@@ -2351,3 +2351,65 @@ button.accent:hover, .btn-accent:hover {
     justify-content: center;
     margin-top: 1.5rem;
 }
+
+/* ── Toggle Switch (iOS-style checkbox) ──────────────────────────── */
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 26px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-round);
+    transition: background var(--trans-normal), border-color var(--trans-normal);
+    cursor: pointer;
+}
+
+.toggle-slider::before {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: var(--text-secondary);
+    border-radius: 50%;
+    transition: transform var(--trans-normal), background var(--trans-normal);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: var(--text-accent);
+    border-color: var(--text-accent);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(22px);
+    background: var(--bg-primary);
+}
+
+/* ── Settings Collapsible Group ──────────────────────────────────── */
+
+.setting-group {
+    overflow: hidden;
+    max-height: 400px;
+    opacity: 1;
+    transition: max-height 0.3s ease, opacity 0.25s ease;
+}
+
+.setting-group.collapsed {
+    max-height: 0;
+    opacity: 0;
+}

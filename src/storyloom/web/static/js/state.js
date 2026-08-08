@@ -126,18 +126,21 @@ const SETTINGS = [
         type: "text",
         label: "Image API URL",
         placeholder: "https://api.apiyi.com/v1",
+        group: "image",
     },
     {
         key: "img_api_key",
         type: "password",
         label: "Image API Key",
         placeholder: "sk-...",
+        group: "image",
     },
     {
         key: "img_api_model",
         type: "text",
         label: "Image Model",
         placeholder: "flux-2-pro",
+        group: "image",
     },
     {
         key: "portrait_remove_bg",
@@ -148,15 +151,12 @@ const SETTINGS = [
             { value: "auto", label: "Auto" },
             { value: "always", label: "Always" },
         ],
+        group: "image",
     },
     {
         key: "img_generation_enabled",
-        type: "select",
+        type: "toggle",
         label: "Image Generation",
-        options: [
-            { value: "true", label: "Enabled" },
-            { value: "false", label: "Disabled" },
-        ],
     },
 ];
 

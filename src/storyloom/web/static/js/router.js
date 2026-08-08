@@ -367,27 +367,57 @@
             + '6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 '
             + '17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
 
-        const rows = SETTINGS.map(def => {
+        const rows = SETTINGS.reduce((acc, def, i) => {
+            const prevGroup = i > 0 ? SETTINGS[i - 1].group : undefined;
+            const thisGroup = def.group;
             const current = getSetting(def.key);
             const label = esc(_(def.label));
 
+            /* ── Group boundary: close previous group ── */
+            if (prevGroup && prevGroup !== thisGroup) {
+                acc.push("</div>");
+            }
+
+            /* ── Group boundary: open new group ── */
+            if (thisGroup && thisGroup !== prevGroup) {
+                const enabled = getSetting("img_generation_enabled") !== "false";
+                const collapsed = enabled ? "" : " collapsed";
+                acc.push(`<div class="setting-group${collapsed}" data-group="${thisGroup}">`);
+            }
+
+            /* ── Toggle (checkbox slider) ── */
+            if (def.type === "toggle") {
+                const checked = current !== "false" ? " checked" : "";
+                acc.push(`
+                    <div class="setting-row">
+                        <span class="setting-label">${label}</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="setting-${def.key}"${checked}>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>`);
+                return acc;
+            }
+
+            /* ── Select dropdown ── */
             if (def.type === "select") {
-                return `
+                acc.push(`
                     <div class="setting-row">
                         <span class="setting-label">${label}</span>
                         <select id="setting-${def.key}">${def.options.map(opt =>
                             `<option value="${esc(opt.value)}" ${current === opt.value ? "selected" : ""}>${esc(_(opt.label))}</option>`
                         ).join("")}</select>
-                    </div>`;
+                    </div>`);
+                return acc;
             }
 
-            /* text / password: display + edit button (✎ → ✓ / ✕) */
+            /* ── text / password: display + edit button (✎ → ✓ / ✕) ── */
             const isKeyField = def.key === "api_key" || def.key === "img_api_key";
             const displayVal = isKeyField
                 ? maskKey(current)
                 : (current || esc(def.placeholder || ""));
             const displayCls = (!current && def.key !== "api_key") ? "setting-val muted" : "setting-val";
-            return `
+            acc.push(`
                 <div class="setting-row" id="row-${def.key}">
                     <span class="setting-label">${label}</span>
                     <span class="${displayCls}" id="display-${def.key}">${esc(displayVal)}</span>
@@ -397,8 +427,15 @@
                            class="setting-input hidden">
                     <button class="setting-edit-btn" id="edit-${def.key}"
                             title="${esc(_("Edit"))}">${Icons.pencil()}</button>
-                </div>`;
-        }).join("");
+                </div>`);
+
+            /* ── Close trailing group ── */
+            if (i === SETTINGS.length - 1 && thisGroup) {
+                acc.push("</div>");
+            }
+
+            return acc;
+        }, []).join("");
 
         app.innerHTML = `
             <div class="settings-view">
@@ -437,6 +474,28 @@
         });
 
         SETTINGS.forEach(def => {
+            /* ── Toggle: collapse / expand group ── */
+            if (def.type === "toggle") {
+                const el = document.getElementById(`setting-${def.key}`);
+                if (!el) return;
+                el.addEventListener("change", () => {
+                    const value = el.checked ? "true" : "false";
+                    /* Toggle group visibility */
+                    const group = document.querySelector(
+                        `.setting-group[data-group="${def.group || "image"}"]`
+                    );
+                    if (group) {
+                        if (el.checked) {
+                            group.classList.remove("collapsed");
+                        } else {
+                            group.classList.add("collapsed");
+                        }
+                    }
+                    applySetting(def.key, value);
+                });
+                return;
+            }
+
             if (def.type === "select") {
                 const el = document.getElementById(`setting-${def.key}`);
                 if (!el) return;
