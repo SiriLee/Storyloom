@@ -261,8 +261,9 @@ class TestBuildMatchMessages:
             AssetType.CHAR_PORTRAIT, "hero", roster_with_entries,
         )
         content = msgs[1]["content"]
-        # ghost has "" description → should still be listed
+        # ghost has "" description → placeholder text replaces empty string
         assert '"ghost"' in content
+        assert "(no description)" in content
 
     def test_only_same_asset_type_entries(self, roster_with_entries):
         """CHAR match only lists CHAR entries, not BACKGROUND."""
@@ -290,8 +291,7 @@ class TestBuildMatchMessages:
             AssetType.BACKGROUND, "tavern", roster_with_entries,
         )
         content = msgs[1]["content"]
-        # Should use scene/background label
-        assert "Background" in content or "Scene" in content
+        assert "Background / Scene" in content
 
     def test_char_portrait_uses_character_guidance(self, roster_with_entries):
         """CHAR_PORTRAIT type gets character-specific label."""
@@ -300,8 +300,7 @@ class TestBuildMatchMessages:
             AssetType.CHAR_PORTRAIT, "hero", roster_with_entries,
         )
         content = msgs[1]["content"]
-        # Should use character label
-        assert "Character" in content or "Portrait" in content
+        assert "Character Portrait" in content
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -479,6 +478,10 @@ class TestMatchProcessor:
 
         assert task.result == "mage"
         assert len(api.calls) == 2
+        # First call: disabled thinking
+        assert api.calls[0]["extra_params"]["thinking"]["type"] == "disabled"
+        # Retry: light thinking
+        assert api.calls[1]["extra_params"]["thinking"]["type"] == "enabled"
 
     # ── Both attempts fail ────────────────────────────────────────────
 
@@ -497,9 +500,8 @@ class TestMatchProcessor:
         process(task)
 
         assert task.completed is True
-        # result is None — UI will display no asset (silent degradation)
-        # task.error should record the failure
-        assert task.error is not None or task.result is None
+        assert task.result is None       # UI will display no asset (silent degradation)
+        assert task.error is not None    # failure must be recorded
 
     def test_both_invalid_responses_give_up(self, roster_with_entries):
         """Both LLM responses return invalid names → give up."""
@@ -517,6 +519,7 @@ class TestMatchProcessor:
 
         assert task.completed is True
         assert task.result is None
+        assert task.error is not None    # failure must be recorded
         assert len(api.calls) == 2
 
     def test_mixed_api_error_then_invalid_give_up(self, roster_with_entries):
@@ -535,6 +538,7 @@ class TestMatchProcessor:
 
         assert task.completed is True
         assert task.result is None
+        assert task.error is not None    # failure must be recorded
         assert len(api.calls) == 2
 
     # ── Empty roster ──────────────────────────────────────────────────
