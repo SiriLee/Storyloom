@@ -545,6 +545,7 @@ class GenerateProcessor:
 
             if asset_id is not None:
                 roster.set_target(asset_type, local_name, asset_id)
+                lib.save()
                 task.complete()
                 return
 
@@ -563,6 +564,7 @@ class GenerateProcessor:
                 )
 
             roster.set_target(asset_type, local_name, asset_id)
+            lib.save()
             task.complete()
 
         return process
