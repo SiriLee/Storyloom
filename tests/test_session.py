@@ -153,7 +153,7 @@ class TestGameSessionLifecycle:
             gl, game_id = session.start_game(SAMPLE_RESULT, game_mode="graph")
             assert gl._roster is not None
             assert gl._task_pool is not None
-            assert gl._process_factory is not None
+            assert gl._match_processor is not None
 
     def test_start_game_text_mode_does_not_mount(self):
         """start_game(game_mode='text') → all graph attrs stay None."""
@@ -162,7 +162,7 @@ class TestGameSessionLifecycle:
             gl, game_id = session.start_game(SAMPLE_RESULT, game_mode="text")
             assert gl._roster is None
             assert gl._task_pool is None
-            assert gl._process_factory is None
+            assert gl._match_processor is None
 
     def test_load_game_graph_mode_mounts_pipeline(self):
         """load_game reads config.mode='graph' → mount_graph_pipeline called."""
@@ -173,7 +173,7 @@ class TestGameSessionLifecycle:
             gl = session.load_game(game_id, "_init.json")
             assert gl._roster is not None
             assert gl._task_pool is not None
-            assert gl._process_factory is not None
+            assert gl._match_processor is not None
 
     def test_load_game_text_mode_does_not_mount(self):
         """load_game reads config.mode='text' → all graph attrs stay None."""
@@ -183,7 +183,7 @@ class TestGameSessionLifecycle:
             gl = session.load_game(game_id, "_init.json")
             assert gl._roster is None
             assert gl._task_pool is None
-            assert gl._process_factory is None
+            assert gl._match_processor is None
 
     def test_checkpoint_save_preserves_mode(self):
         """start_game(graph) → to_save_dict() writes config.mode='graph'.

@@ -521,7 +521,8 @@ class GameLoop:
         self._roster: GameAssetRoster | None = None
         self._task_pool: TaskPool | None = None
         self._last_scene: str | None = None  # §7.7: persisted in save, emitted on load
-        self._process_factory: Callable | None = None
+        self._match_processor: Callable | None = None
+        self._generate_processor: Callable | None = None
 
         # Pending API state — every round's Phase 5 launches the *next*
         # round's API call in a daemon thread and stores the result queue
@@ -755,8 +756,8 @@ class GameLoop:
             from storyloom.tasks import TaskGenerator
             task_queue: deque[object] | None = deque()
             task_gen = TaskGenerator(task_queue, self._roster,
-                                     match_processor=self._process_factory,
-                                     generate_processor=self._process_factory,
+                                     match_processor=self._match_processor,
+                                     generate_processor=self._generate_processor,
                                      task_pool=self._task_pool)
         else:
             task_queue = None
@@ -1316,7 +1317,9 @@ class GameLoop:
 
         library.save()
 
-        self._process_factory = self._stub_process_factory(
+        from storyloom.tasks import MatchProcessor
+        self._match_processor = MatchProcessor(self.api_client)
+        self._generate_processor = self._stub_process_factory(
             system_catalog=system_catalog,
         )
         # -- §7.8 delete block end --

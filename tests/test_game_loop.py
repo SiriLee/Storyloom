@@ -102,6 +102,8 @@ class MockApiResult:
 class MockApiClient:
     """Mock API client for testing."""
 
+    model = "deepseek-v4-pro"  # MatchProcessor reads this for thinking params
+
     def __init__(self, response: str = SAMPLE_XML):
         self.response = response
         self.last_messages = None
@@ -1325,34 +1327,39 @@ class TestGameLoopGraphPipeline:
         assert isinstance(gl._task_pool, TaskPool)
 
     def test_mount_sets_process_factory(self, tmp_path):
-        """mount_graph_pipeline() stores a process_factory that accepts
-        (AssetType, str, GameAssetRoster) and returns a Task.process."""
+        """mount_graph_pipeline() stores callable match_processor (MatchProcessor
+        for MATCH) and generate_processor (stub for GENERATE, until §7.8b).
+        MatchProcessor needs roster entries + a JSON response from the mock."""
         gl = self._make_gl()
+        # mount_graph_pipeline wires MatchProcessor(self.api_client) for match.
+        # The mock already has chat() that returns self.response — set it to
+        # valid JSON so MatchProcessor's _parse_match_response can extract a name.
+        gl.api_client.response = '{"selected": "hero"}'
         gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
-        assert callable(gl._process_factory)
-        # Verify it returns a callable that accepts a Task
+        assert callable(gl._match_processor)
+        assert callable(gl._generate_processor)
+        # Verify both return a Task.process closure
         from storyloom.assets import AssetType
         from storyloom.tasks import Task, TaskType
-        proc = gl._process_factory(AssetType.CHAR_PORTRAIT, "hero",
+        # MATCH: needs roster entries for MatchProcessor to work
+        gl._roster.add(AssetType.CHAR_PORTRAIT, "hero",
+                       "A brave knight in silver armor")
+        proc = gl._match_processor(AssetType.CHAR_PORTRAIT, "hero",
                                    gl._roster)
         assert callable(proc)
-        # proc should accept a Task argument
         t = Task(TaskType.MATCH, 1, AssetType.CHAR_PORTRAIT)
-        # §7.7: MATCH task.result = local_name (not __stub__).
-        # EventDispatcher resolves via roster.lookup(type, result).target.
         proc(t)
-        t.complete()
+        assert t.completed is True
         assert t.result == "hero"
 
-        # §7.7: GENERATE → set_target to correct stub asset ID
+        # GENERATE: still uses stub until §7.8b
         g = Task(TaskType.GENERATE, 0, AssetType.CHAR_PORTRAIT)
-        # Simulate TaskGenerator creating a placeholder first
         gl._roster.add(AssetType.CHAR_PORTRAIT, "new_hero",
                        "New character", target=None)
-        proc2 = gl._process_factory(AssetType.CHAR_PORTRAIT, "new_hero",
-                                    gl._roster)
+        proc2 = gl._generate_processor(AssetType.CHAR_PORTRAIT, "new_hero",
+                                       gl._roster)
         proc2(g)
-        g.complete()
+        g.complete()  # stub does not call complete() — caller does
         item = gl._roster.lookup(AssetType.CHAR_PORTRAIT, "new_hero")
         assert item is not None
         assert item.target == "stub_default_portrait"
@@ -1388,7 +1395,7 @@ class TestGameLoopGraphPipeline:
         gl = self._make_gl()
         assert gl._roster is None
         assert gl._task_pool is None
-        assert gl._process_factory is None
+        assert gl._match_processor is None
 
     def test_text_mode_stream_round_creates_text_dispatcher(self, tmp_path):
         """Text mode: stream_round() creates EventDispatcher without queue/roster."""
