@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
+from storyloom.io._types import RemoveBgPolicy
 from storyloom.user_config import UserConfig
 
 
@@ -25,7 +26,7 @@ def cfg():
     c.img_api_key = "sk-img-key"
     c.img_api_base_url = "https://api.img.com"
     c.img_api_model = "flux-2-pro"
-    c.img_remove_bg = "auto"
+    c.portrait_remove_bg = "auto"
     return c
 
 
@@ -155,18 +156,34 @@ class TestImgApiClientInit:
     def test_reads_img_config_from_user_config(self, cfg):
         from storyloom.io.img_api_client import ImgApiClient
         with patch("storyloom.io.img_api_client.httpx.Client"):
-            client = ImgApiClient(cfg)
+            client = ImgApiClient(cfg, remove_bg=RemoveBgPolicy.AUTO)
         assert client.api_key == "sk-img-key"
         assert client.base_url == "https://api.img.com"
         assert client.model == "flux-2-pro"
-        assert client.remove_bg_policy.value == "auto"
+        assert client.remove_bg_policy == RemoveBgPolicy.AUTO
+
+    def test_remove_bg_is_required(self, cfg):
+        """Constructing without remove_bg must raise TypeError."""
+        from storyloom.io.img_api_client import ImgApiClient
+        with patch("storyloom.io.img_api_client.httpx.Client"):
+            with pytest.raises(TypeError):
+                ImgApiClient(cfg)  # missing required keyword argument
+
+    def test_remove_bg_is_passed_through(self, cfg):
+        """Explicit remove_bg value is returned, not read from config."""
+        from storyloom.io.img_api_client import ImgApiClient
+        with patch("storyloom.io.img_api_client.httpx.Client"):
+            # Set config to something different to prove it's ignored
+            cfg.portrait_remove_bg = "never"
+            client = ImgApiClient(cfg, remove_bg=RemoveBgPolicy.ALWAYS)
+            assert client.remove_bg_policy == RemoveBgPolicy.ALWAYS
 
     def test_env_var_overrides_img_config(self, cfg, monkeypatch):
         monkeypatch.setenv("IMAGE_API_KEY", "sk-from-env")
         monkeypatch.setenv("IMAGE_MODEL", "custom-model-env")
         from storyloom.io.img_api_client import ImgApiClient
         with patch("storyloom.io.img_api_client.httpx.Client"):
-            client = ImgApiClient(cfg)
+            client = ImgApiClient(cfg, remove_bg=RemoveBgPolicy.AUTO)
         assert client.api_key == "sk-from-env"
         assert client.model == "custom-model-env"
 
@@ -180,7 +197,7 @@ class TestImgApiClientInit:
         c.img_api_key = ""
         from storyloom.io.img_api_client import ImgApiClient
         with patch("storyloom.io.img_api_client.httpx.Client"):
-            client = ImgApiClient(c)
+            client = ImgApiClient(c, remove_bg=RemoveBgPolicy.AUTO)
         assert client.api_key == "sk-llm-fallback"  # env overrides
 
     def test_img_key_falls_back_to_llm_key_config(self, monkeypatch):
@@ -193,7 +210,7 @@ class TestImgApiClientInit:
         c.img_api_key = ""
         from storyloom.io.img_api_client import ImgApiClient
         with patch("storyloom.io.img_api_client.httpx.Client"):
-            client = ImgApiClient(c)
+            client = ImgApiClient(c, remove_bg=RemoveBgPolicy.AUTO)
         assert client.api_key == "sk-llm-config-only"
 
     def test_base_url_uses_default_when_empty(self, monkeypatch):
@@ -202,17 +219,16 @@ class TestImgApiClientInit:
         c.img_api_base_url = ""
         from storyloom.io.img_api_client import ImgApiClient
         with patch("storyloom.io.img_api_client.httpx.Client"):
-            client = ImgApiClient(c)
+            client = ImgApiClient(c, remove_bg=RemoveBgPolicy.AUTO)
         assert client.base_url == "https://api.apiyi.com/v1"
 
     def test_uses_config_when_no_env(self, cfg, monkeypatch):
         monkeypatch.delenv("IMAGE_API_KEY", raising=False)
         monkeypatch.delenv("IMAGE_BASE_URL", raising=False)
         monkeypatch.delenv("IMAGE_MODEL", raising=False)
-        monkeypatch.delenv("IMAGE_REMOVE_BG", raising=False)
         from storyloom.io.img_api_client import ImgApiClient
         with patch("storyloom.io.img_api_client.httpx.Client"):
-            client = ImgApiClient(cfg)
+            client = ImgApiClient(cfg, remove_bg=RemoveBgPolicy.AUTO)
         assert client.api_key == "sk-img-key"
         assert client.base_url == "https://api.img.com"
         assert client.model == "flux-2-pro"
@@ -221,7 +237,7 @@ class TestImgApiClientInit:
         """PORTRAIT → 1024x1024 for flux-2-pro preset."""
         from storyloom.io.img_api_client import ImgApiClient, ImageSize
         with patch("storyloom.io.img_api_client.httpx.Client"):
-            client = ImgApiClient(cfg)
+            client = ImgApiClient(cfg, remove_bg=RemoveBgPolicy.AUTO)
         assert client._resolve_size(ImageSize.PORTRAIT) == "1024x1024"
         assert client._resolve_size(ImageSize.BACKGROUND) == "1280x720"
 
@@ -231,7 +247,7 @@ class TestImgApiClientInit:
         c = UserConfig()
         from storyloom.io.img_api_client import ImgApiClient, ImageSize
         with patch("storyloom.io.img_api_client.httpx.Client"):
-            client = ImgApiClient(c)
+            client = ImgApiClient(c, remove_bg=RemoveBgPolicy.AUTO)
         assert client._resolve_size(ImageSize.PORTRAIT) == "1024x1024"
         assert client._resolve_size(ImageSize.BACKGROUND) == "1280x720"
 
@@ -283,7 +299,7 @@ class TestImgApiClientGenerate:
             mock_cls.return_value = mock_client
             _configure_mocks_for_success(mock_client, raw)
 
-            client = ImgApiClient(cfg)
+            client = ImgApiClient(cfg, remove_bg=RemoveBgPolicy.AUTO)
             result = client.generate(
                 "test prompt", ImageSize.PORTRAIT,
                 remove_bg=RemoveBgPolicy.NEVER,
@@ -305,7 +321,7 @@ class TestImgApiClientGenerate:
             mock_cls.return_value = mock_client
             _configure_mocks_for_success(mock_client, raw)
 
-            client = ImgApiClient(cfg)
+            client = ImgApiClient(cfg, remove_bg=RemoveBgPolicy.AUTO)
             client.generate("anime warrior", ImageSize.PORTRAIT,
                             remove_bg=RemoveBgPolicy.NEVER)
 
@@ -330,7 +346,7 @@ class TestImgApiClientGenerate:
             mock_cls.return_value = mock_client
             _configure_mocks_for_success(mock_client, raw)
 
-            client = ImgApiClient(cfg)
+            client = ImgApiClient(cfg, remove_bg=RemoveBgPolicy.AUTO)
             client.generate(
                 "same character", ImageSize.PORTRAIT,
                 image_urls=["https://ref.example.com/ref.png"],
@@ -355,7 +371,7 @@ class TestImgApiClientGenerate:
             }
             mock_client.post.return_value = post_resp
 
-            client = ImgApiClient(cfg)
+            client = ImgApiClient(cfg, remove_bg=RemoveBgPolicy.AUTO)
             with pytest.raises(ImageApiError, match="401"):
                 client.generate("prompt", ImageSize.PORTRAIT,
                                 remove_bg=RemoveBgPolicy.NEVER)
@@ -372,7 +388,7 @@ class TestImgApiClientGenerate:
             mock_cls.return_value = mock_client
             mock_client.post.side_effect = httpx.ConnectError("connection refused")
 
-            client = ImgApiClient(cfg)
+            client = ImgApiClient(cfg, remove_bg=RemoveBgPolicy.AUTO)
             with pytest.raises(ImageApiError, match="onnect"):
                 client.generate("prompt", ImageSize.PORTRAIT,
                                 remove_bg=RemoveBgPolicy.NEVER)
@@ -395,7 +411,7 @@ class TestImgApiClientGenerate:
                 post_resp, b"", status=403,
             )
 
-            client = ImgApiClient(cfg)
+            client = ImgApiClient(cfg, remove_bg=RemoveBgPolicy.AUTO)
             with pytest.raises(ImageApiError, match="download.*403"):
                 client.generate("prompt", ImageSize.PORTRAIT,
                                 remove_bg=RemoveBgPolicy.NEVER)
@@ -409,7 +425,7 @@ class TestImgApiClientGenerate:
         c.img_api_key = ""
         from storyloom.io.img_api_client import ImgApiClient, ImageSize
         with patch("storyloom.io.img_api_client.httpx.Client"):
-            client = ImgApiClient(c)
+            client = ImgApiClient(c, remove_bg=RemoveBgPolicy.AUTO)
         with pytest.raises(ValueError, match="API key"):
             client.generate("prompt", ImageSize.PORTRAIT)
 
@@ -420,7 +436,7 @@ class TestImgApiClientConfigSummary:
     def test_returns_string_with_key_info(self, cfg):
         from storyloom.io.img_api_client import ImgApiClient
         with patch("storyloom.io.img_api_client.httpx.Client"):
-            client = ImgApiClient(cfg)
+            client = ImgApiClient(cfg, remove_bg=RemoveBgPolicy.AUTO)
         summary = client.config_summary
         assert "flux-2-pro" in summary
         assert "api.img.com" in summary or "auto" in summary
@@ -432,7 +448,7 @@ class TestImgApiClientConfigSummary:
         c.img_api_key = ""
         from storyloom.io.img_api_client import ImgApiClient
         with patch("storyloom.io.img_api_client.httpx.Client"):
-            client = ImgApiClient(c)
+            client = ImgApiClient(c, remove_bg=RemoveBgPolicy.AUTO)
         summary = client.config_summary
         assert isinstance(summary, str)
         assert len(summary) > 0

@@ -442,12 +442,12 @@
                 if (!el) return;
                 el.addEventListener("change", async () => {
                     /* ── Background Removal: verify model is available ── */
-                    if (def.key === "img_remove_bg" && el.value !== "never") {
+                    if (def.key === "portrait_remove_bg" && el.value !== "never") {
                         try {
                             const status = await API.get("/api/config/bg-removal-status");
                             if (!status.available) {
                                 /* Model not found — revert. */
-                                el.value = getSetting("img_remove_bg") || "never";
+                                el.value = getSetting("portrait_remove_bg") || "never";
                                 return;
                             }
                         } catch (_) {

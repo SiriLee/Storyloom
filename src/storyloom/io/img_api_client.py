@@ -122,9 +122,20 @@ class ImgApiClient:
     falls back to ``LLM_API_KEY`` / ``api_key``.
     """
 
-    def __init__(self, config: "UserConfig | None" = None):
+    def __init__(self, config: "UserConfig | None" = None, *,
+                 remove_bg: RemoveBgPolicy):
+        """Initialize the image API client.
+
+        Args:
+            config: UserConfig instance (reads a fresh one if None).
+            remove_bg: Background removal policy. **Required.**
+                Callers are responsible for determining the correct policy:
+                - CHAR_PORTRAIT → user-configured policy (portrait_remove_bg)
+                - BACKGROUND     → RemoveBgPolicy.NEVER (hardcoded)
+        """
         from storyloom.user_config import UserConfig
         self._cfg = config if config is not None else UserConfig()
+        self._remove_bg = remove_bg
         # Thread-local httpx.Client: default transport is not thread-safe,
         # and Task Pool (7.4+) will call generate() from multiple threads.
         self._local = threading.local()
@@ -165,16 +176,14 @@ class ImgApiClient:
 
     @property
     def remove_bg_policy(self) -> RemoveBgPolicy:
-        """Resolved background removal policy."""
-        raw = (
-            os.environ.get("IMAGE_REMOVE_BG")
-            or self._cfg.img_remove_bg
-            or "auto"
-        )
-        try:
-            return RemoveBgPolicy(raw)
-        except ValueError:
-            return RemoveBgPolicy.AUTO
+        """Background removal policy set at construction time.
+
+        Unlike pre-7.8 behaviour, this no longer reads from UserConfig
+        or the ``IMAGE_REMOVE_BG`` environment variable.  Callers are
+        responsible for determining the correct policy per asset type
+        and passing it explicitly to the constructor.
+        """
+        return self._remove_bg
 
     # ── HTTP client ──────────────────────────────────────────────────
 

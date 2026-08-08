@@ -119,8 +119,8 @@ class TestConfig:
         assert "img_api_key" in data
         assert "img_api_base_url" in data
         assert "img_api_model" in data
-        assert "img_remove_bg" in data
-        assert data["img_remove_bg"] == "auto"
+        assert "portrait_remove_bg" in data
+        assert data["portrait_remove_bg"] == "auto"
 
     def test_update_config_game_mode_valid(self, client):
         res = client.post("/api/config", json={"game_mode": "graph"})
@@ -140,17 +140,17 @@ class TestConfig:
             "img_api_key": "sk-img-test",
             "img_api_base_url": "https://img.example.com",
             "img_api_model": "custom-model",
-            "img_remove_bg": "always",
+            "portrait_remove_bg": "always",
         })
         assert res.status_code == 200
         data = client.get("/api/config").json()
         assert "****" in data["img_api_key"]
         assert data["img_api_base_url"] == "https://img.example.com"
         assert data["img_api_model"] == "custom-model"
-        assert data["img_remove_bg"] == "always"
+        assert data["portrait_remove_bg"] == "always"
 
-    def test_update_img_remove_bg_rejects_invalid(self, client):
-        res = client.post("/api/config", json={"img_remove_bg": "sometimes"})
+    def test_update_portrait_remove_bg_rejects_invalid(self, client):
+        res = client.post("/api/config", json={"portrait_remove_bg": "sometimes"})
         assert res.status_code == 400
 
     # ── Version migration (7.3) ──

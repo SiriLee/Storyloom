@@ -1321,7 +1321,7 @@ class GameLoop:
     # -- §7.8 delete block start: _stub_process_factory --
     @staticmethod
     def _stub_process_factory(*, img_generation_enabled: bool = True,
-                              img_remove_bg: str = "auto",
+                              portrait_remove_bg: str = "auto",
                               system_catalog: dict | None = None):
         """§7.6 stub — MATCH passes through local_name; GENERATE fills placeholder.
 
@@ -1335,8 +1335,11 @@ class GameLoop:
         Args:
             img_generation_enabled: §7.8 framework — when False, LLM selection
                 degrades to forced selection from system catalog.
-            img_remove_bg: §7.8 framework — background removal policy
-                passed through to image generation.
+            portrait_remove_bg: §7.8 framework — background removal policy
+                for character portraits only.  Converted to
+                ``RemoveBgPolicy`` when constructing ``ImgApiClient``.
+                Background images always use ``RemoveBgPolicy.NEVER``
+                regardless of this setting.
             system_catalog: §7.8 framework — snapshot of system assets
                 for forced-selection fallback.
 

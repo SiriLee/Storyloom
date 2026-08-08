@@ -126,7 +126,7 @@ async def get_config():
         "img_api_key": _mask(cfg.img_api_key),
         "img_api_base_url": cfg.img_api_base_url or DEFAULT_IMG_BASE_URL,
         "img_api_model": cfg.img_api_model,
-        "img_remove_bg": cfg.img_remove_bg,
+        "portrait_remove_bg": cfg.portrait_remove_bg,
         "img_generation_enabled": cfg.img_generation_enabled,
     }
 
@@ -140,7 +140,7 @@ class ConfigUpdate(BaseModel):
     img_api_key: str | None = None
     img_api_base_url: str | None = None
     img_api_model: str | None = None
-    img_remove_bg: str | None = None
+    portrait_remove_bg: str | None = None
     img_generation_enabled: bool | None = None
 
 
@@ -175,14 +175,14 @@ async def update_config(body: ConfigUpdate):
         cfg.img_api_base_url = body.img_api_base_url
     if body.img_api_model is not None:
         cfg.img_api_model = body.img_api_model
-    if body.img_remove_bg is not None:
-        if body.img_remove_bg not in ("auto", "always", "never"):
+    if body.portrait_remove_bg is not None:
+        if body.portrait_remove_bg not in ("auto", "always", "never"):
             raise HTTPException(
                 400,
-                f"img_remove_bg must be 'auto', 'always', or 'never', "
-                f"got {body.img_remove_bg!r}",
+                f"portrait_remove_bg must be 'auto', 'always', or 'never', "
+                f"got {body.portrait_remove_bg!r}",
             )
-        cfg.img_remove_bg = body.img_remove_bg
+        cfg.portrait_remove_bg = body.portrait_remove_bg
     if body.img_generation_enabled is not None:
         cfg.img_generation_enabled = body.img_generation_enabled
     cfg.save()

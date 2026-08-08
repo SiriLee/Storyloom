@@ -24,7 +24,7 @@ Config resolution (matches 7.3 design):
     Key:      IMAGE_API_KEY → img_api_key → LLM_API_KEY → api_key
     URL:      IMAGE_BASE_URL → img_api_base_url → DEFAULT_IMG_BASE_URL
     Model:    IMAGE_MODEL → img_api_model → DEFAULT_IMG_MODEL
-    RemBG:    IMAGE_REMOVE_BG → img_remove_bg → "auto"
+    RemBG:    portrait_remove_bg (config.json) → "auto"
 
 ============================================================================
 Usage:
@@ -37,7 +37,6 @@ Usage:
     # Env var overrides (same pattern as LLM)
     IMAGE_API_KEY=sk-xxx python scripts/validate_image_api.py
     IMAGE_MODEL=seedream-5-0-260128 python scripts/validate_image_api.py
-    IMAGE_REMOVE_BG=always python scripts/validate_image_api.py
 
     # WSL2 with proxy (httpx reads HTTP_PROXY/HTTPS_PROXY automatically)
     python scripts/validate_image_api.py
@@ -153,7 +152,7 @@ def main() -> None:
     parser.add_argument(
         "--remove-bg", type=str, default=None,
         choices=["auto", "always", "never"],
-        help="Override background removal policy (env: IMAGE_REMOVE_BG)",
+        help="Override portrait background removal policy (config: portrait_remove_bg)",
     )
     parser.add_argument(
         "--skip-consistency", action="store_true",
@@ -172,12 +171,14 @@ def main() -> None:
         os.environ["IMAGE_BASE_URL"] = args.base_url
     if args.api_key:
         os.environ["IMAGE_API_KEY"] = args.api_key
-    if args.remove_bg:
-        os.environ["IMAGE_REMOVE_BG"] = args.remove_bg
-
     # ── Load config ──────────────────────────────────────────────────
     app_dir = Path(args.app_dir)
     cfg = UserConfig(app_dir)
+
+    # CLI override for bg removal (applied after config load so
+    # config.json is not mutated — --remove-bg affects this run only).
+    if args.remove_bg:
+        cfg.portrait_remove_bg = args.remove_bg
 
     if cfg.needs_migration:
         print(f"⚠  Config version mismatch (file v{cfg._version}, "
@@ -186,7 +187,8 @@ def main() -> None:
         print()
 
     # ── Create client ─────────────────────────────────────────────────
-    client = ImgApiClient(cfg)
+    portrait_policy = RemoveBgPolicy(cfg.portrait_remove_bg)
+    client = ImgApiClient(cfg, remove_bg=portrait_policy)
 
     if not client.api_key:
         print("ERROR: No image API key configured.")

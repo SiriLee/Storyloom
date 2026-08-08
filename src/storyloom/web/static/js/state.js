@@ -140,7 +140,7 @@ const SETTINGS = [
         placeholder: "flux-2-pro",
     },
     {
-        key: "img_remove_bg",
+        key: "portrait_remove_bg",
         type: "select",
         label: "Sprite Cutout",
         options: [
@@ -201,7 +201,7 @@ async function saveConfig() {
         api_model: getSetting("api_model"),
         img_api_base_url: getSetting("img_api_base_url"),
         img_api_model: getSetting("img_api_model"),
-        img_remove_bg: getSetting("img_remove_bg"),
+        portrait_remove_bg: getSetting("portrait_remove_bg"),
         img_generation_enabled: getSetting("img_generation_enabled") !== "false",
     };
     /* Only send api_key if the user typed a real one — an empty or
@@ -252,8 +252,8 @@ async function initConfig() {
         if (data.img_api_model) {
             localStorage.setItem(SETTINGS_STORE + "img_api_model", data.img_api_model);
         }
-        if (data.img_remove_bg) {
-            localStorage.setItem(SETTINGS_STORE + "img_remove_bg", data.img_remove_bg);
+        if (data.portrait_remove_bg) {
+            localStorage.setItem(SETTINGS_STORE + "portrait_remove_bg", data.portrait_remove_bg);
         }
         if (data.img_generation_enabled !== undefined) {
             localStorage.setItem(SETTINGS_STORE + "img_generation_enabled",

@@ -150,9 +150,9 @@ class TestUserConfigImageFields:
         cfg = UserConfig()
         assert cfg.img_api_model == "flux-2-pro"
 
-    def test_img_remove_bg_default(self):
+    def test_portrait_remove_bg_default(self):
         cfg = UserConfig()
-        assert cfg.img_remove_bg == "auto"
+        assert cfg.portrait_remove_bg == "auto"
 
     # ── Setters ──
 
@@ -168,21 +168,21 @@ class TestUserConfigImageFields:
         with pytest.raises(ValueError, match="game_mode"):
             cfg.game_mode = "invalid"
 
-    def test_img_remove_bg_setter_rejects_invalid(self):
+    def test_portrait_remove_bg_setter_rejects_invalid(self):
         cfg = UserConfig()
-        with pytest.raises(ValueError, match="img_remove_bg"):
-            cfg.img_remove_bg = "sometimes"
+        with pytest.raises(ValueError, match="portrait_remove_bg"):
+            cfg.portrait_remove_bg = "sometimes"
 
     def test_img_fields_setters(self):
         cfg = UserConfig()
         cfg.img_api_key = "sk-img-test"
         cfg.img_api_base_url = "https://img.example.com"
         cfg.img_api_model = "custom-model"
-        cfg.img_remove_bg = "always"
+        cfg.portrait_remove_bg = "always"
         assert cfg.img_api_key == "sk-img-test"
         assert cfg.img_api_base_url == "https://img.example.com"
         assert cfg.img_api_model == "custom-model"
-        assert cfg.img_remove_bg == "always"
+        assert cfg.portrait_remove_bg == "always"
 
     # ── Load backfill ──
 
@@ -200,7 +200,7 @@ class TestUserConfigImageFields:
         assert cfg.img_api_key == ""
         assert cfg.img_api_base_url == ""
         assert cfg.img_api_model == "flux-2-pro"
-        assert cfg.img_remove_bg == "auto"
+        assert cfg.portrait_remove_bg == "auto"
         # Should have been re-saved with all fields
         saved = json.loads((tmp_path / "config.json").read_text())
         assert "game_mode" in saved
@@ -215,7 +215,7 @@ class TestUserConfigImageFields:
         cfg.img_api_key = "sk-img-save"
         cfg.img_api_base_url = "https://images.example.com"
         cfg.img_api_model = "my-model"
-        cfg.img_remove_bg = "never"
+        cfg.portrait_remove_bg = "never"
         cfg.save()
 
         cfg2 = UserConfig(tmp_path)
@@ -223,7 +223,7 @@ class TestUserConfigImageFields:
         assert cfg2.img_api_key == "sk-img-save"
         assert cfg2.img_api_base_url == "https://images.example.com"
         assert cfg2.img_api_model == "my-model"
-        assert cfg2.img_remove_bg == "never"
+        assert cfg2.portrait_remove_bg == "never"
 
     def test_save_json_structure_includes_img_fields(self, tmp_path):
         cfg = UserConfig(tmp_path)
@@ -235,7 +235,7 @@ class TestUserConfigImageFields:
         assert data["img_api_key"] == "sk-test"
         assert data["img_api_base_url"] == ""
         assert data["img_api_model"] == "flux-2-pro"
-        assert data["img_remove_bg"] == "auto"
+        assert data["portrait_remove_bg"] == "auto"
         # Version matches current schema
         assert data["version"] == 2
 

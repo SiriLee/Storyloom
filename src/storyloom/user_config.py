@@ -31,7 +31,7 @@ class UserConfig:
         "img_api_key": "",
         "img_api_base_url": "",
         "img_api_model": "flux-2-pro",
-        "img_remove_bg": "auto",
+        "portrait_remove_bg": "auto",
         "img_generation_enabled": True,
     }
 
@@ -46,7 +46,7 @@ class UserConfig:
         self._img_api_key: str = self._DEFAULTS["img_api_key"]
         self._img_api_base_url: str = self._DEFAULTS["img_api_base_url"]
         self._img_api_model: str = self._DEFAULTS["img_api_model"]
-        self._img_remove_bg: str = self._DEFAULTS["img_remove_bg"]
+        self._portrait_remove_bg: str = self._DEFAULTS["portrait_remove_bg"]
         self._img_generation_enabled: bool = self._DEFAULTS["img_generation_enabled"]
         self._needs_migration: bool = False
 
@@ -124,17 +124,21 @@ class UserConfig:
         self._img_api_model = value
 
     @property
-    def img_remove_bg(self) -> str:
-        return self._img_remove_bg
+    def portrait_remove_bg(self) -> str:
+        """Background removal policy for character portraits only.
 
-    @img_remove_bg.setter
-    def img_remove_bg(self, value: str) -> None:
+        Background images always use NEVER — this setting does not affect them.
+        """
+        return self._portrait_remove_bg
+
+    @portrait_remove_bg.setter
+    def portrait_remove_bg(self, value: str) -> None:
         if value not in ("auto", "always", "never"):
             raise ValueError(
-                f"img_remove_bg must be 'auto', 'always', or 'never', "
+                f"portrait_remove_bg must be 'auto', 'always', or 'never', "
                 f"got {value!r}"
             )
-        self._img_remove_bg = value
+        self._portrait_remove_bg = value
 
     @property
     def img_generation_enabled(self) -> bool:
@@ -200,7 +204,7 @@ class UserConfig:
         self._img_api_key = data.get("img_api_key", self._DEFAULTS["img_api_key"])
         self._img_api_base_url = data.get("img_api_base_url", self._DEFAULTS["img_api_base_url"])
         self._img_api_model = data.get("img_api_model", self._DEFAULTS["img_api_model"])
-        self._img_remove_bg = data.get("img_remove_bg", self._DEFAULTS["img_remove_bg"])
+        self._portrait_remove_bg = data.get("portrait_remove_bg", self._DEFAULTS["portrait_remove_bg"])
         self._img_generation_enabled = data.get(
             "img_generation_enabled", self._DEFAULTS["img_generation_enabled"]
         )
@@ -241,7 +245,7 @@ class UserConfig:
         self._img_api_key = self._DEFAULTS["img_api_key"]
         self._img_api_base_url = self._DEFAULTS["img_api_base_url"]
         self._img_api_model = self._DEFAULTS["img_api_model"]
-        self._img_remove_bg = self._DEFAULTS["img_remove_bg"]
+        self._portrait_remove_bg = self._DEFAULTS["portrait_remove_bg"]
         self._img_generation_enabled = self._DEFAULTS["img_generation_enabled"]
 
     def save(self) -> None:
@@ -268,7 +272,7 @@ class UserConfig:
             "img_api_key": self._img_api_key,
             "img_api_base_url": self._img_api_base_url,
             "img_api_model": self._img_api_model,
-            "img_remove_bg": self._img_remove_bg,
+            "portrait_remove_bg": self._portrait_remove_bg,
             "img_generation_enabled": self._img_generation_enabled,
         }
 
