@@ -1295,7 +1295,6 @@ class GameLoop:
             except Exception:
                 # system_media/ exists but is broken — skip, don't block
                 pass
-        library.save()
 
         # -- §7.8 delete block start: stub pre-population + stub factory --
         # §7.7: register real stub assets in the library so roster.add()
@@ -1312,6 +1311,8 @@ class GameLoop:
                 library.add(atype, aid,
                             "Stub " + ("Portrait" if atype == AssetType.CHAR_PORTRAIT else "Background"),
                             asset_id=aid)
+
+        library.save()
 
         self._process_factory = self._stub_process_factory(
             system_catalog=system_catalog,
