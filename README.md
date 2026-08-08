@@ -1,165 +1,159 @@
 # Storyloom
 
-> AI-powered interactive text fiction engine — the LLM narrates, the engine orchestrates.
->
-> [中文版本](./README.zh-CN.md)
+> An LLM-powered interactive fiction engine with a visual novel mode.
 
-Storyloom turns a large language model into a game master. You and the AI collaboratively build a story world, define characters and game mechanics, then play through a branching narrative where your choices shape the outcome. The engine handles state management, context window stewardship, and real-time streaming — the LLM focuses on telling a great story.
+[![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![Tests](https://img.shields.io/badge/tests-883-brightgreen)](.)
 
-**Status (2026-08-04):** Phase 1 complete. Version 1.3.0 — pipeline refactored for Phase 2 graph mode. Playable via dev CLI or web UI (FastAPI + SSE single-page app). Standalone binary + pip wheel.
+<!-- TODO: screenshot or GIF demo -->
 
-## Highlights
+---
 
-- **Seamless narration** — The bridge pre-fetch mechanism fires the next API call mid-paragraph, hiding LLM latency behind the current text. No "waiting for response" pauses between segments.
-- **Local source of truth** — All game state lives in the engine. The LLM *suggests* changes; the engine validates (type checks, range checks) before applying. Rejected suggestions feed back as corrections.
-- **Two-layer branching** — Intra-segment narrative branches (player choices within a scene) and outline-level route forks (story-direction changes at checkpoints). One is reversible, the other isn't.
-- **Conversation-based context** — Sliding window of recent rounds + permanent Round 1 anchor + checkpoint compression. Fits a long-running game in ~50K tokens without losing coherence.
-- **Streaming XML output** — The LLM emits `<seg>`, `<choice>`, `<bridge/>`, `<set>`, `<checkpoint>` elements in a `<story>` document. Parsed line-by-line — no buffering, no waiting for the full response.
-- **Co-creation flow** — Not just "pick a genre." The AI interviews you about your story idea, then generates a tailored world, protagonist, game variables, and plot outline before play begins.
+## Install
 
-## Quick Start
+Download the latest binary for your platform from
+[Releases](https://github.com/SiriLee/Storyloom/releases).  No Python required.
+
+Or install from source:
 
 ```bash
-# Install
-pip install -e .
+git clone https://github.com/SiriLee/Storyloom.git && cd Storyloom
+pip install -e ".[bg]"
+```
 
-# Configure — copy config.example.json to config.json and edit
+Graph mode needs a one-time asset download into your working directory:
+
+```bash
+python3 -c "import urllib.request as u,zipfile as z;u.urlretrieve('https://github.com/SiriLee/Storyloom/releases/download/v2.0.0/system_media-v1.0.0.zip','_sm.zip');z.ZipFile('_sm.zip').extractall('system_media');print('OK')" && rm _sm.zip
+```
+
+---
+
+## Configure
+
+```bash
 cp config.example.json config.json
-# Edit config.json with your API credentials
-
-# Play (CLI)
-python -m storyloom.dev_cli
-
-# Play (Web UI)
-python -m storyloom.web          # → http://127.0.0.1:8000
 ```
 
-Any OpenAI-compatible API works — DeepSeek, OpenAI, local llama.cpp, etc. Set `api_base_url` and `api_model` to match your provider.
+```json
+{
+  "api_key": "sk-...",
+  "api_base_url": "https://api.deepseek.com",
+  "api_model": "deepseek-v4-pro",
+  "game_mode": "graph"
+}
+```
 
-See [`src/storyloom/dev_cli/README.md`](./src/storyloom/dev_cli/README.md) for CLI controls and observer mode.
+Any OpenAI-compatible provider works. Image generation (graph mode) needs an
+additional `img_api_*` block — configure it in the Settings UI on first launch.
 
-### Packaging (Web UI)
+---
 
-Build a standalone executable + pip wheel for distribution:
+## Run
 
 ```bash
-./scripts/build.sh
+storyloom-web          # → http://127.0.0.1:8000
+# or
+python -m storyloom.web
 ```
 
-Output in `dist/storyloom-web-v{VERSION}/`:
+---
 
-| File | Use |
-|------|-----|
-| `storyloom-web` | Standalone binary — download and run (no Python needed) |
-| `locale/` | i18n files — keep next to the binary |
-| `*.whl` | pip package — `pip install storyloom-*.whl` → `storyloom-web` command |
+## What It Does
 
-Requires `build` + `pyinstaller` (installed automatically by the script).
+You describe a story idea. The AI interviews you, builds a world, and becomes
+your game master. You play through branching narrative — choices matter, state
+persists, and the engine handles pacing so you never see a loading spinner.
+
+**Graph mode** adds character portraits and scene backgrounds, declared on the
+fly by the AI and resolved by the engine's asset pipeline in real time.
+
+---
+
+## Capabilities
+
+| | |
+|---|---|
+| Streaming XML pipeline | `StreamParser → StateManager → EventDispatcher` — parsed line-by-line, no buffering |
+| Bridge pre-fetch | Next API call fires mid-paragraph; latency hidden behind reading time |
+| State validation | LLM *suggests* writes; engine type-checks before applying; rejected writes feed back |
+| Two-layer branching | In-scene choices + outline-level route forks at checkpoints |
+| Asset pipeline | O(1) catalog match → LLM fallback → AI generation; async, non-blocking |
+| Context management | Sliding window + Round 1 anchor + checkpoint compression; ~50K tokens |
+| Co-creation | AI interviews you about your idea before generating world, characters, and plot |
+| Save / load | Atomic JSON saves; mode-agnostic — switch text/graph any time |
+| i18n | English, 简体中文, 繁體中文 (gettext) |
+| Web UI | FastAPI + SSE + vanilla JS SPA |
+| CLI | Terminal client with debug observer |
+| Packaged | `pip install` + standalone binary (PyInstaller) + system asset zip |
+
+---
 
 ## Architecture
 
-Storyloom is a **single Python application** — not a client-server system. The core engine is UI-agnostic, exposing a generator-based event stream consumed by any presentation layer through `GameSession`.
+```mermaid
+graph TD
+    LLM[Director LLM]
+    Parser[Stream Parser]
+    State[State Manager]
+    Tasks[Task Generator + Pool]
+    Dispatcher[Event Dispatcher]
+    UI[UI]
 
-```
-┌──────────────────────────────────────────────────┐
-│               Storyloom Core Engine              │
-│  ┌──────────┐  ┌───────────┐  ┌───────────────┐ │
-│  │GameLoop  │  │ContextMgr │  │  Event Pipe   │ │
-│  │(orchestr-│  │(messages) │  │ StreamParser  │ │
-│  │ ator)    │  └───────────┘  │     →         │ │
-│  └──────────┘                 │ StateManager  │ │
-│  ┌──────────┐  ┌───────────┐  │     →         │ │
-│  │PromptBldr│  │CoCreate   │  │EventDispatcher│ │
-│  └──────────┘  └───────────┘  └───────────────┘ │
-│  ┌──────────┐  ┌───────────┐  ┌───────────────┐ │
-│  │ApiClient │  │SaveManager│  │  UserConfig   │ │
-│  └──────────┘  └───────────┘  └───────────────┘ │
-└─────────────────────┬────────────────────────────┘
-                      │ GameSession (public API)
-              ┌───────┴────────┐
-              ▼                ▼
-       ┌──────────┐    ┌──────────────┐
-       │ Dev CLI  │    │  Web UI      │
-       │(terminal)│    │(FastAPI+SSE) │
-       └──────────┘    └──────────────┘
+    LLM -- "token stream" --> Parser
+    Parser -- "event" --> State
+    Parser -. "asset trigger" .-> Tasks
+
+    State -- "processed event" --> Dispatcher
+    Tasks -- "completed task" --> Dispatcher
+
+    Dispatcher -- "bound event" --> UI
+    UI -. "choice" .-> State
+
+    State -. "pre-fetch" .-> LLM
 ```
 
-### How a round works
+Solid lines are streaming data flow. Dotted lines are one-shot triggers.
+Graph-mode asset tags spawn tasks that resolve asynchronously, without blocking
+the text pipeline.
 
-```
-Player reads text ──→ makes choice ──→ engine sends prompt ──→ LLM streams XML
-                                                                       │
-                    ┌──────────────────────────────────────────────────┘
-                    ▼
-         StreamParser (line → Event)
-                    │
-         StateManager (state logic, branch filter, choice pause)
-                    │
-         EventDispatcher (Event → UI dict)
-                    │
-       ┌────────────┼────────────┬────────────┐
-       ▼            ▼            ▼            ▼
-    <seg>        <choice>    <bridge/>     <set>
-    display      present     fire next     validate &
-    narrative    options     API call      apply state
-```
-
-The `<bridge/>` element triggers the next API call mid-paragraph, hiding LLM latency behind the current text display.
-
-The engine is organized into `storyloom.core` (game loop, state manager, event dispatcher, context management, prompt building, co-creation, save system), `storyloom.parser` (streaming XML parser, Event types, shared data types), `storyloom.io` (API client), and `storyloom.user_config` (config management). The UI layer — `storyloom.web` (FastAPI + SSE + SPA) and `storyloom.dev_cli` (terminal) — imports from `storyloom.core` via `GameSession`. See `CLAUDE.md` for the complete file ownership map.
+---
 
 ## Documentation
 
-| Document | What it covers |
-|----------|---------------|
-| [`docs/spec/exec-flow.md`](./docs/spec/exec-flow.md) | Phase 1 execution pipeline — **authoritative** |
-| [`docs/spec/block-spec.md`](./docs/spec/block-spec.md) | XML element syntax, branch routing, state validation |
-| [`docs/spec/prompt-design.md`](./docs/spec/prompt-design.md) | Prompt templates & conversation architecture |
-| [`docs/spec/data-model.md`](./docs/spec/data-model.md) | GameState, save system, config constants |
-| [`docs/engineering-journal.md`](./docs/engineering-journal.md) | Design decision log (2026-07-02 → present) |
-| [`docs/README.md`](./docs/README.md) | Full documentation index |
+| | |
+|---|---|
+| Theory | [First principles](docs/theory/first-principles.md) · [Bridge mechanism](docs/theory/bridge-mechanism.md) · [Streaming parse](docs/theory/streaming-parse.md) · [Asset generation](docs/theory/asset-generation.md) |
+| Spec | [Phase 1 pipeline](docs/spec/exec-flow.md) · [XML elements](docs/spec/block-spec.md) · [Prompts](docs/spec/prompt-design.md) · [Data model](docs/spec/data-model.md) |
+| Graph mode | [Design](docs/graph-mode-spec/design.md) |
+| API | [GameSession](docs/api/session.md) · [Co-create](docs/api/co-create.md) |
+| Log | [Engineering journal](docs/engineering-journal.md) |
 
-## Development
+---
+
+## Develop
 
 ```bash
-# Run tests (mock — no API key needed)
-pytest --ignore=tests/test_api_client.py
+git clone https://github.com/SiriLee/Storyloom.git && cd Storyloom
+pip install -e ".[bg]"
 
-# Run all tests including API tests
-pytest
+pytest                          # 883 tests, no API key needed
 
-# Run a specific test file
-pytest tests/test_game_loop.py -v
+# Build
+bash scripts/build.sh           # standalone binary + wheel
+bash scripts/pack_system_media.sh  # system asset zip for release
 ```
 
-**Tech stack:** Python 3.10+ (standard library preferred), OpenAI-compatible API, local JSON storage, gettext i18n. Web: FastAPI + SSE + vanilla JS SPA. Packaging: PyInstaller + pip wheel.
+```bash
+# Generate system assets from source (needs image API key)
+python scripts/generate_system_assets.py
+python scripts/generate_single_asset.py sys_student_female --dry-run
+```
 
-**Conventions:** Conventional Commits, English code comments & git messages, Chinese prompt variables.
+**Conventions:** Python ≥ 3.10 · stdlib-first · Conventional Commits · English
+code & docs · mock tests (no real API calls) · Chinese internal discussions.
 
-**Tests:** pytest tests (mock, no API key needed). `pytest --ignore=tests/test_api_client.py` for engine-only tests.
-
-### Web API
-
-The web server exposes REST + SSE endpoints for config, co-creation, game streaming, and save management. See `src/storyloom/web/server.py` for the complete endpoint reference.
-
-### API for UI integration
-
-UI developers interact with the engine through `GameSession` — the sole public API surface.
-See [`docs/api/session.md`](./docs/api/session.md) for a complete usage guide with code examples,
-and [`docs/api/co-create.md`](./docs/api/co-create.md) for the co-creation API reference.
-
-## Roadmap
-
-- [x] Phase 1 core engine — game loop, co-creation, saving, ending detection, i18n
-- [x] Bridge pre-fetch for seamless narration
-- [x] Conversation-based context with sliding window + compression
-- [x] Streaming Event pipeline — StreamParser → StateManager → EventDispatcher
-- [x] UserConfig — centralized config management
-- [x] Web UI (FastAPI + SSE) — main menu, co-create chat, game view, adventure log, settings, credits
-- [x] Packaging — standalone binary (PyInstaller) + pip wheel via `scripts/build.sh`
-- [ ] Phase 2 — image mode (static backgrounds + character sprites), TaskGenerator + Task Pool, asset pipeline, graph-mode UI
-- [ ] Phase 3 — full image mode, visual quality on par with mainstream visual novel games, cloud sync, TTS, script export
-
-## License
+---
 
 MIT
