@@ -103,8 +103,8 @@ def main() -> None:
                     continue
             tasks.append((atype, asset_id, entry))
 
-    # Respect --start
-    if args.start:
+    # Respect --start (skipped when --only is set — see docs)
+    if args.start and not args.only:
         filtered = []
         found = False
         for t in tasks:
@@ -113,8 +113,8 @@ def main() -> None:
             if found:
                 filtered.append(t)
         tasks = filtered
-        if not found and not args.only:
-            print(f"WARNING: --start {args.start} not found, generating all")
+        if not found:
+            print(f"WARNING: --start {args.start} not found, nothing to generate")
 
     if not tasks:
         print("No assets to generate.")

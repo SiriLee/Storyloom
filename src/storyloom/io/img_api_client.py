@@ -73,6 +73,49 @@ class ImageModelPreset:
 # (default_sizes, extra_body) would affect all concurrent requests.
 # For dynamic model registration, create a new preset dict instead.
 MODEL_PRESETS: dict[str, ImageModelPreset] = {
+    # ── Seedream family (high-quality anime, excellent for visual novel) ─
+    "seedream-5-0-pro-260628": ImageModelPreset(
+        label="Seedream 5.0 Pro",
+        default_sizes={
+            "portrait": "2048x2048",
+            "background": "2560x1440",
+        },
+        supports_reference=True,
+    ),
+    "seedream-5-0-260128": ImageModelPreset(
+        label="Seedream 5.0",
+        default_sizes={
+            "portrait": "2048x2048",
+            "background": "2560x1440",
+        },
+        supports_reference=True,
+    ),
+    "seedream-4-5-251128": ImageModelPreset(
+        label="Seedream 4.5",
+        default_sizes={
+            "portrait": "2048x2048",
+            "background": "2560x1440",
+        },
+        supports_reference=True,
+    ),
+    "seedream-4-0-250828": ImageModelPreset(
+        label="Seedream 4.0",
+        default_sizes={
+            "portrait": "2048x2048",
+            "background": "2560x1440",
+        },
+        supports_reference=True,
+    ),
+
+    # ── FLUX family ──────────────────────────────────────────────────
+    "flux-2-max": ImageModelPreset(
+        label="FLUX.2 Max",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
     "flux-2-pro": ImageModelPreset(
         label="FLUX.2 Pro",
         default_sizes={
@@ -81,19 +124,233 @@ MODEL_PRESETS: dict[str, ImageModelPreset] = {
         },
         supports_reference=True,
     ),
-    "seedream-5-0-260128": ImageModelPreset(
-        label="Seedream 5.0 Lite",
+    "flux-2-flex": ImageModelPreset(
+        label="FLUX.2 Flex",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+    "flux-2-klein-9b": ImageModelPreset(
+        label="FLUX.2 Klein 9B",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+    "flux-2-klein-4b": ImageModelPreset(
+        label="FLUX.2 Klein 4B",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+    "flux-kontext-max": ImageModelPreset(
+        label="FLUX Kontext Max",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+    "flux-kontext-pro": ImageModelPreset(
+        label="FLUX Kontext Pro",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+    "flux-dev": ImageModelPreset(
+        label="FLUX Dev",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+
+    # ── Gemini family ────────────────────────────────────────────────
+    "gemini-3-pro-image-preview-4k": ImageModelPreset(
+        label="Gemini 3 Pro Image 4K",
+        default_sizes={
+            "portrait": "2048x2048",
+            "background": "3840x2160",
+        },
+        supports_reference=True,
+    ),
+    "gemini-3-pro-image-preview-2k": ImageModelPreset(
+        label="Gemini 3 Pro Image 2K",
         default_sizes={
             "portrait": "2048x2048",
             "background": "2560x1440",
         },
         supports_reference=True,
     ),
-    "gemini-3.1-flash-lite-image": ImageModelPreset(
-        label="Nano Banana Lite",
+    "gemini-3-pro-image-preview": ImageModelPreset(
+        label="Gemini 3 Pro Image",
+        default_sizes={
+            "portrait": "2048x2048",
+            "background": "2048x2048",
+        },
+        supports_reference=True,
+    ),
+    "gemini-3-pro-image-preview-1k": ImageModelPreset(
+        label="Gemini 3 Pro Image 1K",
         default_sizes={
             "portrait": "1024x1024",
             "background": "1024x1024",
+        },
+        supports_reference=True,
+    ),
+    "gemini-3-pro-image": ImageModelPreset(
+        label="Gemini 3 Pro Image (stable)",
+        default_sizes={
+            "portrait": "2048x2048",
+            "background": "2048x2048",
+        },
+        supports_reference=True,
+    ),
+    "gemini-3.1-flash-image-preview-4k": ImageModelPreset(
+        label="Gemini 3.1 Flash Image 4K",
+        default_sizes={
+            "portrait": "2048x2048",
+            "background": "3840x2160",
+        },
+        supports_reference=True,
+    ),
+    "gemini-3.1-flash-image-4k": ImageModelPreset(
+        label="Gemini 3.1 Flash Image 4K (stable)",
+        default_sizes={
+            "portrait": "2048x2048",
+            "background": "3840x2160",
+        },
+        supports_reference=True,
+    ),
+    "gemini-3.1-flash-image-preview": ImageModelPreset(
+        label="Gemini 3.1 Flash Image",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+    "gemini-3.1-flash-image": ImageModelPreset(
+        label="Gemini 3.1 Flash Image (stable)",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+    "gemini-3.1-flash-lite-image": ImageModelPreset(
+        label="Gemini 3.1 Flash Lite Image",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1024x1024",
+        },
+        supports_reference=True,
+    ),
+    "gemini-2.5-flash-image": ImageModelPreset(
+        label="Gemini 2.5 Flash Image",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+    "gemini-2.5-flash-image-preview": ImageModelPreset(
+        label="Gemini 2.5 Flash Image (preview)",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+
+    # ── Nano Banana family (budget, fast) ─────────────────────────────
+    "nano-banana-pro": ImageModelPreset(
+        label="Nano Banana Pro",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=False,
+    ),
+    "nano-banana-2": ImageModelPreset(
+        label="Nano Banana 2",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=False,
+    ),
+    "nano-banana": ImageModelPreset(
+        label="Nano Banana",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1024x1024",
+        },
+        supports_reference=False,
+    ),
+
+    # ── GPT Image family ─────────────────────────────────────────────
+    "gpt-image-2-vip": ImageModelPreset(
+        label="GPT Image 2 VIP",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+    "gpt-image-2-all": ImageModelPreset(
+        label="GPT Image 2 All",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+    "gpt-image-2": ImageModelPreset(
+        label="GPT Image 2",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+    "gpt-image-1.5": ImageModelPreset(
+        label="GPT Image 1.5",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+    "gpt-image-1": ImageModelPreset(
+        label="GPT Image 1",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+    "gpt-image-1-mini": ImageModelPreset(
+        label="GPT Image 1 Mini",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
+        },
+        supports_reference=True,
+    ),
+    "chatgpt-image-latest": ImageModelPreset(
+        label="ChatGPT Image Latest",
+        default_sizes={
+            "portrait": "1024x1024",
+            "background": "1280x720",
         },
         supports_reference=True,
     ),

@@ -79,19 +79,18 @@ def main() -> None:
     out = output_path(asset_type, args.asset_id)
     size = get_image_size(asset_type)
 
-    # ── Resolve bg removal policy ─────────────────────────────────────
-    remove_bg = get_remove_bg(asset_type)
-    if remove_bg is None:
-        # CHAR_PORTRAIT — read from user config
-        cfg_read = UserConfig(Path(args.app_dir))
-        remove_bg = RemoveBgPolicy(cfg_read.portrait_remove_bg)
-
-    # ── Load config + create client ───────────────────────────────────
+    # ── Load config ───────────────────────────────────────────────────
     cfg = UserConfig(Path(args.app_dir))
     if args.model:
         cfg.img_api_model = args.model
     if args.base_url:
         cfg.img_api_base_url = args.base_url
+
+    # ── Resolve bg removal policy ─────────────────────────────────────
+    remove_bg = get_remove_bg(asset_type)
+    if remove_bg is None:
+        # CHAR_PORTRAIT — read from user config
+        remove_bg = RemoveBgPolicy(cfg.portrait_remove_bg)
 
     client = ImgApiClient(cfg, remove_bg=remove_bg)
 
