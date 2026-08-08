@@ -1300,7 +1300,7 @@ class TestSystemAssetReconciliation:
     # ── Remove old declarations ──────────────────────────────────────
 
     def test_import_removes_old_declarations(self, tmp_path):
-        """S_old − S_new → use_count released (from 1 to 0)."""
+        """S_old − S_new with no other references → asset fully deleted."""
         from storyloom.assets._library import AssetLibrary
         import os
 
@@ -1324,10 +1324,10 @@ class TestSystemAssetReconciliation:
         report = lib.import_system_assets(sys_dir)
 
         assert report.removed == ["sys_hero_001"]
-        # use_count released: 1 → 0
+        # use_count reached 0 → asset fully deleted from library
         hero = lib.get(AssetType.CHAR_PORTRAIT, "sys_hero_001")
-        assert hero is not None  # entry preserved
-        assert hero.use_count == 0
+        assert hero is None
+        assert len(lib) == 0
 
     def test_import_removed_asset_with_active_ref_stays(self, tmp_path):
         """S_old − S_new with use_count > 1 → use_count decremented

@@ -29,6 +29,18 @@ class SystemImportReport:
 
     Tracks what changed during reconciliation between the manifest
     and the persisted library state.
+
+    Attributes:
+        version: Manifest version after reconciliation.
+        added: Asset IDs newly imported from the manifest.
+        removed: Asset IDs removed from the manifest.  The system
+            reference is released.  If no other references exist
+            (use_count reaches 0), the asset is fully deleted from
+            the library; otherwise it stays with the remaining
+            reference count.
+        updated: Asset IDs whose descriptions were updated in place.
+        unchanged: Count of assets that existed in both manifest and
+            library with no changes.
     """
     version: str
     added: list[str] = field(default_factory=list)
@@ -238,6 +250,14 @@ class AssetLibrary:
             for aid in sorted(old_ids - new_ids):
                 self.decrease_usage(atype, aid)
                 report.removed.append(aid)
+                # If use_count reached 0 (no roster references),
+                # actually delete the asset from the library.
+                existing = self.get(atype, aid)
+                if existing is not None and existing.use_count == 0:
+                    try:
+                        self.remove(atype, aid)
+                    except ValueError:
+                        pass  # race: use_count changed between check and remove
 
             # ── Updated ──
             for aid in sorted(new_ids & old_ids):
