@@ -26,6 +26,7 @@ from scripts._sysgen_utils import (
     find_asset,
     get_image_size,
     get_remove_bg,
+    normalize_background,
     output_path,
 )
 from storyloom.assets._types import AssetType
@@ -131,9 +132,14 @@ def main() -> None:
 
     elapsed_s = time.perf_counter() - t0
 
+    # ── Post-process: enforce 16:9 aspect ratio for backgrounds ──────
+    raw = result.bytes
+    if asset_type is AssetType.BACKGROUND:
+        raw = normalize_background(raw)
+
     # ── Save ──────────────────────────────────────────────────────────
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(result.bytes)
+    out.write_bytes(raw)
 
     print(f"  Saved:    {out}  ({len(result.bytes)} bytes)")
     print(f"  Format:   {result.format}  {result.width}x{result.height}")

@@ -6,10 +6,16 @@ Internal module — not part of the public storyloom API.
 from __future__ import annotations
 
 import json
+from io import BytesIO
 from pathlib import Path
 
 from storyloom.assets._types import AssetType
 from storyloom.io._types import ImageSize, RemoveBgPolicy
+from storyloom.io.img_utils import detect_format, get_dimensions
+
+# 16:9 aspect ratio target for backgrounds
+_TARGET_AR = 16.0 / 9.0
+_AR_TOLERANCE = 0.02  # ±2% — within this range, skip crop
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _SRC_DIR = _PROJECT_ROOT / "system_media_src"
@@ -94,3 +100,60 @@ def output_path(asset_type: AssetType, asset_id: str) -> Path:
 def output_dir() -> Path:
     """Return the root output directory (``system_media/``)."""
     return _OUTPUT_DIR
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Post-processing — aspect-ratio normalization
+# ═══════════════════════════════════════════════════════════════════
+
+def normalize_background(raw: bytes) -> bytes:
+    """Center-crop a background image to 16:9 if its aspect ratio deviates
+    by more than ±2%.
+
+    This is a safety net: models may return images whose dimensions differ
+    slightly from the requested size.  The UI uses ``object-fit: cover``
+    which crops to fill the viewport, so an off-ratio file produces
+    unpredictable framing.  Normalising at save time guarantees consistent
+    behaviour regardless of model quirks.
+
+    If PIL is unavailable the original bytes are returned unchanged
+    (graceful degradation — the UI's ``cover`` crop still works, just
+    with less control over the framing).
+    """
+    fmt = detect_format(raw)
+    w, h = get_dimensions(raw, fmt)
+    if w == 0 or h == 0:
+        return raw  # can't detect — leave alone
+
+    ar = w / h
+    if abs(ar - _TARGET_AR) <= _AR_TOLERANCE:
+        return raw  # already 16:9 within tolerance
+
+    try:
+        from PIL import Image
+    except ImportError:
+        return raw  # PIL not available — leave alone
+
+    # Calculate target dimensions
+    if ar > _TARGET_AR:
+        # Too wide — crop sides
+        new_w = int(h * _TARGET_AR)
+        new_h = h
+    else:
+        # Too tall — crop top/bottom
+        new_w = w
+        new_h = int(w / _TARGET_AR)
+
+    left = (w - new_w) // 2
+    top = (h - new_h) // 2
+    right = left + new_w
+    bottom = top + new_h
+
+    img = Image.open(BytesIO(raw))
+    cropped = img.crop((left, top, right, bottom))
+
+    buf = BytesIO()
+    # Preserve alpha if present; JPEG → PNG for consistency
+    save_fmt = "PNG" if (fmt in ("png", "webp") or img.mode == "RGBA") else "JPEG"
+    cropped.save(buf, format=save_fmt)
+    return buf.getvalue()

@@ -194,7 +194,7 @@ MODEL_PRESETS: dict[str, ImageModelPreset] = {
         label="Gemini 3 Pro Image",
         default_sizes={
             "portrait": "2048x2048",
-            "background": "2048x2048",
+            "background": "2560x1440",
         },
         supports_reference=True,
     ),
@@ -202,7 +202,7 @@ MODEL_PRESETS: dict[str, ImageModelPreset] = {
         label="Gemini 3 Pro Image 1K",
         default_sizes={
             "portrait": "1024x1024",
-            "background": "1024x1024",
+            "background": "1280x720",
         },
         supports_reference=True,
     ),
@@ -210,7 +210,7 @@ MODEL_PRESETS: dict[str, ImageModelPreset] = {
         label="Gemini 3 Pro Image (stable)",
         default_sizes={
             "portrait": "2048x2048",
-            "background": "2048x2048",
+            "background": "2560x1440",
         },
         supports_reference=True,
     ),
@@ -250,7 +250,7 @@ MODEL_PRESETS: dict[str, ImageModelPreset] = {
         label="Gemini 3.1 Flash Lite Image",
         default_sizes={
             "portrait": "1024x1024",
-            "background": "1024x1024",
+            "background": "1280x720",
         },
         supports_reference=True,
     ),
@@ -292,7 +292,7 @@ MODEL_PRESETS: dict[str, ImageModelPreset] = {
         label="Nano Banana",
         default_sizes={
             "portrait": "1024x1024",
-            "background": "1024x1024",
+            "background": "1280x720",
         },
         supports_reference=False,
     ),

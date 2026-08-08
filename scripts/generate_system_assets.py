@@ -28,6 +28,7 @@ from scripts._sysgen_utils import (
     get_image_size,
     get_remove_bg,
     load_source,
+    normalize_background,
     output_dir,
     output_path,
 )
@@ -164,8 +165,13 @@ def main() -> None:
             failed += 1
             continue
 
+        # Post-process: enforce 16:9 aspect ratio for backgrounds
+        raw = result.bytes
+        if atype is AssetType.BACKGROUND:
+            raw = normalize_background(raw)
+
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_bytes(result.bytes)
+        out.write_bytes(raw)
         total_bytes += len(result.bytes)
 
         print(f"OK  {result.width}x{result.height}  "
