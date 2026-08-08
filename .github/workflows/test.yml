@@ -19,7 +19,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install
-        run: pip install -e ".[bg]"
+        run: pip install ".[bg]" pytest
 
       - name: Run tests
         run: pytest --tb=short 2>&1 | tee pytest.log
