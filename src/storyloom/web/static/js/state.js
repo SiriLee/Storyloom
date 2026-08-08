@@ -120,6 +120,12 @@ const SETTINGS = [
         label: "Model",
         placeholder: "deepseek-v4-pro",
     },
+    /* ── Image Generation Toggle (7.8) ── */
+    {
+        key: "img_generation_enabled",
+        type: "toggle",
+        label: "Image Generation",
+    },
     /* ── Image API Configuration (7.3) ── */
     {
         key: "img_api_base_url",
@@ -152,11 +158,6 @@ const SETTINGS = [
             { value: "always", label: "Always" },
         ],
         group: "image",
-    },
-    {
-        key: "img_generation_enabled",
-        type: "toggle",
-        label: "Image Generation",
     },
 ];
 
