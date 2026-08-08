@@ -1270,7 +1270,8 @@ class GameLoop:
         if self._roster is not None:
             return  # already mounted
 
-        from storyloom.assets import AssetLibrary, GameAssetRoster
+        from storyloom.assets import AssetLibrary, AssetType, GameAssetRoster
+        from storyloom.config import DEFAULT_SYSTEM_MEDIA_DIR
         from storyloom.tasks import TaskPool
 
         self._game_mode = "graph"
@@ -1279,11 +1280,27 @@ class GameLoop:
         self._roster = GameAssetRoster.load(roster_path, library, game_id)
         self._task_pool = TaskPool()
 
+        # ── System assets (§7.8 framework) ──────────────────────────
+        system_catalog: dict | None = None
+        if os.path.isdir(DEFAULT_SYSTEM_MEDIA_DIR):
+            try:
+                lib_imported = library.import_system_assets(
+                    DEFAULT_SYSTEM_MEDIA_DIR
+                )
+                # Build a frozen snapshot for process_factory closures
+                system_catalog = {
+                    atype: library.list_by_type(atype)
+                    for atype in AssetType
+                }
+            except Exception:
+                # system_media/ exists but is broken — skip, don't block
+                pass
+        library.save()
+
         # -- §7.8 delete block start: stub pre-population + stub factory --
         # §7.7: register real stub assets in the library so roster.add()
         # with target="stub_default_*" succeeds.  Roster entries themselves
         # are seeded by _init_stub_roster() from story_config.
-        from storyloom.assets import AssetType
         _STUB_PORTRAIT_ID = "stub_default_portrait"
         _STUB_BG_ID = "stub_default_background"
 
@@ -1295,14 +1312,17 @@ class GameLoop:
                 library.add(atype, aid,
                             "Stub " + ("Portrait" if atype == AssetType.CHAR_PORTRAIT else "Background"),
                             asset_id=aid)
-        library.save()
 
-        self._process_factory = self._stub_process_factory()
+        self._process_factory = self._stub_process_factory(
+            system_catalog=system_catalog,
+        )
         # -- §7.8 delete block end --
 
     # -- §7.8 delete block start: _stub_process_factory --
     @staticmethod
-    def _stub_process_factory():
+    def _stub_process_factory(*, img_generation_enabled: bool = True,
+                              img_remove_bg: str = "auto",
+                              system_catalog: dict | None = None):
         """§7.6 stub — MATCH passes through local_name; GENERATE fills placeholder.
 
         Per design.md §4.3: EventDispatcher calls ``roster.lookup(type,
@@ -1311,6 +1331,15 @@ class GameLoop:
         by _init_stub_roster() → target=stub_default_*.
 
         GENERATE sets target on the placeholder created by TaskGenerator.
+
+        Args:
+            img_generation_enabled: §7.8 framework — when False, LLM selection
+                degrades to forced selection from system catalog.
+            img_remove_bg: §7.8 framework — background removal policy
+                passed through to image generation.
+            system_catalog: §7.8 framework — snapshot of system assets
+                for forced-selection fallback.
+
         §7.8 deletes this entire method and replaces with real LLM matching.
         """
         import time
