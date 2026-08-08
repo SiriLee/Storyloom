@@ -46,7 +46,13 @@ class Asset:
 
     @property
     def file_path(self) -> str:
-        """Relative path from media_dir to the asset file.  (D19)."""
+        """Relative path from media_dir to the asset file.  (D19).
+
+        .. deprecated::
+            Use :meth:`AssetLibrary.asset_path` instead — it resolves
+            the correct root directory for both system and user assets
+            and checks whether the file actually exists on disk.
+        """
         return f"{self.asset_type.value}/{self.id}{self.asset_type.default_extension}"
 
     # ── Serialization ──

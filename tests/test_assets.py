@@ -499,6 +499,123 @@ class TestAssetLibraryAdd:
         with pytest.raises(ValueError, match="asset_id"):
             lib.add(AssetType.CHAR_PORTRAIT, "Weird", asset_id="hello world")
 
+    def test_add_rejects_sys_prefix(self, lib):
+        """asset_id starting with 'sys_' is reserved for system assets."""
+        with pytest.raises(ValueError, match="sys_"):
+            lib.add(AssetType.CHAR_PORTRAIT, "SysHero", asset_id="sys_hero_001")
+
+    def test_add_rejects_sys_prefix_background(self, lib):
+        """sys_ prefix is rejected for all asset types."""
+        with pytest.raises(ValueError, match="sys_"):
+            lib.add(AssetType.BACKGROUND, "SysBg", asset_id="sys_bg_001")
+
+    def test_add_accepts_non_sys_prefix(self, lib):
+        """asset_id without sys_ prefix is accepted normally."""
+        asset = lib.add(AssetType.CHAR_PORTRAIT, "Hero", asset_id="custom_hero")
+        assert asset.id == "custom_hero"
+        assert asset.name == "Hero"
+
+
+# ── Asset path resolution ────────────────────────────────────────────
+
+class TestAssetPath:
+    """AssetLibrary.asset_path() — unified filesystem path resolution.
+
+    System assets (sys_ prefix) resolve under system_media_dir;
+    user assets under media_dir.  Returns None when the file is missing.
+    """
+
+    @staticmethod
+    def _touch_file(dir_path: str, asset_type: AssetType, asset_id: str) -> str:
+        """Create an empty file in *dir_path* and return its full path."""
+        import os
+        sub = os.path.join(dir_path, asset_type.value)
+        os.makedirs(sub, exist_ok=True)
+        path = os.path.join(sub, f"{asset_id}.png")
+        with open(path, "wb") as f:
+            f.write(b"")
+        return path
+
+    def test_asset_path_user_asset(self, tmp_path):
+        """User asset (no sys_ prefix) resolves under media_dir."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        lib = AssetLibrary(media)
+        lib.add(AssetType.CHAR_PORTRAIT, "Hero", asset_id="hero_001")
+        self._touch_file(media, AssetType.CHAR_PORTRAIT, "hero_001")
+
+        asset = lib.get(AssetType.CHAR_PORTRAIT, "hero_001")
+        result = lib.asset_path(asset)
+        assert result is not None
+        assert "media" in result
+        assert result.endswith("char_portrait/hero_001.png")
+
+    def test_asset_path_system_asset(self, tmp_path):
+        """System asset (sys_ prefix) resolves under system_media_dir."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        sys_dir = os.path.join(str(tmp_path), "system_media")
+        lib = AssetLibrary(media)
+        lib._system_media_dir = sys_dir
+        lib._add_system_asset(AssetType.CHAR_PORTRAIT, "sys_hero_001",
+                              "Hero", "A brave warrior.")
+        self._touch_file(sys_dir, AssetType.CHAR_PORTRAIT, "sys_hero_001")
+
+        asset = lib.get(AssetType.CHAR_PORTRAIT, "sys_hero_001")
+        result = lib.asset_path(asset)
+        assert result is not None
+        assert "system_media" in result
+        assert result.endswith("char_portrait/sys_hero_001.png")
+
+    def test_asset_path_missing_file_returns_none(self, tmp_path):
+        """File not on disk → returns None."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        lib = AssetLibrary(media)
+        lib.add(AssetType.CHAR_PORTRAIT, "Ghost", asset_id="missing_001")
+
+        asset = lib.get(AssetType.CHAR_PORTRAIT, "missing_001")
+        assert lib.asset_path(asset) is None
+
+    def test_asset_path_system_dir_not_set(self, tmp_path):
+        """When _system_media_dir is None, sys_ asset falls back to media_dir."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        lib = AssetLibrary(media)
+        # _system_media_dir is None by default — don't set it
+        lib._add_system_asset(AssetType.CHAR_PORTRAIT, "sys_ghost_001",
+                              "Ghost", "A ghost.")
+        self._touch_file(media, AssetType.CHAR_PORTRAIT, "sys_ghost_001")
+
+        asset = lib.get(AssetType.CHAR_PORTRAIT, "sys_ghost_001")
+        result = lib.asset_path(asset)
+        assert result is not None
+        assert "media" in result
+
+    def test_asset_path_background_type(self, tmp_path):
+        """asset_path works for BACKGROUND type assets too."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        lib = AssetLibrary(media)
+        lib.add(AssetType.BACKGROUND, "Tavern", asset_id="bg_001")
+        self._touch_file(media, AssetType.BACKGROUND, "bg_001")
+
+        asset = lib.get(AssetType.BACKGROUND, "bg_001")
+        result = lib.asset_path(asset)
+        assert result is not None
+        assert "background_img" in result
+        assert result.endswith(".png")
+
 
 # ── Get ─────────────────────────────────────────────────────────────
 
@@ -1070,6 +1187,313 @@ class TestAssetLibraryThreadSafety:
 # ═══════════════════════════════════════════════════════════════════
 # GameAssetRoster
 # ═══════════════════════════════════════════════════════════════════
+
+# ── System asset reconciliation ──────────────────────────────────────
+
+class TestSystemAssetReconciliation:
+    """AssetLibrary.import_system_assets() — manifest ↔ library sync.
+
+    Per design: on startup, the manifest declares what system assets
+    *should* exist; the library holds what *does* exist.  Reconciliation
+    computes the diff and applies it — add new, release removed, update
+    changed descriptions.
+    """
+
+    @staticmethod
+    def _write_manifest(system_dir: str, data: dict) -> None:
+        """Write a _manifest.json into *system_dir*."""
+        import json, os
+        os.makedirs(system_dir, exist_ok=True)
+        path = os.path.join(system_dir, "_manifest.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+    @staticmethod
+    def _make_manifest(version: str, assets: dict | None = None) -> dict:
+        """Return a minimal valid manifest dict."""
+        return {
+            "version": version,
+            "min_app_version": "1.3.0",
+            "assets": assets or {},
+        }
+
+    # ── Empty manifest ───────────────────────────────────────────────
+
+    def test_import_empty_manifest(self, tmp_path):
+        """Empty manifest → report shows zero changes."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        sys_dir = os.path.join(str(tmp_path), "system_media")
+        self._write_manifest(sys_dir, self._make_manifest("0.0.0"))
+
+        lib = AssetLibrary(media)
+        report = lib.import_system_assets(sys_dir)
+        assert report.version == "0.0.0"
+        assert report.added == []
+        assert report.removed == []
+        assert report.unchanged == 0
+
+    # ── Add new assets ───────────────────────────────────────────────
+
+    def test_import_adds_new_assets(self, tmp_path):
+        """Manifest with new IDs → assets added to library with use_count=1."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        sys_dir = os.path.join(str(tmp_path), "system_media")
+        manifest = self._make_manifest("1.0.0", {
+            "char_portrait": {
+                "sys_hero_001": {"name": "Hero", "description": "Brave."},
+            },
+            "background_img": {
+                "sys_tavern_001": {"name": "Tavern", "description": "Cozy."},
+            },
+        })
+        self._write_manifest(sys_dir, manifest)
+
+        lib = AssetLibrary(media)
+        report = lib.import_system_assets(sys_dir)
+
+        assert set(report.added) == {"sys_hero_001", "sys_tavern_001"}
+        assert report.removed == []
+        assert report.unchanged == 0
+        assert len(lib) == 2
+
+        hero = lib.get(AssetType.CHAR_PORTRAIT, "sys_hero_001")
+        assert hero is not None
+        assert hero.use_count == 1
+        assert hero.name == "Hero"
+
+        tavern = lib.get(AssetType.BACKGROUND, "sys_tavern_001")
+        assert tavern is not None
+        assert tavern.use_count == 1
+
+    # ── Version skip ─────────────────────────────────────────────────
+
+    def test_import_version_skip(self, tmp_path):
+        """Same version → reconciliation skipped, report shows unchanged."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        sys_dir = os.path.join(str(tmp_path), "system_media")
+        manifest = self._make_manifest("1.0.0", {
+            "char_portrait": {
+                "sys_hero_001": {"name": "Hero", "description": "Brave."},
+            },
+        })
+        self._write_manifest(sys_dir, manifest)
+
+        lib = AssetLibrary(media)
+        report1 = lib.import_system_assets(sys_dir)
+        assert report1.added == ["sys_hero_001"]
+
+        # Second import with same version — skipped
+        report2 = lib.import_system_assets(sys_dir)
+        assert report2.added == []
+        assert report2.unchanged == 1
+        assert len(lib) == 1  # no duplicate
+
+    # ── Remove old declarations ──────────────────────────────────────
+
+    def test_import_removes_old_declarations(self, tmp_path):
+        """S_old − S_new → use_count released (from 1 to 0)."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        sys_dir = os.path.join(str(tmp_path), "system_media")
+
+        # First: import v1 with one asset
+        v1 = self._make_manifest("1.0.0", {
+            "char_portrait": {
+                "sys_hero_001": {"name": "Hero", "description": "Brave."},
+            },
+        })
+        self._write_manifest(sys_dir, v1)
+        lib = AssetLibrary(media)
+        lib.import_system_assets(sys_dir)
+        assert len(lib) == 1
+
+        # Then: import v2 with the asset removed
+        v2 = self._make_manifest("2.0.0", {})
+        self._write_manifest(sys_dir, v2)
+        report = lib.import_system_assets(sys_dir)
+
+        assert report.removed == ["sys_hero_001"]
+        # use_count released: 1 → 0
+        hero = lib.get(AssetType.CHAR_PORTRAIT, "sys_hero_001")
+        assert hero is not None  # entry preserved
+        assert hero.use_count == 0
+
+    def test_import_removed_asset_with_active_ref_stays(self, tmp_path):
+        """S_old − S_new with use_count > 1 → use_count decremented
+        but entry kept (still referenced by a game roster)."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        sys_dir = os.path.join(str(tmp_path), "system_media")
+
+        v1 = self._make_manifest("1.0.0", {
+            "char_portrait": {
+                "sys_hero_001": {"name": "Hero", "description": "Brave."},
+            },
+        })
+        self._write_manifest(sys_dir, v1)
+        lib = AssetLibrary(media)
+        lib.import_system_assets(sys_dir)
+
+        # Simulate a game roster referencing sys_hero_001
+        lib.increase_usage(AssetType.CHAR_PORTRAIT, "sys_hero_001")
+        assert lib.get(AssetType.CHAR_PORTRAIT, "sys_hero_001").use_count == 2
+
+        # Now remove from manifest
+        v2 = self._make_manifest("2.0.0", {})
+        self._write_manifest(sys_dir, v2)
+        report = lib.import_system_assets(sys_dir)
+
+        assert report.removed == ["sys_hero_001"]
+        hero = lib.get(AssetType.CHAR_PORTRAIT, "sys_hero_001")
+        assert hero is not None  # entry still exists
+        assert hero.use_count == 1  # system ref released, game ref remains
+
+    # ── Update descriptions ──────────────────────────────────────────
+
+    def test_import_updates_description(self, tmp_path):
+        """S_new ∩ S_old with different description → updated in place."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        sys_dir = os.path.join(str(tmp_path), "system_media")
+
+        v1 = self._make_manifest("1.0.0", {
+            "char_portrait": {
+                "sys_hero_001": {"name": "Hero", "description": "Old desc."},
+            },
+        })
+        self._write_manifest(sys_dir, v1)
+        lib = AssetLibrary(media)
+        lib.import_system_assets(sys_dir)
+        assert lib.get(AssetType.CHAR_PORTRAIT, "sys_hero_001").description == "Old desc."
+
+        v2 = self._make_manifest("2.0.0", {
+            "char_portrait": {
+                "sys_hero_001": {"name": "Hero", "description": "New desc."},
+            },
+        })
+        self._write_manifest(sys_dir, v2)
+        report = lib.import_system_assets(sys_dir)
+
+        assert report.updated == ["sys_hero_001"]
+        assert lib.get(AssetType.CHAR_PORTRAIT, "sys_hero_001").description == "New desc."
+        assert lib.get(AssetType.CHAR_PORTRAIT, "sys_hero_001").use_count == 1  # unchanged
+
+    def test_import_same_description_not_updated(self, tmp_path):
+        """Description unchanged → not counted as updated."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        sys_dir = os.path.join(str(tmp_path), "system_media")
+        manifest = self._make_manifest("1.0.0", {
+            "char_portrait": {
+                "sys_hero_001": {"name": "Hero", "description": "Same."},
+            },
+        })
+        self._write_manifest(sys_dir, manifest)
+        lib = AssetLibrary(media)
+        lib.import_system_assets(sys_dir)
+
+        # Re-import with same content but different version
+        manifest["version"] = "2.0.0"
+        self._write_manifest(sys_dir, manifest)
+        report = lib.import_system_assets(sys_dir)
+
+        assert report.updated == []
+        assert report.unchanged == 1
+
+    # ── State tracking ───────────────────────────────────────────────
+
+    def test_import_sets_system_metadata(self, tmp_path):
+        """After import, _system_ids, _system_assets_version,
+        _system_media_dir are set correctly."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        sys_dir = os.path.join(str(tmp_path), "system_media")
+        self._write_manifest(sys_dir, self._make_manifest("1.0.0", {
+            "char_portrait": {
+                "sys_hero_001": {"name": "Hero", "description": "Brave."},
+            },
+        }))
+
+        lib = AssetLibrary(media)
+        lib.import_system_assets(sys_dir)
+
+        assert lib._system_assets_version == "1.0.0"
+        assert lib._system_media_dir == os.path.abspath(sys_dir)
+        assert "sys_hero_001" in lib._system_ids
+
+    # ── User assets preserved ────────────────────────────────────────
+
+    def test_import_preserves_user_assets(self, tmp_path):
+        """Reconciliation does not affect non-sys_ assets."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        sys_dir = os.path.join(str(tmp_path), "system_media")
+        self._write_manifest(sys_dir, self._make_manifest("1.0.0", {
+            "char_portrait": {
+                "sys_hero_001": {"name": "Hero", "description": "Brave."},
+            },
+        }))
+
+        lib = AssetLibrary(media)
+        # Add a user asset first
+        lib.add(AssetType.CHAR_PORTRAIT, "Custom", asset_id="custom_001")
+        assert len(lib) == 1
+
+        lib.import_system_assets(sys_dir)
+        assert len(lib) == 2  # user + system
+
+        # User asset untouched
+        custom = lib.get(AssetType.CHAR_PORTRAIT, "custom_001")
+        assert custom is not None
+        assert custom.name == "Custom"
+
+    # ── Clean protection ─────────────────────────────────────────────
+
+    def test_import_use_count_protects_clean(self, tmp_path):
+        """System assets (use_count=1) are protected from clean()."""
+        from storyloom.assets._library import AssetLibrary
+        import os
+
+        media = os.path.join(str(tmp_path), "media")
+        sys_dir = os.path.join(str(tmp_path), "system_media")
+        self._write_manifest(sys_dir, self._make_manifest("1.0.0", {
+            "char_portrait": {
+                "sys_hero_001": {"name": "Hero", "description": "Brave."},
+            },
+        }))
+
+        lib = AssetLibrary(media)
+        # Add a user asset with use_count=0
+        lib.add(AssetType.CHAR_PORTRAIT, "UserAsset", asset_id="user_001")
+        lib.import_system_assets(sys_dir)
+
+        deleted = lib.clean(keep_count=0)
+        # sys_hero_001 (use_count=1) survives; user_001 (use_count=0) deleted
+        assert deleted == 1
+        assert lib.get(AssetType.CHAR_PORTRAIT, "sys_hero_001") is not None
+        assert lib.get(AssetType.CHAR_PORTRAIT, "user_001") is None
+
 
 from storyloom.assets import GameAssetRoster
 

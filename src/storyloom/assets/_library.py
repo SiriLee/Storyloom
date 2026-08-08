@@ -11,11 +11,30 @@ import os
 import re
 import threading
 import uuid
+from dataclasses import dataclass, field
 
 from storyloom.assets._types import Asset, AssetType
 
 # asset_id must be a filesystem-safe identifier — no path separators.
 _SAFE_ID_RE = re.compile(r"^[a-zA-Z0-9_.-]+$")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# System import report
+# ═══════════════════════════════════════════════════════════════════════
+
+@dataclass
+class SystemImportReport:
+    """Result of ``AssetLibrary.import_system_assets()``.
+
+    Tracks what changed during reconciliation between the manifest
+    and the persisted library state.
+    """
+    version: str
+    added: list[str] = field(default_factory=list)
+    removed: list[str] = field(default_factory=list)
+    updated: list[str] = field(default_factory=list)
+    unchanged: int = 0
 
 
 class AssetLibrary:
@@ -37,6 +56,10 @@ class AssetLibrary:
         self._items: dict[AssetType, dict[str, Asset]] = {}
         self._serial_counter: int = 0
         self._lock = threading.Lock()
+        # System assets (§7.8 framework)
+        self._system_ids: set[str] = set()
+        self._system_media_dir: str | None = None
+        self._system_assets_version: str | None = None
 
     # ── CRUD ────────────────────────────────────────────────────────
 
@@ -57,6 +80,12 @@ class AssetLibrary:
         elif not _SAFE_ID_RE.match(asset_id):
             raise ValueError(
                 f"asset_id must match {_SAFE_ID_RE.pattern!r}, got {asset_id!r}"
+            )
+
+        if asset_id.startswith("sys_"):
+            raise ValueError(
+                f"Asset IDs starting with 'sys_' are reserved "
+                f"for system assets, got {asset_id!r}"
             )
 
         with self._lock:
@@ -82,6 +111,155 @@ class AssetLibrary:
         """Return the Asset, or ``None`` if not found.  (D46)."""
         with self._lock:
             return self._items.get(asset_type, {}).get(asset_id)
+
+    def asset_path(self, asset: Asset) -> str | None:
+        """Resolve the absolute filesystem path for *asset*.
+
+        System assets (``id`` starts with ``"sys_"``) resolve under
+        ``_system_media_dir``; user assets under ``media_dir``.
+        Returns ``None`` when the file does not exist on disk.
+
+        .. note::
+
+            Prefer this over ``Asset.file_path``, which is deprecated
+            and does not know about the system media directory.
+        """
+        root = (
+            self._system_media_dir
+            if (self._system_media_dir is not None and asset.id.startswith("sys_"))
+            else self.media_dir
+        )
+        path = os.path.join(
+            root,
+            asset.asset_type.value,
+            f"{asset.id}{asset.asset_type.default_extension}",
+        )
+        return path if os.path.isfile(path) else None
+
+    def _add_system_asset(
+        self,
+        asset_type: AssetType,
+        asset_id: str,
+        name: str,
+        description: str = "",
+    ) -> Asset:
+        """Add a system asset, bypassing the ``sys_`` prefix guard.
+
+        Internal — called by ``import_system_assets()`` during
+        reconciliation.  Regular callers must use ``add()`` which
+        rejects ``sys_``-prefixed IDs.
+        """
+        with self._lock:
+            type_items = self._items.setdefault(asset_type, {})
+            if asset_id in type_items:
+                raise ValueError(
+                    f"Asset already exists: {asset_type.value}/{asset_id}"
+                )
+            serial = self._serial_counter
+            self._serial_counter += 1
+            asset = Asset(
+                asset_type=asset_type,
+                id=asset_id,
+                name=name,
+                description=description,
+                use_count=0,
+                serial=serial,
+            )
+            type_items[asset_id] = asset
+            self._system_ids.add(asset_id)
+            return asset
+
+    # ── System asset reconciliation ────────────────────────────────────
+
+    def import_system_assets(self, system_dir: str) -> SystemImportReport:
+        """Reconcile the library with *system_dir/_manifest.json*.
+
+        Compares the manifest (declarative truth) with the current
+        library state (persisted runtime) and applies the diff:
+
+        * **Added** — assets in manifest but not in library
+          → ``_add_system_asset()`` with ``use_count=1``
+        * **Removed** — assets in library but not in manifest
+          → ``decrease_usage()`` to release the system reference
+        * **Updated** — description changed in manifest
+          → updated in place
+
+        If the manifest version matches ``_system_assets_version``,
+        reconciliation is skipped entirely (idempotent).
+
+        Returns a ``SystemImportReport`` summarising the changes.
+        """
+        import os as _os
+
+        from storyloom.assets._manifest import SystemManifest
+
+        manifest = SystemManifest.load(system_dir)
+
+        # Idempotent — same version, no work needed
+        if self._system_assets_version == manifest.version:
+            unchanged = len(self._system_ids)
+            return SystemImportReport(
+                version=manifest.version, unchanged=unchanged,
+            )
+
+        report = SystemImportReport(version=manifest.version)
+
+        # ── Collect S_old (library sys_ entries) and S_new (manifest) ──
+        s_new: dict[AssetType, set[str]] = {}
+        for atype, entries in manifest.assets.items():
+            s_new[atype] = set(entries.keys())
+
+        s_old: dict[AssetType, set[str]] = {}
+        with self._lock:
+            for atype, type_items in list(self._items.items()):
+                sys_ids = {aid for aid in type_items if aid.startswith("sys_")}
+                if sys_ids:
+                    s_old[atype] = sys_ids
+
+        all_types = set(s_old.keys()) | set(s_new.keys())
+
+        for atype in all_types:
+            new_ids = s_new.get(atype, set())
+            old_ids = s_old.get(atype, set())
+
+            # ── Added ──
+            for aid in sorted(new_ids - old_ids):
+                entry = manifest.assets[atype][aid]
+                self._add_system_asset(atype, aid, entry.name, entry.description)
+                # Set use_count=1 (system reference).  _add_system_asset
+                # initialises to 0 — bump it to 1 now.
+                with self._lock:
+                    asset = self._items.get(atype, {}).get(aid)
+                    if asset is not None:
+                        asset.use_count = 1
+                report.added.append(aid)
+
+            # ── Removed ──
+            for aid in sorted(old_ids - new_ids):
+                self.decrease_usage(atype, aid)
+                report.removed.append(aid)
+
+            # ── Updated ──
+            for aid in sorted(new_ids & old_ids):
+                entry = manifest.assets[atype][aid]
+                with self._lock:
+                    asset = self._items.get(atype, {}).get(aid)
+                    if asset is not None and asset.description != entry.description:
+                        asset.description = entry.description
+                        report.updated.append(aid)
+                    else:
+                        report.unchanged += 1
+
+        # ── Commit metadata ──
+        self._system_ids = {
+            aid
+            for atype in s_new
+            for aid in s_new[atype]
+        }
+        self._system_assets_version = manifest.version
+        self._system_media_dir = _os.path.abspath(system_dir)
+
+        return report
 
     def remove(self, asset_type: AssetType, asset_id: str) -> Asset:
         """Remove an asset.  Returns the removed Asset.
@@ -275,6 +453,15 @@ class AssetLibrary:
                 if asset.serial > max_serial:
                     max_serial = asset.serial
 
+        # Restore system-asset metadata
+        lib._system_assets_version = data.get("system_assets_version")
+        lib._system_ids = {
+            aid
+            for type_items in lib._items.values()
+            for aid in type_items
+            if aid.startswith("sys_")
+        }
+
         # New instance not yet shared — _serial_counter write is safe
         # without the lock.
         lib._serial_counter = max_serial + 1
@@ -311,4 +498,7 @@ class AssetLibrary:
             items[atype.value] = {
                 aid: asset.to_dict() for aid, asset in type_items.items()
             }
-        return {"version": self.VERSION, "items": items}
+        result: dict = {"version": self.VERSION, "items": items}
+        if self._system_assets_version is not None:
+            result["system_assets_version"] = self._system_assets_version
+        return result
