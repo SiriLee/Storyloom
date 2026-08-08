@@ -14,44 +14,67 @@ from storyloom.tasks._types import Task
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Match prompt templates (placeholder — §7.8a prompt design TBD)
+# Match prompt templates (design doc: prompt-design-llm-match.md)
 # ═══════════════════════════════════════════════════════════════════════
 
-# Final prompts will be designed in a dedicated session.  These are
-# functional placeholders that produce correct matching behaviour.
+_MATCH_SYSTEM_PROMPTS: dict[AssetType, str] = {
+    AssetType.CHAR_PORTRAIT: """\
+You are the asset matcher in a real-time visual novel game. Given a target character name and a list of available portrait entries, pick the single best match.
 
-_MATCH_SYSTEM_PROMPT = (
-    "You are a strict media asset matcher for a visual novel engine.\n"
-    "Given a target name and a list of available entries, select the\n"
-    "single best matching entry.  You MUST pick one — this is a forced choice.\n\n"
-    "Rules:\n"
-    "- Prefer exact name matches.\n"
-    "- If no exact match, prefer the entry whose name or description is most\n"
-    "  semantically related to the target.\n"
-    "- A partial or variant name (e.g. \"Jack\" vs \"Jack.smile\") counts as a\n"
-    "  strong signal.\n"
-    "- Reply ONLY with a JSON object: {\"selected\": \"<exact local_name>\"}"
-)
+## Output Format
 
-# Per-type guidance appended to the system prompt.  (design.md §5.4:
-# "不同素材类型使用不同 Prompt").
-_ASSET_TYPE_GUIDANCE: dict[AssetType, str] = {
-    AssetType.CHAR_PORTRAIT: (
-        "For character portraits, match by name, appearance traits, or role.\n"
-        "Favour entries whose description shares visual or personality cues\n"
-        "with the target."
-    ),
-    AssetType.BACKGROUND: (
-        "For background scenes, match by location name, atmosphere, or setting.\n"
-        "Favour entries whose description shares environmental or mood cues\n"
-        "with the target."
-    ),
+Reply ONLY with a valid JSON object:
+{"selected": "<exact name from the list>"}
+
+## Example
+
+Target: "Alice.happy"
+Entries:
+- "Alice": A young woman with blue hair and a gentle expression
+- "Alice.sad": A young woman with blue hair, looking down with sorrow
+- "Alice.smile": A young woman with blue hair and a gentle smile
+- "Bob": A tall warrior in plate armor
+- "Queen": An elderly ruler with silver crown
+
+Output:
+{"selected": "Alice.smile"}
+
+## Matching Rules
+
+1. NAME VARIANT — match by name first.
+2. SEMANTIC MATCH — use description when names are equally close.""",
+    AssetType.BACKGROUND: """\
+You are the asset matcher in a real-time visual novel game. Given a target scene name and a list of available background entries, pick the single best match.
+
+## Output Format
+
+Reply ONLY with a valid JSON object:
+{"selected": "<exact name from the list>"}
+
+## Example
+
+Target: "forest.night"
+Entries:
+- "forest": A dense woodland with dappled sunlight through leaves
+- "castle": An ancient stone fortress on a windswept cliff
+- "tavern": A warm, crowded inn with a roaring fireplace
+
+Output:
+{"selected": "forest"}
+
+## Matching Rules
+
+1. NAME VARIANT — match by name first.
+2. SEMANTIC MATCH — use description when names are equally close.""",
 }
 
-_ASSET_TYPE_LABELS: dict[AssetType, str] = {
-    AssetType.CHAR_PORTRAIT: "Character Portrait",
-    AssetType.BACKGROUND: "Background / Scene",
-}
+_USER_MESSAGE_TEMPLATE = """\
+Target: "{target_name}"
+
+Entries:
+{entries}
+
+Select the ONLY best match for "{target_name}". You MUST pick one."""
 
 
 def build_match_messages(
@@ -74,23 +97,16 @@ def build_match_messages(
     if not entries:
         return []
 
-    guidance = _ASSET_TYPE_GUIDANCE.get(asset_type, "")
-    system_msg = _MATCH_SYSTEM_PROMPT
-    if guidance:
-        system_msg += "\n\n" + guidance
+    system_msg = _MATCH_SYSTEM_PROMPTS[asset_type]
 
     entry_lines: list[str] = []
     for local_name, item in entries.items():
         desc = item.local_description or "(no description)"
         entry_lines.append(f'- "{local_name}": {desc}')
 
-    type_label = _ASSET_TYPE_LABELS.get(asset_type, asset_type.value)
-    user_msg = (
-        f'Target: "{target_name}"\n'
-        f"Type: {type_label}\n"
-        f"Available entries:\n"
-        + "\n".join(entry_lines)
-        + f'\n\nSelect the best match for "{target_name}".'
+    user_msg = _USER_MESSAGE_TEMPLATE.format(
+        target_name=target_name,
+        entries="\n".join(entry_lines),
     )
 
     return [

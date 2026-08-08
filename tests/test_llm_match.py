@@ -340,23 +340,21 @@ class TestBuildMatchMessages:
         )
         assert msgs == []
 
-    def test_background_uses_scene_guidance(self, roster_with_entries):
-        """BACKGROUND type gets scene-specific label in user message."""
+    def test_background_uses_scene_prompt(self, roster_with_entries):
+        """BACKGROUND system prompt targets scene/location."""
         from storyloom.tasks._llm_match import build_match_messages
         msgs = build_match_messages(
             AssetType.BACKGROUND, "tavern", roster_with_entries,
         )
-        content = msgs[1]["content"]
-        assert "Background / Scene" in content
+        assert "target scene name" in msgs[0]["content"]
 
-    def test_char_portrait_uses_character_guidance(self, roster_with_entries):
-        """CHAR_PORTRAIT type gets character-specific label."""
+    def test_char_portrait_uses_character_prompt(self, roster_with_entries):
+        """CHAR_PORTRAIT system prompt targets character/portrait."""
         from storyloom.tasks._llm_match import build_match_messages
         msgs = build_match_messages(
             AssetType.CHAR_PORTRAIT, "hero", roster_with_entries,
         )
-        content = msgs[1]["content"]
-        assert "Character Portrait" in content
+        assert "target character name" in msgs[0]["content"]
 
 
 # ═══════════════════════════════════════════════════════════════════════
