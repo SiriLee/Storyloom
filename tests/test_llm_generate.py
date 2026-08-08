@@ -386,7 +386,6 @@ class TestCollectReferenceImages:
 
     def test_three_images_returned(self, media_library):
         """Roster with 4 real targets → returns 3 base64 data URLs."""
-        import tempfile
         from storyloom.tasks._llm_generate import _collect_reference_images
 
         roster = GameAssetRoster("test_ref", media_library)
@@ -626,6 +625,17 @@ class TestLLMSelection:
         assert '"NewGuy"' not in user_content
         assert '"hero"' in user_content
 
+    def test_forced_mode_uses_forced_prompt(self, sel_roster, sel_library):
+        """_select(forced=True) uses forced-mode prompt (no null, must-pick rule)."""
+        from storyloom.tasks._llm_generate import _select
+
+        api = FakeApiClient(responses=['{"scope": "game", "selected": "hero"}'])
+        _select(api, AssetType.CHAR_PORTRAIT, "hero", "desc",
+                sel_roster, sel_library, forced=True)
+        user_content = api.calls[0]["messages"][0]["content"]
+        assert "null" not in user_content.split("Output Format")[1].split("##")[0]
+        assert "You MUST pick one" in user_content
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # 4. TestForcedSelection
@@ -714,7 +724,7 @@ class TestForcedSelection:
 class TestImageSave:
     """_save_image — file persistence + library registration."""
 
-    def test_saves_png_to_media_dir(self, library, tmp_path):
+    def test_saves_png_to_media_dir(self, tmp_path):
         """Saves PNG bytes to media/{type}/{id}.png."""
         from storyloom.tasks._llm_generate import _save_image
 
@@ -726,7 +736,7 @@ class TestImageSave:
         assert expected_path.is_file()
         assert expected_path.read_bytes() == raw
 
-    def test_registers_in_library(self, library, tmp_path):
+    def test_registers_in_library(self, tmp_path):
         """Asset is added to AssetLibrary with correct metadata."""
         from storyloom.tasks._llm_generate import _save_image
 
@@ -739,7 +749,7 @@ class TestImageSave:
         assert asset.name == "Hero"
         assert asset.description == "A brave hero"
 
-    def test_creates_directory(self, library, tmp_path):
+    def test_creates_directory(self, tmp_path):
         """Creates media/{type}/ directory if missing."""
         from storyloom.tasks._llm_generate import _save_image
 
@@ -755,7 +765,7 @@ class TestImageSave:
         expected = tmp_path / "media" / "background_img" / f"{aid}.png"
         assert expected.is_file()
 
-    def test_background_saved_to_correct_dir(self, library, tmp_path):
+    def test_background_saved_to_correct_dir(self, tmp_path):
         """BACKGROUND type saves to background_img/ directory."""
         from storyloom.tasks._llm_generate import _save_image
 
@@ -830,7 +840,7 @@ class TestGenerateProcessor:
         return r
 
     def _make_gp(self, gp_library, api=None, img_portrait=None, img_bg=None,
-                 enabled=True, media_dir=None):
+                 enabled=True):
         """Create a GenerateProcessor with test dependencies."""
         from storyloom.tasks._llm_generate import GenerateProcessor
 
@@ -840,9 +850,6 @@ class TestGenerateProcessor:
             img_portrait = FakeImgApiClient(remove_bg=RemoveBgPolicy.AUTO)
         if img_bg is None:
             img_bg = FakeImgApiClient(remove_bg=RemoveBgPolicy.NEVER)
-        if media_dir is None:
-            import tempfile
-            media_dir = tempfile.mkdtemp()
 
         return GenerateProcessor(
             api_client=api,
@@ -850,7 +857,6 @@ class TestGenerateProcessor:
             img_client_background=img_bg,
             library=gp_library,
             img_generation_enabled=enabled,
-            media_dir=media_dir,
         )
 
     def test_selection_hit_game_scope(self, gp_library, gp_roster):
@@ -1007,7 +1013,6 @@ class TestGenerateProcessorIntegration:
             img_client_background=img,
             library=lib,
             img_generation_enabled=True,
-            media_dir=str(tmp_path / "media"),
         )
 
         task = Task(TaskType.GENERATE, 0, AssetType.CHAR_PORTRAIT)
@@ -1020,13 +1025,14 @@ class TestGenerateProcessorIntegration:
 
         assert task.completed
         assert task.error is None
-        # Placeholder should be filled
         item = roster.lookup(AssetType.CHAR_PORTRAIT, "NewChar")
         assert item is not None
         assert item.target is not None
+        # Generated asset should exist in the library
+        assert (AssetType.CHAR_PORTRAIT, item.target) in lib
 
-    def test_error_records_in_task(self, tmp_path):
-        """Process error → task.error set, task.completed True."""
+    def test_all_errors_fallback_to_system_asset(self, tmp_path):
+        """All LLM/generation paths fail → programmatic fallback picks system asset."""
         from storyloom.tasks._llm_generate import GenerateProcessor
         from storyloom.io.img_api_client import ImageApiError
 
@@ -1040,8 +1046,6 @@ class TestGenerateProcessorIntegration:
         roster = GameAssetRoster("test_int2", lib)
         roster.add(AssetType.CHAR_PORTRAIT, "NewChar", "A new character", target=None)
 
-        # Selection returns null, then generation fails, forced also fails
-        # But forced fallback should still pick sys_ asset (programmatic)
         api = FakeApiClient(responses=[
             '{"scope": "null", "selected": null}',
             ApiError("forced failed too"),
@@ -1054,7 +1058,6 @@ class TestGenerateProcessorIntegration:
             img_client_background=img,
             library=lib,
             img_generation_enabled=True,
-            media_dir=str(tmp_path / "media"),
         )
 
         task = Task(TaskType.GENERATE, 0, AssetType.CHAR_PORTRAIT)
@@ -1066,6 +1069,7 @@ class TestGenerateProcessorIntegration:
             task.wait(timeout=5.0)
 
         assert task.completed
-        # Even with all errors, forced fallback picks from library
         item = roster.lookup(AssetType.CHAR_PORTRAIT, "NewChar")
         assert item.target is not None  # fallback worked
+        # Must be a system asset (sys_ prefix)
+        assert item.target.startswith("sys_")

@@ -1310,7 +1310,6 @@ class GameLoop:
             img_client_background=ImgApiClient(raw_cfg, remove_bg=RemoveBgPolicy.NEVER),
             library=library,
             img_generation_enabled=img_enabled,
-            media_dir=DEFAULT_MEDIA_DIR,
         )
 
     # ── Observer ──────────────────────────────────────────────────

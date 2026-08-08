@@ -520,7 +520,6 @@ class GenerateProcessor:
         img_client_background,  # ImgApiClient (remove_bg=NEVER)
         library: AssetLibrary,
         img_generation_enabled: bool,
-        media_dir: str,
     ):
         self._api = api_client
         self._img_clients = {
@@ -529,7 +528,6 @@ class GenerateProcessor:
         }
         self._library = library
         self._img_generation_enabled = img_generation_enabled
-        self._media_dir = media_dir
 
     def __call__(
         self,
