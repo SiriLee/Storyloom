@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import struct
 import time
+from io import BytesIO
 
 from storyloom.io._types import ImageResult, RemoveBgPolicy
 
@@ -337,3 +338,60 @@ def maybe_remove_background(
         url=result.url,
         elapsed_ms=result.elapsed_ms + elapsed * 1000,
     )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Background aspect ratio normalisation (§7.8b)
+# ═══════════════════════════════════════════════════════════════════
+
+_TARGET_AR = 16.0 / 9.0
+_AR_TOLERANCE = 0.02  # ±2% — within this range, skip crop
+
+
+def normalize_background(raw: bytes) -> bytes:
+    """Center-crop a background image to 16:9 if its aspect ratio deviates
+    by more than ±2%.
+
+    This is a safety net: models may return images whose dimensions differ
+    slightly from the requested size.  The UI uses ``object-fit: cover``
+    which crops to fill the viewport, so an off-ratio file produces
+    unpredictable framing.  Normalising at save time guarantees consistent
+    behaviour regardless of model quirks.
+
+    If PIL is unavailable the original bytes are returned unchanged
+    (graceful degradation — the UI's ``cover`` crop still works, just
+    with less control over the framing).
+    """
+    fmt = detect_format(raw)
+    w, h = get_dimensions(raw, fmt)
+    if w == 0 or h == 0:
+        return raw
+
+    ar = w / h
+    if abs(ar - _TARGET_AR) <= _AR_TOLERANCE:
+        return raw
+
+    try:
+        from PIL import Image
+    except ImportError:
+        return raw
+
+    if ar > _TARGET_AR:
+        new_w = int(h * _TARGET_AR)
+        new_h = h
+    else:
+        new_w = w
+        new_h = int(w / _TARGET_AR)
+
+    left = (w - new_w) // 2
+    top = (h - new_h) // 2
+    right = left + new_w
+    bottom = top + new_h
+
+    img = Image.open(BytesIO(raw))
+    cropped = img.crop((left, top, right, bottom))
+
+    buf = BytesIO()
+    save_fmt = "PNG" if (fmt in ("png", "webp") or img.mode == "RGBA") else "JPEG"
+    cropped.save(buf, format=save_fmt)
+    return buf.getvalue()

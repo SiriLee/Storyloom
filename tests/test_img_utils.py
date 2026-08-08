@@ -377,3 +377,85 @@ class TestMaybeRemoveBackground:
         with patch.object(img_utils, "remove_background", return_value=None):
             result = img_utils.maybe_remove_background(r, RemoveBgPolicy.AUTO)
             assert result is r  # unchanged — degrade gracefully
+
+
+# ═══════════════════════════════════════════════════════════════════
+# normalize_background (§7.8b)
+# ═══════════════════════════════════════════════════════════════════
+
+def _make_png(width: int, height: int) -> bytes:
+    """Create a minimal valid RGBA PNG with the given dimensions."""
+    import struct
+    import zlib
+
+    def chunk(ctype: bytes, data: bytes) -> bytes:
+        c = ctype + data
+        return struct.pack(">I", len(data)) + c + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+    raw_rows = b"".join(
+        b"\x00" + b"\xff\x00\x00\xff" * width for _ in range(height)
+    )
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", ihdr)
+        + chunk(b"IDAT", zlib.compress(raw_rows))
+        + chunk(b"IEND", b"")
+    )
+
+
+class TestNormalizeBackground:
+    """normalize_background — 16:9 aspect ratio enforcement."""
+
+    def test_already_16_9_passthrough(self):
+        """320x180 is exactly 16:9 → returned unchanged."""
+        from storyloom.io.img_utils import normalize_background
+
+        raw = _make_png(320, 180)
+        result = normalize_background(raw)
+        assert result == raw
+
+    def test_non_16_9_cropped(self):
+        """200x200 (1:1) → cropped to center 16:9."""
+        from storyloom.io.img_utils import normalize_background
+
+        raw = _make_png(200, 200)
+        result = normalize_background(raw)
+        assert result != raw
+        from storyloom.io.img_utils import detect_format, get_dimensions
+        fmt = detect_format(result)
+        w, h = get_dimensions(result, fmt)
+        assert w > 0 and h > 0
+        assert abs((w / h) - (16.0 / 9.0)) <= 0.02
+
+    def test_invalid_bytes_passthrough(self):
+        """Garbage bytes → returned unchanged (graceful degradation)."""
+        from storyloom.io.img_utils import normalize_background
+
+        garbage = b"not an image"
+        result = normalize_background(garbage)
+        assert result == garbage
+
+    def test_too_wide_cropped(self):
+        """320x100 (3.2:1) → crop sides to 16:9."""
+        from storyloom.io.img_utils import normalize_background
+
+        raw = _make_png(320, 100)
+        result = normalize_background(raw)
+        assert result != raw
+        from storyloom.io.img_utils import detect_format, get_dimensions
+        fmt = detect_format(result)
+        w, h = get_dimensions(result, fmt)
+        assert abs((w / h) - (16.0 / 9.0)) <= 0.02
+
+    def test_too_tall_cropped(self):
+        """100x320 (0.31:1) → crop top/bottom to 16:9."""
+        from storyloom.io.img_utils import normalize_background
+
+        raw = _make_png(100, 320)
+        result = normalize_background(raw)
+        assert result != raw
+        from storyloom.io.img_utils import detect_format, get_dimensions
+        fmt = detect_format(result)
+        w, h = get_dimensions(result, fmt)
+        assert abs((w / h) - (16.0 / 9.0)) <= 0.02
