@@ -449,21 +449,15 @@ def _collect_reference_images(
             continue
 
         b64 = base64.b64encode(raw).decode("ascii")
-        mime = _mime_type(raw)
-        refs.append(f"data:{mime};base64,{b64}")
+        refs.append(f"data:{_mime_for(asset_type)};base64,{b64}")
 
     return refs
 
 
-def _mime_type(raw: bytes) -> str:
-    """Return the MIME type for *raw* image bytes."""
-    from storyloom.io.img_utils import detect_format
-    fmt = detect_format(raw)
-    return {
-        "png": "image/png",
-        "jpeg": "image/jpeg",
-        "webp": "image/webp",
-    }.get(fmt, "image/png")
+def _mime_for(asset_type: AssetType) -> str:
+    """Return the MIME type for *asset_type* based on its default extension."""
+    ext = asset_type.default_extension.lstrip(".")
+    return f"image/{ext}"
 
 
 # ═══════════════════════════════════════════════════════════════════════
