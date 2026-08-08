@@ -755,7 +755,9 @@ class GameLoop:
             from storyloom.tasks import TaskGenerator
             task_queue: deque[object] | None = deque()
             task_gen = TaskGenerator(task_queue, self._roster,
-                                     self._process_factory, self._task_pool)
+                                     match_processor=self._process_factory,
+                                     generate_processor=self._process_factory,
+                                     task_pool=self._task_pool)
         else:
             task_queue = None
             task_gen = None

@@ -23,10 +23,11 @@ class TaskGenerator:
     Args:
         task_queue: FIFO deque — tasks are appended immediately on creation.
         roster: Per-game asset roster for program-match lookups.
-        process_factory: ``Callable[[AssetType, str, GameAssetRoster], Callable[[Task], None]]`` —
-            returns a closure for ``Task.process`` when program match fails.
-            Receives *(asset_type, local_name, roster)*.  **Required** —
-            no default (stub in §7.4, real LLM in §7.8).
+        match_processor: ``Callable[[AssetType, str, GameAssetRoster], Callable[[Task], None]] | None`` —
+            returns a closure for ``Task.process`` when program match fails
+            for MATCH tasks (§7.8a).  ``None`` → sync-complete as no-op.
+        generate_processor: Same protocol for GENERATE tasks (§7.8b).
+            ``None`` → sync-complete as no-op (placeholder still created).
         task_pool: Thread 4 executor.  If ``None``, async tasks are not
             submitted (useful for testing program match in isolation).
     """
@@ -39,12 +40,14 @@ class TaskGenerator:
     }
 
     def __init__(self, task_queue: deque[Task], roster: GameAssetRoster,
-                 process_factory,
+                 match_processor=None,
+                 generate_processor=None,
                  task_pool: TaskPool | None = None):
         self._queue = task_queue
         self._roster = roster
         self._pool = task_pool
-        self._process_factory = process_factory
+        self._match_processor = match_processor
+        self._generate_processor = generate_processor
 
     # ── Public API ───────────────────────────────────────────────────────
 
@@ -83,13 +86,13 @@ class TaskGenerator:
 
         if local_name and self._roster.lookup(asset_type, local_name) is not None:
             task.complete(result=local_name)          # O(1) hit
-        elif local_name:
-            task.process = self._process_factory(asset_type, local_name,
+        elif local_name and self._match_processor is not None:
+            task.process = self._match_processor(asset_type, local_name,
                                                            self._roster)
             if self._pool is not None:
                 self._pool.submit(task)
         else:
-            task.complete()                           # empty name → no-op
+            task.complete()                           # no processor or empty name → no-op
         return task
 
     # ── GENERATE ──────────────────────────────────────────────────────────
@@ -115,10 +118,13 @@ class TaskGenerator:
         elif local_name:
             # Placeholder first — sync, before pool submit (design.md §6.4)
             self._roster.add(asset_type, local_name, desc, target=None)
-            task.process = self._process_factory(asset_type, local_name,
-                                                           self._roster)
-            if self._pool is not None:
-                self._pool.submit(task)
+            if self._generate_processor is not None:
+                task.process = self._generate_processor(asset_type, local_name,
+                                                                  self._roster)
+                if self._pool is not None:
+                    self._pool.submit(task)
+            else:
+                task.complete()                        # no processor — placeholder stays
         # else: empty local_name → skip placeholder, sync-complete as no-op
         # (LLM output error — nothing meaningful to generate)
         else:

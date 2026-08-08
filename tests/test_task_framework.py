@@ -87,7 +87,8 @@ def pipeline(library, roster):
     def _factory(atype, lname, _roster):
         return stub_process_factory(atype, lname, _roster)
 
-    gen = TaskGenerator(q, roster, process_factory=_factory,
+    gen = TaskGenerator(q, roster, match_processor=_factory,
+                        generate_processor=_factory,
                         task_pool=pool)
     dispatcher = EventDispatcher(q, roster)
     yield SimpleNamespace(

@@ -73,7 +73,8 @@ class GraphPipeline:
         self.task_pool = TaskPool(max_workers=2)
         self.task_gen = TaskGenerator(
             self.task_queue, self.roster,
-            process_factory=stub_process_factory,
+            match_processor=stub_process_factory,
+            generate_processor=stub_process_factory,
             task_pool=self.task_pool,
         )
 
