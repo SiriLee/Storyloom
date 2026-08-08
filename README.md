@@ -22,6 +22,10 @@ git clone https://github.com/SiriLee/Storyloom.git && cd Storyloom
 pip install -e ".[bg]"
 ```
 
+`[bg]` adds background removal (`onnxruntime` + a one-time ~4.4 MB model
+download during install).  Omit it if you don't need the feature.  The download
+is non-fatal — install succeeds either way.
+
 Graph mode needs a one-time asset download into your working directory:
 
 ```bash
@@ -138,7 +142,7 @@ the text pipeline.
 git clone https://github.com/SiriLee/Storyloom.git && cd Storyloom
 pip install -e ".[bg]"
 
-pytest                          # 883 tests, no API key needed
+pytest                          # no API key needed
 
 # Build
 bash scripts/build.sh           # standalone binary + wheel
