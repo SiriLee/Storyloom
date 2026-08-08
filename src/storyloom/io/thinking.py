@@ -41,11 +41,21 @@ _THINKING_PRESETS: list[tuple[str, dict, dict, dict]] = [
         {},                                              # enabled = API default
     ),
     # ── Anthropic Claude ──────────────────────────────────────────────
-    # NOTE: budget_tokens format works for Claude ≤ 4.6 only.
-    # Claude ≥ 4.7 (Opus 5, Sonnet 5) requires adaptive thinking:
-    #   disabled → {} (extended thinking doesn't exist on ≥ 4.7)
-    #   light    → {"thinking": {"type": "adaptive"}, "output_config": {"effort": "low"}}
-    # TODO: add version-aware Claude entries when §7.8b needs light thinking.
+    # Per official docs (platform.claude.com, Aug 2026):
+    #   ≤ 4.5: extended thinking ONLY — {"thinking": {"type": "enabled", "budget_tokens": N}}
+    #   4.6:   extended deprecated, adaptive available
+    #   ≥ 4.7: extended REMOVED — {"thinking": {"type": "enabled", "budget_tokens": N}} → 400
+    #          Must use {"thinking": {"type": "adaptive"}} + {"output_config": {"effort": "..."}}
+    #
+    # disabled: {"thinking": {"type": "disabled"}} works for ≤ 4.6.
+    #   On ≥ 4.7 this parameter is not recognised (extended thinking
+    #   doesn't exist) — likely silently ignored, but adaptive thinking
+    #   may still engage.  No perfect "off" switch exists for ≥ 4.7.
+    # light/enabled: budget_tokens format works for ≤ 4.6 only.
+    #   On ≥ 4.7 these will 400 — the ApiError is caught and the caller
+    #   retries or degrades gracefully.
+    # TODO: add version-aware Claude entries when §7.8b needs reliable
+    #   light thinking on ≥ 4.7 models.
     (
         "claude",
         {"thinking": {"type": "disabled"}},
@@ -53,10 +63,13 @@ _THINKING_PRESETS: list[tuple[str, dict, dict, dict]] = [
         {"thinking": {"type": "enabled", "budget_tokens": 4096}},
     ),
     # ── Google Gemini ─────────────────────────────────────────────────
-    # NOTE: Gemini 2.5 Pro rejects thinking_budget=0 (min is 128).
-    # Flash accepts 0–24576.  Gemini 3 uses thinking_level string instead.
-    # Current disabled preset may 400 on 2.5 Pro — the API will reject
-    # and the caller's exception handler catches it as an ApiError.
+    # Per discuss.google.dev (Aug 2026):
+    #   2.5 Flash: thinking_budget range 0–24576 (0 = disabled).
+    #   2.5 Pro:   min is 128, CANNOT disable.  thinking_budget=0 → 400.
+    #   3.x:       uses thinking_level string instead (none/minimal/low/…).
+    # Current disabled preset will 400 on 2.5 Pro — the ApiError is
+    # caught and the caller retries or degrades gracefully.
+    # TODO: split Gemini entries by version when §7.8b needs reliable disabling.
     (
         "gemini",
         {"thinking_config": {"thinking_budget": 0}},
@@ -64,14 +77,15 @@ _THINKING_PRESETS: list[tuple[str, dict, dict, dict]] = [
         {},                                              # enabled = API default
     ),
     # ── Alibaba Qwen ──────────────────────────────────────────────────
-    # Two wire formats exist:
-    #   DashScope (native):     enable_thinking: false  (top-level)
-    #   OpenAI-compatible:      chat_template_kwargs: {enable_thinking: false}
-    # We target OpenAI-compatible endpoints (what ApiClient speaks).
+    # Per official docs (alibabacloud.com, Aug 2026):
+    #   DashScope / official API: enable_thinking is a top-level field.
+    #   Self-hosted vLLM/SGLang: use chat_template_kwargs nesting instead.
+    # We target the official API format; users on self-hosted endpoints
+    # should change api_base_url or adjust the preset.
     # Qwen3 hybrid models require this to avoid burning tokens on <think>.
     (
         "qwen",
-        {"chat_template_kwargs": {"enable_thinking": False}},
+        {"enable_thinking": False},
         {},                                              # light = default (no override)
         {},                                              # enabled = default
     ),
@@ -87,10 +101,13 @@ _THINKING_PRESETS: list[tuple[str, dict, dict, dict]] = [
         {},                                              # enabled = API default
     ),
     # ── OpenAI (GPT-5 / o-series) ─────────────────────────────────────
-    # Matches "gpt-" prefix (OpenAI model names: gpt-5.2, gpt-5-mini, etc.).
-    # GPT-5 uses reasoning_effort to control thinking depth.
-    # NOTE: gpt-5-mini rejects "none" with 400 — when that happens the
-    # ApiError is caught and the caller retries or degrades gracefully.
+    # Matches "gpt" prefix (model names: gpt-5.2, gpt-5-mini, etc.).
+    # Per community.openai.com (2026):
+    #   reasoning_effort values: none / minimal / low / medium / high.
+    #   gpt-5-mini rejects "none" with 400 → use "minimal" as fallback.
+    #   gpt-5.1+ defaults to "none" (reasoning off by default).
+    #   gpt-5 / pro / 5.5 default to "medium".
+    # NOTE: gpt-5-mini + disabled → 400; caught as ApiError, caller retries.
     (
         "gpt",
         {"reasoning_effort": "none"},

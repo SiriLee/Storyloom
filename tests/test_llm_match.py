@@ -160,10 +160,10 @@ class TestThinkingPresets:
     # ── Qwen ──────────────────────────────────────────────────────────
 
     def test_qwen_disabled(self):
-        """Qwen model + disabled → chat_template_kwargs nesting (OpenAI-compat)."""
+        """Qwen model + disabled → enable_thinking=False (top-level, official API)."""
         from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("qwen-max", "disabled")
-        assert params == {"chat_template_kwargs": {"enable_thinking": False}}
+        assert params == {"enable_thinking": False}
 
     def test_qwen_light_is_empty(self):
         """Qwen light mode → empty (no specific param)."""
