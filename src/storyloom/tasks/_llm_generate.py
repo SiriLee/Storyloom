@@ -15,6 +15,7 @@ import uuid
 
 from storyloom.assets import AssetLibrary, AssetType, GameAssetRoster
 from storyloom.config import GENERATE_LIBRARY_TOP_N, GENERATE_REF_IMAGE_COUNT
+from storyloom.tasks._types import Task
 
 # ═══════════════════════════════════════════════════════════════════════
 # Prompt templates (per prompt-design-llm-generate.md)
@@ -281,11 +282,12 @@ def _select(
     roster: GameAssetRoster,
     library,  # AssetLibrary
     forced: bool = False,
+    thinking_mode: str = "light",
 ) -> str | None:
     """Run LLM selection.  Returns ``asset_id`` or ``None``.
 
-    Single light-thinking call.  On ApiError or unparseable response,
-    returns ``None`` (caller handles fallback).
+    On ApiError or unparseable response, returns ``None``
+    (caller handles fallback).
     """
     from storyloom.io.api_client import ApiError
     from storyloom.io.thinking import get_thinking_params
@@ -301,7 +303,7 @@ def _select(
             messages=messages,
             max_tokens=128,
             response_format={"type": "json_object"},
-            extra_params=get_thinking_params(api_client.model, "light"),
+            extra_params=get_thinking_params(api_client.model, thinking_mode),
         )
     except ApiError:
         return None
@@ -370,37 +372,21 @@ def _select_forced(
     type, then first user asset, or raises ``RuntimeError`` if the
     library is empty.
     """
-    from storyloom.io.api_client import ApiError
-
     # Attempt 1: light thinking
     result = _select(
         api_client, asset_type, target_name, target_description,
-        roster, library, forced=True,
+        roster, library, forced=True, thinking_mode="light",
     )
     if result is not None:
         return result
 
-    # Attempt 2: enabled thinking
-    try:
-        prompt = build_selection_prompt(
-            asset_type, target_name, target_description,
-            roster, library, forced=True,
-        )
-        messages = [{"role": "user", "content": prompt}]
-        raw = api_client.chat(
-            messages=messages,
-            max_tokens=128,
-            response_format={"type": "json_object"},
-            extra_params={},  # enabled = API default
-        )
-    except ApiError:
-        pass
-    else:
-        roster_entries = roster.list_by_type(asset_type)
-        library_entries = library.list_by_type(asset_type)
-        result = _parse_selection_response(raw, roster_entries, library_entries)
-        if result is not None:
-            return result
+    # Attempt 2: enabled (heavier) thinking
+    result = _select(
+        api_client, asset_type, target_name, target_description,
+        roster, library, forced=True, thinking_mode="enabled",
+    )
+    if result is not None:
+        return result
 
     # Programmatic fallback: first sys_ asset, then first user asset
     all_assets = library.list_by_type(asset_type)
