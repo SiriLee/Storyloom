@@ -28,6 +28,8 @@ venv/
 saves/
 media/
 system_media/
+system_media_src/
+system_media-v*.zip
 
 # Test outputs (LLM-generated, reproducible via toolchain)
 tests/prompt_lab/data/output/
