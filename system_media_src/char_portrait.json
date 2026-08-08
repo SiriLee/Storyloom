@@ -1,0 +1,127 @@
+{
+  "sys_child_male": {
+    "name": "Young Boy",
+    "description": "Young boy, child, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Young boy, child, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_child_female": {
+    "name": "Young Girl",
+    "description": "Young girl, child, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Young girl, child, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_young_male": {
+    "name": "Teenage Boy",
+    "description": "Teenage boy, adolescent, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Teenage boy, adolescent, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_young_female": {
+    "name": "Teenage Girl",
+    "description": "Teenage girl, adolescent, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Teenage girl, adolescent, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_adult_male": {
+    "name": "Adult Man",
+    "description": "Adult man, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Adult man, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_adult_female": {
+    "name": "Adult Woman",
+    "description": "Adult woman, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Adult woman, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_middle_male": {
+    "name": "Middle-aged Man",
+    "description": "Middle-aged man, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Middle-aged man, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_middle_female": {
+    "name": "Middle-aged Woman",
+    "description": "Middle-aged woman, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Middle-aged woman, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_elderly_male": {
+    "name": "Elderly Man",
+    "description": "Elderly man, gray hair, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Elderly man, gray hair, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_elderly_female": {
+    "name": "Elderly Woman",
+    "description": "Elderly woman, gray hair, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Elderly woman, gray hair, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_student_male": {
+    "name": "Male Student",
+    "description": "Male student in school uniform, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Male student in school uniform, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_student_female": {
+    "name": "Female Student",
+    "description": "Female student in school uniform, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Female student in school uniform, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_teacher_male": {
+    "name": "Male Teacher",
+    "description": "Male teacher in formal attire, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Male teacher in formal attire, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_teacher_female": {
+    "name": "Female Teacher",
+    "description": "Female teacher in formal attire, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Female teacher in formal attire, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_doctor_male": {
+    "name": "Male Doctor",
+    "description": "Male doctor in white coat, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Male doctor in white coat, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_doctor_female": {
+    "name": "Female Doctor",
+    "description": "Female doctor in white coat, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Female doctor in white coat, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_nurse_female": {
+    "name": "Female Nurse",
+    "description": "Female nurse in medical uniform, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Female nurse in medical uniform, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_officer_male": {
+    "name": "Male Officer",
+    "description": "Male military officer in uniform, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Male military officer in uniform, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_officer_female": {
+    "name": "Female Officer",
+    "description": "Female military officer in uniform, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Female military officer in uniform, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_noble_male": {
+    "name": "Male Noble",
+    "description": "Male noble in formal attire, elegant, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Male noble in formal attire, elegant, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_noble_female": {
+    "name": "Female Noble",
+    "description": "Female noble in formal gown, elegant, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Female noble in formal gown, elegant, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_worker_male": {
+    "name": "Male Worker",
+    "description": "Male worker in durable clothing, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Male worker in durable clothing, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_clergy_male": {
+    "name": "Male Clergy",
+    "description": "Male clergy in religious robe, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Male clergy in religious robe, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_server_female": {
+    "name": "Female Server",
+    "description": "Female server in apron and uniform, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Female server in apron and uniform, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  },
+  "sys_athlete_male": {
+    "name": "Male Athlete",
+    "description": "Male athlete in sportswear, neutral expression",
+    "prompt": "Japanese anime visual novel style. Half-body character portrait. Male athlete in sportswear, neutral expression. Standing pose, facing forward, neutral expression. Generic design, suitable for various character roles. Clean lineart, soft cel shading. Transparent background, no background, isolated character. High quality professional illustration."
+  }
+}

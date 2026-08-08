@@ -1,0 +1,127 @@
+{
+  "sys_classroom": {
+    "name": "Classroom",
+    "description": "Empty classroom with desks and blackboard, bright lighting",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Empty classroom with desks and blackboard, bright lighting. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_library": {
+    "name": "Library",
+    "description": "Library interior with bookshelves and reading tables",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Library interior with bookshelves and reading tables. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_laboratory": {
+    "name": "Laboratory",
+    "description": "Science laboratory with desks and equipment",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Science laboratory with desks and equipment. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_playground": {
+    "name": "Playground",
+    "description": "School playground with running track and open field",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. School playground with running track and open field. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_rooftop": {
+    "name": "School Rooftop",
+    "description": "School rooftop with railing and open sky",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. School rooftop with railing and open sky. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_house_living": {
+    "name": "Living Room",
+    "description": "Living room with sofa and coffee table",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Living room with sofa and coffee table. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_bedroom": {
+    "name": "Bedroom",
+    "description": "Simple bedroom with bed and window",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Simple bedroom with bed and window. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_kitchen": {
+    "name": "Kitchen",
+    "description": "Home kitchen with counters, sink and stove",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Home kitchen with counters, sink and stove. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_office": {
+    "name": "Office",
+    "description": "Office room with desk, chair and computer",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Office room with desk, chair and computer. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_cafe": {
+    "name": "Cafe",
+    "description": "Cozy cafe interior with small tables and warm lighting",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Cozy cafe interior with small tables and warm lighting. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_restaurant": {
+    "name": "Restaurant",
+    "description": "Formal restaurant with dining tables and chandeliers",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Formal restaurant with dining tables and chandeliers. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_tavern": {
+    "name": "Tavern",
+    "description": "Tavern interior with wooden tables and bar counter, warm lighting",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Tavern interior with wooden tables and bar counter, warm lighting. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_hospital": {
+    "name": "Hospital Room",
+    "description": "Hospital patient room with bed and medical equipment",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Hospital patient room with bed and medical equipment. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_corridor": {
+    "name": "Corridor",
+    "description": "Long corridor with doors, institutional building interior",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Long corridor with doors, institutional building interior. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_station": {
+    "name": "Station",
+    "description": "Train station platform with benches and tracks",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Train station platform with benches and tracks. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_palace_hall": {
+    "name": "Palace Hall",
+    "description": "Grand palace hall with pillars and high ceiling",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Grand palace hall with pillars and high ceiling. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_temple": {
+    "name": "Temple",
+    "description": "Temple interior with altar, solemn atmosphere",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Temple interior with altar, solemn atmosphere. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_city_street": {
+    "name": "City Street",
+    "description": "City street with buildings and shops",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. City street with buildings and shops. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_market": {
+    "name": "Market",
+    "description": "Outdoor market with stalls and colorful awnings",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Outdoor market with stalls and colorful awnings. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_forest": {
+    "name": "Forest",
+    "description": "Dense forest with trees and a winding path",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Dense forest with trees and a winding path. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_beach": {
+    "name": "Beach",
+    "description": "Sandy beach with ocean waves, clear sky",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Sandy beach with ocean waves, clear sky. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_garden": {
+    "name": "Garden",
+    "description": "Ornamental garden with flower beds and stone path",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Ornamental garden with flower beds and stone path. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_village": {
+    "name": "Village",
+    "description": "Rural village with small houses and dirt road",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Rural village with small houses and dirt road. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_castle": {
+    "name": "Castle",
+    "description": "Medieval castle exterior with stone walls and towers",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Medieval castle exterior with stone walls and towers. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_ruins": {
+    "name": "Ruins",
+    "description": "Ancient stone ruins with arches, overgrown with moss",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Ancient stone ruins with arches, overgrown with moss. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  }
+}
