@@ -99,19 +99,19 @@ class TestThinkingPresets:
 
     def test_deepseek_disabled(self):
         """DeepSeek model + disabled → thinking.type=disabled."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("deepseek-v4-pro", "disabled")
         assert params == {"thinking": {"type": "disabled"}}
 
     def test_deepseek_light(self):
         """DeepSeek model + light → thinking.type=enabled."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("deepseek-chat", "light")
         assert params == {"thinking": {"type": "enabled"}}
 
     def test_deepseek_enabled_is_empty(self):
         """DeepSeek enabled mode → empty (API default)."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("deepseek-v4-pro", "enabled")
         assert params == {}
 
@@ -119,20 +119,20 @@ class TestThinkingPresets:
 
     def test_claude_disabled(self):
         """Claude model + disabled → thinking.type=disabled."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("claude-sonnet-5", "disabled")
         assert params == {"thinking": {"type": "disabled"}}
 
     def test_claude_light(self):
         """Claude model + light → includes budget_tokens=1024."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("claude-opus-4-8", "light")
         assert params["thinking"]["type"] == "enabled"
         assert params["thinking"]["budget_tokens"] == 1024
 
     def test_claude_enabled(self):
         """Claude model + enabled → includes budget_tokens=4096."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("claude-haiku-4-5", "enabled")
         assert params["thinking"]["type"] == "enabled"
         assert params["thinking"]["budget_tokens"] == 4096
@@ -141,33 +141,33 @@ class TestThinkingPresets:
 
     def test_gemini_disabled(self):
         """Gemini model + disabled → thinking_budget=0."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("gemini-2.5-pro", "disabled")
         assert params == {"thinking_config": {"thinking_budget": 0}}
 
     def test_gemini_light(self):
         """Gemini model + light → thinking_budget=512."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("gemini-2.0-flash", "light")
         assert params == {"thinking_config": {"thinking_budget": 512}}
 
     def test_gemini_enabled_is_empty(self):
         """Gemini enabled mode → empty (API default)."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("gemini-pro", "enabled")
         assert params == {}
 
     # ── Qwen ──────────────────────────────────────────────────────────
 
     def test_qwen_disabled(self):
-        """Qwen model + disabled → enable_thinking=False."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        """Qwen model + disabled → chat_template_kwargs nesting (OpenAI-compat)."""
+        from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("qwen-max", "disabled")
-        assert params == {"enable_thinking": False}
+        assert params == {"chat_template_kwargs": {"enable_thinking": False}}
 
     def test_qwen_light_is_empty(self):
         """Qwen light mode → empty (no specific param)."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("qwen-plus", "light")
         assert params == {}
 
@@ -175,34 +175,90 @@ class TestThinkingPresets:
 
     def test_glm_disabled(self):
         """GLM model + disabled → thinking.type=disabled."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("glm-4-plus", "disabled")
         assert params == {"thinking": {"type": "disabled"}}
 
     def test_glm_light(self):
         """GLM model + light → thinking.type=enabled."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("glm-4-flash", "light")
         assert params == {"thinking": {"type": "enabled"}}
+
+    # ── OpenAI ────────────────────────────────────────────────────────
+
+    def test_openai_disabled(self):
+        """OpenAI GPT-5 + disabled → reasoning_effort=none."""
+        from storyloom.io.thinking import get_thinking_params
+        params = get_thinking_params("gpt-5.2", "disabled")
+        assert params == {"reasoning_effort": "none"}
+
+    def test_openai_light(self):
+        """OpenAI GPT-5 + light → reasoning_effort=minimal."""
+        from storyloom.io.thinking import get_thinking_params
+        params = get_thinking_params("gpt-5-mini", "light")
+        assert params == {"reasoning_effort": "minimal"}
+
+    # ── Kimi / Moonshot ────────────────────────────────────────────────
+
+    def test_kimi_disabled(self):
+        """Kimi K2 + disabled → thinking.type=disabled."""
+        from storyloom.io.thinking import get_thinking_params
+        params = get_thinking_params("kimi-k2.6", "disabled")
+        assert params == {"thinking": {"type": "disabled"}}
+
+    def test_kimi_light(self):
+        """Kimi K2 + light → thinking.type=enabled."""
+        from storyloom.io.thinking import get_thinking_params
+        params = get_thinking_params("kimi-k2.5", "light")
+        assert params == {"thinking": {"type": "enabled"}}
+
+    # ── Grok / xAI ─────────────────────────────────────────────────────
+
+    def test_grok_disabled(self):
+        """Grok + disabled → reasoning.enabled=false (boolean, not string)."""
+        from storyloom.io.thinking import get_thinking_params
+        params = get_thinking_params("grok-4.20", "disabled")
+        assert params == {"reasoning": {"enabled": False}}
+
+    def test_grok_light_is_empty(self):
+        """Grok light mode → empty (API choice)."""
+        from storyloom.io.thinking import get_thinking_params
+        params = get_thinking_params("grok-3", "light")
+        assert params == {}
+
+    # ── Doubao / ByteDance ─────────────────────────────────────────────
+
+    def test_doubao_disabled(self):
+        """Doubao + disabled → thinking.type=disabled."""
+        from storyloom.io.thinking import get_thinking_params
+        params = get_thinking_params("doubao-seed-1.6", "disabled")
+        assert params == {"thinking": {"type": "disabled"}}
+
+    def test_doubao_light_is_auto(self):
+        """Doubao light → thinking.type=auto (unique model-decides mode)."""
+        from storyloom.io.thinking import get_thinking_params
+        params = get_thinking_params("doubao-1.5-thinking-vision-pro", "light")
+        assert params == {"thinking": {"type": "auto"}}
 
     # ── Unknown / edge cases ──────────────────────────────────────────
 
     def test_unknown_model_returns_empty(self):
         """Unknown model → empty params for all modes."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         assert get_thinking_params("some-unknown-model", "disabled") == {}
         assert get_thinking_params("some-unknown-model", "light") == {}
         assert get_thinking_params("some-unknown-model", "enabled") == {}
 
     def test_case_insensitive_match(self):
         """Model name matching is case-insensitive."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("DeepSeek-V4-Pro", "disabled")
         assert params == {"thinking": {"type": "disabled"}}
 
     def test_substring_match(self):
         """Model prefix can appear anywhere in the model string."""
-        from storyloom.tasks._llm_match import get_thinking_params
+        from storyloom.io.thinking import get_thinking_params
         # "deepseek" appears in the middle
         params = get_thinking_params("my-deepseek-model", "disabled")
         assert params == {"thinking": {"type": "disabled"}}

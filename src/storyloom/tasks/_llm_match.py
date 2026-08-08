@@ -3,86 +3,14 @@
 Per design.md §5.4: low-probability forced-choice path.  Scope is the
 game asset roster only (never the global library).  Two attempts —
 no-thinking then light-thinking — then silent degradation.
-
-§7.8a infrastructure: ``get_thinking_params()`` serves all future
-LLM-powered pipeline stages (matching, selection, generation).
 """
 
 from __future__ import annotations
 
 from storyloom.assets import AssetType, GameAssetRoster
 from storyloom.io.api_client import ApiClient, ApiError
+from storyloom.io.thinking import get_thinking_params
 from storyloom.tasks._types import Task
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# Thinking mode presets (§7.8a infrastructure)
-# ═══════════════════════════════════════════════════════════════════════
-
-# Ordered list of (model_substring, disabled_params, light_params, enabled_params).
-# First match wins (case-insensitive).  Unknown models → empty params.
-# Extend this list when adding support for new model providers.
-
-_THINKING_PRESETS: list[tuple[str, dict, dict, dict]] = [
-    # ── DeepSeek ──────────────────────────────────────────────────────
-    (
-        "deepseek",
-        {"thinking": {"type": "disabled"}},
-        {"thinking": {"type": "enabled"}},
-        {},                                              # enabled = API default
-    ),
-    # ── Anthropic Claude ──────────────────────────────────────────────
-    (
-        "claude",
-        {"thinking": {"type": "disabled"}},
-        {"thinking": {"type": "enabled", "budget_tokens": 1024}},
-        {"thinking": {"type": "enabled", "budget_tokens": 4096}},
-    ),
-    # ── Google Gemini ─────────────────────────────────────────────────
-    (
-        "gemini",
-        {"thinking_config": {"thinking_budget": 0}},
-        {"thinking_config": {"thinking_budget": 512}},
-        {},                                              # enabled = API default
-    ),
-    # ── Alibaba Qwen ──────────────────────────────────────────────────
-    (
-        "qwen",
-        {"enable_thinking": False},
-        {},                                              # light = default
-        {},                                              # enabled = default
-    ),
-    # ── Zhipu GLM ─────────────────────────────────────────────────────
-    (
-        "glm",
-        {"thinking": {"type": "disabled"}},
-        {"thinking": {"type": "enabled"}},
-        {},                                              # enabled = API default
-    ),
-]
-
-
-def get_thinking_params(model: str, mode: str = "disabled") -> dict:
-    """Return ``extra_params`` dict for controlling thinking on *model*.
-
-    Args:
-        model: Model identifier string (e.g. ``"deepseek-v4-pro"``).
-        mode: ``"disabled"`` | ``"light"`` | ``"enabled"``.
-
-    Returns:
-        Dict suitable as ``extra_params`` for ``ApiClient.chat()``.
-        Empty dict for unknown models (no thinking control attempted).
-    """
-    model_lower = model.lower()
-    for prefix, disabled, light, enabled in _THINKING_PRESETS:
-        if prefix in model_lower:
-            if mode == "disabled":
-                return disabled
-            elif mode == "light":
-                return light
-            else:
-                return enabled
-    return {}
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -204,7 +132,12 @@ def _parse_match_response(raw: str, entries: dict) -> str | None:
     except (_json.JSONDecodeError, TypeError, AttributeError):
         pass
 
-    # 2. Substring scan — find any entry key in the raw text
+    # 2. Substring scan — find any entry key in the raw text.
+    # NOTE: this is intentionally loose — ``"hero" in "heroine"``
+    # returns True.  In practice, local_names are sufficiently
+    # distinct (``"jack_smile"`` / ``"forest_clearing"``) that
+    # collisions are harmless.  This is a best-effort fallback;
+    # the JSON parse above is the primary extraction path.
     for name in entries:
         if name in raw:
             return name

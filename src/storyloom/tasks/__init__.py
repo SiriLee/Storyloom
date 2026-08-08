@@ -3,7 +3,8 @@
 from storyloom.tasks._types import Task, TaskTimeoutError, TaskType
 from storyloom.tasks._pool import TaskPool
 from storyloom.tasks._generator import TaskGenerator
-from storyloom.tasks._llm_match import MatchProcessor, get_thinking_params
+from storyloom.tasks._llm_match import MatchProcessor
+from storyloom.io.thinking import get_thinking_params  # canonical location: io/
 
 __all__ = [
     "MatchProcessor",
