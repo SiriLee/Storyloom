@@ -311,3 +311,50 @@ class TestUserConfigImageFields:
         assert cfg2.api_model == "deepseek-v4-pro"
         assert cfg2.img_api_key == "sk-img"
         assert cfg2.img_api_model == "flux-2-pro"
+
+    # ── img_generation_enabled (§7.8 framework) ──
+
+    def test_img_generation_enabled_default(self):
+        """img_generation_enabled defaults to True."""
+        cfg = UserConfig()
+        assert cfg.img_generation_enabled is True
+
+    def test_img_generation_enabled_setter(self):
+        """img_generation_enabled accepts True/False."""
+        cfg = UserConfig()
+        cfg.img_generation_enabled = False
+        assert cfg.img_generation_enabled is False
+        cfg.img_generation_enabled = True
+        assert cfg.img_generation_enabled is True
+
+    def test_img_generation_enabled_round_trip(self, tmp_path):
+        """img_generation_enabled survives save→load."""
+        cfg = UserConfig(tmp_path)
+        cfg.img_generation_enabled = False
+        cfg.save()
+
+        cfg2 = UserConfig(tmp_path)
+        assert cfg2.img_generation_enabled is False
+
+    def test_img_generation_enabled_backfill(self, tmp_path):
+        """Old config without img_generation_enabled → defaults to True."""
+        _write_json(tmp_path / "config.json", {
+            "version": 2,
+            "language": "en",
+            "api_key": "sk-old",
+            "api_base_url": "https://old.example.com",
+            "api_model": "old-model",
+        })
+        cfg = UserConfig(tmp_path)
+        assert cfg.img_generation_enabled is True
+        # Backfilled on save
+        saved = json.loads((tmp_path / "config.json").read_text())
+        assert "img_generation_enabled" in saved
+
+    def test_img_generation_enabled_in_json_structure(self, tmp_path):
+        """config.json contains img_generation_enabled after save."""
+        cfg = UserConfig(tmp_path)
+        cfg.img_generation_enabled = False
+        cfg.save()
+        data = json.loads((tmp_path / "config.json").read_text())
+        assert data["img_generation_enabled"] is False

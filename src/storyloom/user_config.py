@@ -32,6 +32,7 @@ class UserConfig:
         "img_api_base_url": "",
         "img_api_model": "flux-2-pro",
         "img_remove_bg": "auto",
+        "img_generation_enabled": True,
     }
 
     def __init__(self, app_dir: str | Path | None = None):
@@ -46,6 +47,7 @@ class UserConfig:
         self._img_api_base_url: str = self._DEFAULTS["img_api_base_url"]
         self._img_api_model: str = self._DEFAULTS["img_api_model"]
         self._img_remove_bg: str = self._DEFAULTS["img_remove_bg"]
+        self._img_generation_enabled: bool = self._DEFAULTS["img_generation_enabled"]
         self._needs_migration: bool = False
 
         if self._app_dir is not None:
@@ -135,6 +137,14 @@ class UserConfig:
         self._img_remove_bg = value
 
     @property
+    def img_generation_enabled(self) -> bool:
+        return self._img_generation_enabled
+
+    @img_generation_enabled.setter
+    def img_generation_enabled(self, value: bool) -> None:
+        self._img_generation_enabled = value
+
+    @property
     def needs_migration(self) -> bool:
         """True when ``config.json`` schema version doesn't match current."""
         return self._needs_migration
@@ -191,6 +201,9 @@ class UserConfig:
         self._img_api_base_url = data.get("img_api_base_url", self._DEFAULTS["img_api_base_url"])
         self._img_api_model = data.get("img_api_model", self._DEFAULTS["img_api_model"])
         self._img_remove_bg = data.get("img_remove_bg", self._DEFAULTS["img_remove_bg"])
+        self._img_generation_enabled = data.get(
+            "img_generation_enabled", self._DEFAULTS["img_generation_enabled"]
+        )
 
         # Version check — if schema version doesn't match, mark for
         # migration instead of backfilling.  Old values are already
@@ -229,6 +242,7 @@ class UserConfig:
         self._img_api_base_url = self._DEFAULTS["img_api_base_url"]
         self._img_api_model = self._DEFAULTS["img_api_model"]
         self._img_remove_bg = self._DEFAULTS["img_remove_bg"]
+        self._img_generation_enabled = self._DEFAULTS["img_generation_enabled"]
 
     def save(self) -> None:
         """Atomically write current values to config.json.
@@ -255,6 +269,7 @@ class UserConfig:
             "img_api_base_url": self._img_api_base_url,
             "img_api_model": self._img_api_model,
             "img_remove_bg": self._img_remove_bg,
+            "img_generation_enabled": self._img_generation_enabled,
         }
 
         path.parent.mkdir(parents=True, exist_ok=True)
