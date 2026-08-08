@@ -1,0 +1,73 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install -e ".[bg]"
+
+      - name: Run tests
+        run: pytest --tb=short 2>&1 | tee pytest.log
+
+      - name: Update badge
+        if: github.ref == 'refs/heads/main'
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: e809f4fcaea1700560591c9867659fc0
+        run: |
+          summary=$(tail -1 pytest.log)
+
+          if echo "$summary" | grep -q "failed"; then
+            color="red"
+          elif echo "$summary" | grep -q "error"; then
+            color="orange"
+          else
+            color="brightgreen"
+          fi
+
+          python3 -c "
+          import json, os, re, urllib.request
+
+          summary = '''$summary'''
+          passed = re.search(r'(\d+) passed', summary)
+          failed = re.search(r'(\d+) failed', summary)
+          errors = re.search(r'(\d+) error', summary)
+          p = int(passed.group(1)) if passed else 0
+          f = int(failed.group(1)) if failed else 0
+          e = int(errors.group(1)) if errors else 0
+          msg = f'{p}/{p+f+e} passed'
+          color = '$color'
+
+          data = {
+              'schemaVersion': 1,
+              'label': 'tests',
+              'message': msg,
+              'color': color,
+          }
+          req = urllib.request.Request(
+              'https://api.github.com/gists/${GIST_ID}',
+              data=json.dumps({'files': {'badge.json': {'content': json.dumps(data)}}}).encode(),
+              headers={
+                  'Authorization': f'Bearer {os.environ[\"GIST_TOKEN\"]}',
+                  'Accept': 'application/vnd.github+json',
+              },
+              method='PATCH',
+          )
+          urllib.request.urlopen(req)
+          print(f'Badge updated: {msg}')
+          "
