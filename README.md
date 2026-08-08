@@ -4,7 +4,6 @@
 
 [![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-883-brightgreen)](.)
 
 <!-- TODO: screenshot or GIF demo -->
 
