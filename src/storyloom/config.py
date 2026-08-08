@@ -6,6 +6,8 @@ SAVE_VERSION = 3           # save file format version; mismatch → load error (
 # ── Default directory names ──────────────────────────────────────
 DEFAULT_SAVES_DIR = "saves"
 DEFAULT_MEDIA_DIR = "media"
+DEFAULT_SYSTEM_MEDIA_DIR = "system_media"
+SYSTEM_MANIFEST_FILENAME = "_manifest.json"
 
 # ── Sliding window ─────────────────────────────────────────────
 WINDOW_SIZE = 3          # full rounds to keep in window
