@@ -26,28 +26,74 @@ esac
 echo "=== Storyloom Web UI Build v${VERSION} ==="
 
 # 0. Clean previous build artifacts
-echo "[0/5] Cleaning previous builds..."
+echo "--- Cleaning previous builds ---"
 rm -rf build/ dist/*.whl dist/*.tar.gz dist/storyloom-web*
 rm -f src/storyloom/models/*.onnx
 
 # 1. Install project + build tools (PyInstaller needs deps to discover imports)
-echo "[1/5] Installing project + build tools..."
+echo "--- Installing project + build tools ---"
 $PYTHON -m pip install -q -e ".[bg]" build pyinstaller wheel 2>/dev/null || \
     $PYTHON -m pip install -q --break-system-packages -e ".[bg]" build pyinstaller wheel
 
 # 2. pip packages (wheel + sdist)
 #    i18n (.mo + frontend JS dict) compiled automatically by setup.py build hook
-echo "[2/5] Building pip packages..."
+echo "--- Building pip packages ---"
 $PYTHON -m build --no-isolation
 
+# System media: use local copy or download from GitHub Release.
+SM_VERSION="1.0.0"
+SM_ZIP="system_media-v${SM_VERSION}.zip"
+SM_URL="https://github.com/SiriLee/Storyloom/releases/download/v${VERSION}/${SM_ZIP}"
+
+# Portable check: manifest exists AND both directories contain at least one PNG.
+_has_media() {
+    [ -f "system_media/_manifest.json" ] || return 1
+    [ -f "system_media/VERSION" ] || return 1
+    [ -n "$(find system_media/char_portrait -name '*.png' -print -quit 2>/dev/null)" ] || return 1
+    [ -n "$(find system_media/background_img -name '*.png' -print -quit 2>/dev/null)" ] || return 1
+}
+
+if _has_media; then
+    echo "--- System media: using local copy ---"
+else
+    echo "--- System media: downloading v${SM_VERSION} ---"
+    # Local zip (from scripts/pack_system_media.sh) takes priority over download.
+    if [ -f "$SM_ZIP" ]; then
+        echo "  Using local $SM_ZIP"
+    else
+        $PYTHON -c "
+import urllib.request, sys
+try:
+    urllib.request.urlretrieve('${SM_URL}', '${SM_ZIP}')
+    print('  Downloaded ${SM_ZIP}')
+except Exception as e:
+    print(f'  WARNING: Download failed: {e}', file=sys.stderr)
+    print('  Generate locally: python scripts/generate_system_assets.py', file=sys.stderr)
+    sys.exit(1)
+" || true  # continue build even if download fails
+    fi
+    if [ -f "$SM_ZIP" ]; then
+        mkdir -p system_media
+        $PYTHON -c "import zipfile; zipfile.ZipFile('${SM_ZIP}').extractall('system_media')"
+        echo "  Extracted to system_media/"
+    fi
+fi
+
+# PyInstaller --add-data separator: ':' on Linux/macOS, ';' on Windows.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) ADD_SEP=";" ;;
+    *)                     ADD_SEP=":" ;;
+esac
+
 # 3. PyInstaller single-file executable
-echo "[3/5] Building standalone executable..."
+echo "--- Building standalone executable ---"
 $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
     --name "$BIN_NAME" \
-    --add-data "locale:locale" \
-    --add-data "src/storyloom/web/static:storyloom/web/static" \
-    --add-data "src/storyloom/core/lang_meta:storyloom/core/lang_meta" \
-    --add-data "src/storyloom/models:storyloom/models" \
+    --add-data "locale${ADD_SEP}locale" \
+    --add-data "src/storyloom/web/static${ADD_SEP}storyloom/web/static" \
+    --add-data "src/storyloom/core/lang_meta${ADD_SEP}storyloom/core/lang_meta" \
+    --add-data "src/storyloom/models${ADD_SEP}storyloom/models" \
+    --add-data "system_media${ADD_SEP}system_media" \
     --hidden-import uvicorn.loops.auto \
     --hidden-import uvicorn.protocols.http.auto \
     --hidden-import onnxruntime \
@@ -55,7 +101,7 @@ $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
     src/storyloom/web/__main__.py
 
 # 4. Assemble release directory
-echo "[4/5] Assembling release directory..."
+echo "--- Assembling release directory ---"
 mkdir -p "$OUTPUT_DIR"
 cp "dist/$BIN_NAME" "$OUTPUT_DIR/"
 cp -r locale "$OUTPUT_DIR/"
@@ -63,7 +109,7 @@ cp config.example.json "$OUTPUT_DIR/"
 cp "dist/storyloom-${VERSION}-"*.whl "dist/storyloom-${VERSION}.tar.gz" "$OUTPUT_DIR/"
 
 # 5. Create zip for GitHub Release upload
-echo "[5/5] Creating release archive..."
+echo "--- Creating release archive ---"
 # Map platform to friendly name for release assets
 case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*) PLATFORM="Windows" ;;
