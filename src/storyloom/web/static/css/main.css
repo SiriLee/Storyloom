@@ -1457,12 +1457,12 @@ button.accent:hover, .btn-accent:hover {
 .gp-mode-badge {
     display: inline-block;
     font-family: var(--font-mono);
-    font-size: 0.75rem;
-    padding: 0.15em 0.65em;
+    font-size: 0.72rem;
+    padding: 0.1em 0.55em;
     border-radius: 3px;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
-    margin-bottom: var(--space-xl);
+    margin: var(--space-sm) 0 var(--space-sm) 0;
     background: rgba(78, 204, 163, 0.12);
     color: var(--text-accent);
     border: 1px solid rgba(78, 204, 163, 0.25);
@@ -1479,7 +1479,7 @@ button.accent:hover, .btn-accent:hover {
     font-size: var(--font-3xl);
     font-weight: normal;
     color: var(--text-accent);
-    margin-bottom: var(--space-xl);
+    margin-bottom: 0;
     letter-spacing: 0.05em;
 }
 
@@ -1644,12 +1644,12 @@ button.accent:hover, .btn-accent:hover {
 .sv-mode-badge {
     display: inline-block;
     font-family: var(--font-mono);
-    font-size: 0.72rem;
-    padding: 0.1em 0.55em;
+    font-size: 0.65rem;
+    padding: 0.05em 0.45em;
     border-radius: 3px;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
     text-transform: uppercase;
-    margin-left: 0.6em;
+    margin-left: 0.5em;
     vertical-align: middle;
     background: rgba(78, 204, 163, 0.12);
     color: var(--text-accent);
