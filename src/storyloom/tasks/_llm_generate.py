@@ -493,6 +493,62 @@ def _save_image(
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# Standalone image generation (shared by GenerateProcessor + Prebuilder)
+# ═══════════════════════════════════════════════════════════════════════
+
+def generate_asset_image(
+    asset_type: AssetType,
+    name: str,
+    description: str,
+    img_client,       # ImgApiClient
+    library: AssetLibrary,
+    reference_image_urls: list[str] | None = None,
+) -> str | None:
+    """Generate one asset image via AI, save to disk, register in *library*.
+
+    Standalone function — callable from ``GenerateProcessor`` during
+    gameplay and from ``Prebuilder`` during co-creation (§7.8c).
+
+    Args:
+        asset_type: CHAR_PORTRAIT or BACKGROUND.
+        name: Asset display name (from DECLARE or story_config).
+        description: Visual description for the generation prompt.
+        img_client: Configured ``ImgApiClient`` for the asset type.
+        library: Global ``AssetLibrary`` for registration.
+        reference_image_urls: Optional base64 data URLs for style reference.
+
+    Returns:
+        The new ``asset_id``, or ``None`` on failure.
+    """
+    from storyloom.io._types import ImageSize
+    from storyloom.io.img_api_client import ImageApiError
+
+    has_ref = bool(reference_image_urls)
+    prompt = build_generation_prompt(
+        asset_type, name, description, has_reference=has_ref,
+    )
+
+    size = (
+        ImageSize.PORTRAIT if asset_type == AssetType.CHAR_PORTRAIT
+        else ImageSize.BACKGROUND
+    )
+
+    try:
+        result = img_client.generate(prompt, size, image_urls=reference_image_urls or None)
+    except (ImageApiError, ValueError):
+        return None
+
+    raw = result.bytes
+
+    # Post-process: enforce 16:9 for backgrounds
+    if asset_type is AssetType.BACKGROUND:
+        from storyloom.io.img_utils import normalize_background
+        raw = normalize_background(raw)
+
+    return _save_image(library, asset_type, name, description, raw)
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # GenerateProcessor
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -584,32 +640,9 @@ class GenerateProcessor:
         img_client,  # ImgApiClient
     ) -> str | None:
         """Run AI image generation.  Returns ``asset_id`` or ``None``."""
-        from storyloom.io._types import ImageSize
-        from storyloom.io.img_api_client import ImageApiError
-
         model = img_client.model
         refs = _collect_reference_images(asset_type, roster, local_name, model)
-        has_ref = len(refs) > 0
-
-        prompt = build_generation_prompt(
-            asset_type, local_name, description, has_reference=has_ref,
+        return generate_asset_image(
+            asset_type, local_name, description, img_client,
+            self._library, reference_image_urls=refs or None,
         )
-
-        size = (
-            ImageSize.PORTRAIT if asset_type == AssetType.CHAR_PORTRAIT
-            else ImageSize.BACKGROUND
-        )
-
-        try:
-            result = img_client.generate(prompt, size, image_urls=refs or None)
-        except (ImageApiError, ValueError):
-            return None
-
-        raw = result.bytes
-
-        # Post-process: enforce 16:9 for backgrounds
-        if asset_type is AssetType.BACKGROUND:
-            from storyloom.io.img_utils import normalize_background
-            raw = normalize_background(raw)
-
-        return _save_image(self._library, asset_type, local_name, description, raw)
