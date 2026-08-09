@@ -117,6 +117,13 @@ class TestEntityParsing:
         assert len(result) == 1
         assert result[0].name == "Valid Place"
 
+    def test_parse_none_inputs(self):
+        """None characters / None locations → treated as empty, no crash."""
+        from storyloom.core.prebuild import parse_entities
+
+        result = parse_entities(characters=None, locations=None)
+        assert result == []
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # 2. TestBatchSelectionPrompt
@@ -194,8 +201,9 @@ class TestBatchSelectionPrompt:
         assert "cl000001" in user
         assert "def456" in user
 
-    def test_forced_mode_says_must_pick(self, library):
-        """Forced mode: output format says no null allowed."""
+    def test_forced_mode_no_generate_or_null(self, library):
+        """Forced mode: prompt MUST NOT mention 'generate', 'null',
+        or 'conservative' — only the match-only path is visible."""
         from storyloom.core.prebuild import (
             EntitySpec,
             build_batch_selection_messages,
@@ -206,9 +214,13 @@ class TestBatchSelectionPrompt:
         msgs = build_batch_selection_messages(
             AssetType.CHAR_PORTRAIT, entities, library, forced=True,
         )
-        # System prompt should mention forced selection
         combined = msgs[0]["content"] + msgs[1]["content"]
-        assert "MUST" in combined or "must" in combined
+        # Must contain forced language
+        assert "MUST" in combined
+        # Must NOT leak normal-mode concepts
+        assert "generate" not in combined.lower()
+        assert "null" not in combined.lower()
+        assert "conservative" not in combined.lower()
 
     def test_empty_entities_returns_empty(self, library):
         """No entities → empty messages list."""
@@ -437,6 +449,66 @@ class TestBatchSelectionResponse:
         assert len(results) == 3
         assert results[0].action == "matched"
 
+    # ── Forced-mode format (no "action" field) ───────────────────────
+
+    def test_parse_forced_format_valid(self, entities, library):
+        """Forced mode: no action field → all entries treated as matched."""
+        from storyloom.core.prebuild import parse_batch_selection_response
+
+        raw = json.dumps({
+            "results": [
+                {"name": "Kael", "asset_id": "fe000001"},
+                {"name": "Mouse", "asset_id": "abc123"},
+                {"name": "Michiko", "asset_id": "fe000001"},
+            ]
+        })
+        results = parse_batch_selection_response(raw, entities, library)
+        assert results is not None
+        assert len(results) == 3
+        assert all(r.action == "matched" for r in results)
+        assert results[0].asset_id == "fe000001"
+        assert results[1].asset_id == "abc123"
+
+    def test_parse_forced_format_missing_asset_id(self, entities, library):
+        """Forced mode: entry without asset_id → None."""
+        from storyloom.core.prebuild import parse_batch_selection_response
+
+        raw = json.dumps({
+            "results": [
+                {"name": "Kael", "asset_id": "fe000001"},
+                {"name": "Mouse"},  # no asset_id
+                {"name": "Michiko", "asset_id": "fe000001"},
+            ]
+        })
+        result = parse_batch_selection_response(raw, entities, library)
+        assert result is None
+
+    def test_parse_forced_format_invalid_asset_id(self, entities, library):
+        """Forced mode: asset_id not in library → None."""
+        from storyloom.core.prebuild import parse_batch_selection_response
+
+        raw = json.dumps({
+            "results": [
+                {"name": "Kael", "asset_id": "nonexistent"},
+                {"name": "Mouse", "asset_id": "abc123"},
+                {"name": "Michiko", "asset_id": "fe000001"},
+            ]
+        })
+        result = parse_batch_selection_response(raw, entities, library)
+        assert result is None
+
+    def test_parse_forced_format_incomplete_coverage(self, entities, library):
+        """Forced mode: not all entities covered → None."""
+        from storyloom.core.prebuild import parse_batch_selection_response
+
+        raw = json.dumps({
+            "results": [
+                {"name": "Kael", "asset_id": "fe000001"},
+            ]
+        })
+        result = parse_batch_selection_response(raw, entities, library)
+        assert result is None
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # 4. TestPrebuilderOrchestration
@@ -509,7 +581,7 @@ def _make_mock_img_client():
 
 
 def _char_select_json(action="generate", asset_id=None):
-    """Batch selection response for characters."""
+    """Batch selection response for characters (normal mode — has 'action')."""
     return json.dumps({"results": [
         {"name": "Kael", "action": action, "asset_id": asset_id},
         {"name": "Mouse", "action": action, "asset_id": asset_id},
@@ -517,10 +589,26 @@ def _char_select_json(action="generate", asset_id=None):
 
 
 def _bg_select_json(action="generate", asset_id=None):
-    """Batch selection response for backgrounds."""
+    """Batch selection response for backgrounds (normal mode — has 'action')."""
     return json.dumps({"results": [
         {"name": "Neo-Tokyo Streets", "action": action, "asset_id": asset_id},
         {"name": "The Rat's Nest", "action": action, "asset_id": asset_id},
+    ]})
+
+
+def _char_forced_json(asset_id="fe000001"):
+    """Batch selection response for characters (forced mode — no 'action')."""
+    return json.dumps({"results": [
+        {"name": "Kael", "asset_id": asset_id},
+        {"name": "Mouse", "asset_id": asset_id},
+    ]})
+
+
+def _bg_forced_json(asset_id="cl000001"):
+    """Batch selection response for backgrounds (forced mode — no 'action')."""
+    return json.dumps({"results": [
+        {"name": "Neo-Tokyo Streets", "asset_id": asset_id},
+        {"name": "The Rat's Nest", "asset_id": asset_id},
     ]})
 
 
@@ -671,9 +759,10 @@ class TestPrebuilderOrchestration:
         image generation calls."""
         from storyloom.core.prebuild import Prebuilder
 
+        # Forced mode prompt → LLM returns forced format (no "action" field)
         api = _make_mock_api_client(
-            _char_select_json("match", "fe000001"),
-            _bg_select_json("match", "cl000001"),
+            _char_forced_json("fe000001"),
+            _bg_forced_json("cl000001"),
         )
         img = _make_mock_img_client()
 
@@ -716,15 +805,15 @@ class TestPrebuilderOrchestration:
         ))
 
         event_types = [e["type"] for e in events]
-        # Parse event then selection events then generate events then complete
         assert "prebuild_progress" in event_types
         assert "prebuild_complete" in event_types
 
-        # Check phase transitions
+        # Check phase transitions — each phase must appear as a named key
         phases = [e.get("phase") for e in events if e["type"] == "prebuild_progress"]
-        assert "parse" in phases
-        assert "selection" in phases or any("selection" in str(e) for e in events)
-        assert "generate" in phases or any("generate" in str(e) for e in events)
+        assert "parse" in phases, f"phases: {phases}"
+        assert "selection" in phases, f"phases: {phases}"
+        # Generation only runs when entities need it (Kael is 'generate')
+        assert "generate" in phases, f"phases: {phases}"
 
     def test_progress_events_have_entity_names(self, library, roster):
         """Generate-phase progress events include entity names and counts."""
@@ -759,8 +848,9 @@ class TestPrebuilderOrchestration:
     # ── Verification failure ─────────────────────────────────────────
 
     def test_verification_failure_missing_entity(self, library, roster):
-        """If an entity is missing from the roster after all steps, the
-        prebuild fails with errors."""
+        """Selection response missing an entity → parse returns None →
+        force-select-all covers the gap → prebuild succeeds with all
+        entities having non-null targets."""
         from storyloom.core.prebuild import Prebuilder
 
         # Selection returns only 1 of 2 chars — missing "Mouse"
@@ -769,6 +859,8 @@ class TestPrebuilderOrchestration:
                 {"name": "Kael", "action": "match", "asset_id": "fe000001"},
             ]}),
             _bg_select_json("match", "cl000001"),
+            # Force-select calls for Mouse:
+            json.dumps({"selected": "fe000001"}),  # light thinking
         )
         img = _make_mock_img_client()
 
@@ -778,10 +870,16 @@ class TestPrebuilderOrchestration:
 
         final = events[-1]
         assert final["type"] == "prebuild_complete"
-        # Selection response missing Mouse → parse_batch_selection_response
-        # returns None → we fall through to force-select for all.  So
-        # this should actually succeed (force-select covers the gap).
-        # See test_selection_api_failure_triggers_force_select below.
+        # Parse failed for portraits (missing Mouse) → force-select-all
+        # recovered by selecting for every entity.  All targets non-null.
+        assert final["success"] is True
+        assert final["errors"] == []
+        item_k = roster.lookup(AssetType.CHAR_PORTRAIT, "Kael")
+        assert item_k is not None
+        assert item_k.target is not None
+        item_m = roster.lookup(AssetType.CHAR_PORTRAIT, "Mouse")
+        assert item_m is not None
+        assert item_m.target is not None
 
     def test_selection_api_failure_triggers_force_select(self, library, roster):
         """When batch selection API call fails, all entities get force-selected."""
@@ -835,8 +933,10 @@ class TestPrebuilderOrchestration:
                                 img_generation_enabled=True, max_workers=1)
         list(prebuilder.build(_SAMPLE_CHARS, _SAMPLE_LOCS, roster))
 
-        # Exactly 2 chat calls (portrait + background batch selection)
-        assert api.chat.call_count >= 2
+        # Exactly 2 chat calls — one per asset type (portrait + background)
+        assert api.chat.call_count == 2, (
+            f"Expected 2 batch selection calls, got {api.chat.call_count}"
+        )
 
     # ── Empty inputs ──────────────────────────────────────────────────
 
