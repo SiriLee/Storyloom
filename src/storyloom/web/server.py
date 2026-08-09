@@ -12,6 +12,7 @@ Endpoint groups:
                  POST /api/co-create/retry-send           — retry failed send()
                  POST /api/co-create/generate             — gen story setup + create save
                  POST /api/co-create/retry-generate       — retry failed generate()
+                 GET  /api/co-create/prebuild/{id}/stream — SSE material pre-build progress
                  POST /api/co-create/abort                — abort co-creation
   Game:          POST /api/game/{id}/start               — start Round 1 prompt
                  GET  /api/game/{id}/stream               — SSE narrative stream
@@ -341,20 +342,78 @@ def co_create_retry_generate():
     }
 
 
-class PrebuildBody(BaseModel):
-    game_id: str
+@app.get("/api/co-create/prebuild/{game_id}/stream")
+async def co_create_prebuild_stream(game_id: str):
+    """SSE endpoint for material pre-build progress.  (§7.8c)
 
+    A background daemon thread runs the ``prebuild_assets()`` generator.
+    Events are pushed into an ``asyncio.Queue`` via
+    ``call_soon_threadsafe`` and the async generator drains it with
+    ``await q.get()``.
 
-@app.post("/api/co-create/prebuild")
-def co_create_prebuild(body: PrebuildBody):
-    """Run material pre-build for a graph-mode game.  (§7.7)
-
-    Called by the UI after story generation completes.  Seeds the
-    per-game asset roster from story_config.  Must be called before
-    ``POST /api/game/{id}/start``.
+    The stream ends naturally after ``prebuild_complete`` (success or
+    failure).  No choice-pause, no keepalive (prebuild completes within
+    30 s).
     """
-    result = _game_session.prebuild_assets(body.game_id)
-    return result
+    import asyncio
+
+    q: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
+    # ── Background thread: run prebuild pipeline ────────────────────
+    def run_prebuild() -> None:
+        try:
+            for event in _game_session.prebuild_assets(game_id):
+                loop.call_soon_threadsafe(q.put_nowait, event)
+                if event["type"] == "prebuild_complete":
+                    return
+        except Exception as exc:
+            loop.call_soon_threadsafe(
+                q.put_nowait, {
+                    "type": "prebuild_complete",
+                    "success": False,
+                    "results": [],
+                    "errors": [str(exc)],
+                    "warnings": [],
+                }
+            )
+        finally:
+            try:
+                loop.call_soon_threadsafe(q.put_nowait, None)
+            except RuntimeError:
+                pass
+
+    thread = threading.Thread(target=run_prebuild, daemon=True)
+    thread.start()
+
+    # ── Async SSE generator ─────────────────────────────────────────
+    async def event_generator():
+        try:
+            while True:
+                event = await q.get()
+
+                # None sentinel — producer thread has exited.
+                if event is None:
+                    break
+
+                etype = event.get("type", "")
+                data = json.dumps(event, ensure_ascii=False)
+                yield f"event: {etype}\ndata: {data}\n\n"
+
+                if etype == "prebuild_complete":
+                    break
+        finally:
+            pass  # daemon thread exits on its own
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/api/co-create/abort")

@@ -434,18 +434,36 @@ class TestCoCreateAbort:
 
 
 class TestCoCreatePrebuild:
-    def test_prebuild_returns_ok(self, client, app_dir):
-        """POST /api/co-create/prebuild → calls prebuild_assets, returns ok."""
+    def test_prebuild_stream_returns_sse(self, client, app_dir):
+        """GET /api/co-create/prebuild/{id}/stream → SSE progress events."""
         from storyloom.web.server import _game_session
 
+        def _fake_prebuild(game_id):
+            yield {
+                "type": "prebuild_progress",
+                "phase": "parse",
+                "entities": {"char_portrait": 2, "background": 1},
+            }
+            yield {
+                "type": "prebuild_complete",
+                "success": True,
+                "results": [],
+                "errors": [],
+                "warnings": [],
+            }
+
         with patch.object(_game_session, "prebuild_assets",
-                          return_value={"status": "ok"}):
-            res = client.post("/api/co-create/prebuild",
-                              json={"game_id": "test-game-123"})
+                          side_effect=_fake_prebuild):
+            res = client.get("/api/co-create/prebuild/test-game-123/stream")
 
         assert res.status_code == 200
-        data = res.json()
-        assert data["status"] == "ok"
+        assert "text/event-stream" in res.headers["content-type"]
+        body = res.text
+        assert "event: prebuild_progress" in body
+        assert "event: prebuild_complete" in body
+        assert "prebuild_progress" in body
+        assert "prebuild_complete" in body
+        assert "success" in body
 
 
 # ═══════════════════════════════════════════════════════════════════
