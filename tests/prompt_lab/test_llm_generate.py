@@ -41,9 +41,9 @@ from storyloom.user_config import UserConfig
 # target_id is the internal library asset ID (invisible to LLM).
 _CHAR_ROSTER = [
     ("爱丽丝", "银色长发、深红眼眸的年轻女子，身穿白色连衣裙", "roster_alice"),
-    ("数学老师", "穿白衬衫戴眼镜的中年男教师，神情严肃", "roster_math_teacher"),
+    ("老铁匠王", "一个五十多岁的壮汉，光着膀子，肌肉结实，围着皮围裙，手里拿着铁锤，满脸煤灰", "roster_smith"),
     ("酒馆老板", "秃顶的胖老头，围着沾满油渍的围裙，笑容可掬", "roster_innkeeper"),
-    ("骑士团长", "金色短发、银色盔甲的女骑士，目光锐利", "roster_knight"),
+    ("骑士团长艾琳", "金色短发、银色盔甲的女骑士，目光锐利，腰间佩剑", "roster_knight"),
 ]
 
 _BG_ROSTER = [
@@ -67,25 +67,25 @@ BG_IDS: set[str] = set()
 TEST_CASES: list[dict] = [
     # ── Roster match ~10% ────────────────────────────────────────────
     {
-        "label": "Roaster — 老师 → 数学老师",
+        "label": "Roaster — 铁匠 → 老铁匠王",
         "asset_type": AssetType.CHAR_PORTRAIT,
-        "target_name": "老师",
-        "target_desc": "一个秃顶戴眼镜的老头，穿着黑色长袍，手持教鞭",
+        "target_name": "铁匠",
+        "target_desc": "一个五十多岁的壮汉，光着膀子，肌肉结实，围着皮围裙，手里拿着铁锤，满脸煤灰",
         "roster": _CHAR_ROSTER,
         "forced": False,
-        "accept": {"roster_数学老师"},
-        "note": "LLM 重新声明了已存在于名册中的角色——名称重叠触发名册优先匹配",
+        "accept": {"roster_smith"},
+        "note": "同一角色简写名——名称重叠且描述一致，名册优先匹配",
     },
     # ── Library match ~60% — CHAR ─────────────────────────────────────
     {
-        "label": "Lib — 年轻女法师",
+        "label": "Lib/Null — 年轻女法师",
         "asset_type": AssetType.CHAR_PORTRAIT,
         "target_name": "年轻女法师",
         "target_desc": "一个十七八岁的少女，身穿深蓝色法师长袍，手持橡木法杖，法杖顶端镶嵌着发光的蓝宝石",
         "roster": _CHAR_ROSTER,
         "forced": False,
-        "accept": None,  # → CHAR_IDS at runtime
-        "note": "常见角色原型——年轻女性在系统素材中覆盖良好",
+        "accept": {"sys_young_female", "sys_student_female"},
+        "note": "少女→Teenage Girl/Student——年龄性别身份高度吻合",
     },
     {
         "label": "Lib — 铁匠老王",
@@ -94,18 +94,18 @@ TEST_CASES: list[dict] = [
         "target_desc": "一个五十多岁的壮汉，光着膀子，肌肉结实，围着皮围裙，手里拿着铁锤，满脸煤灰",
         "roster": _CHAR_ROSTER,
         "forced": False,
-        "accept": None,
-        "note": "手工艺人原型——中年男性角色在系统中常见",
+        "accept": {"sys_worker_male", "sys_middle_male"},
+        "note": "壮年工匠→Worker/Middle-aged——职业和年龄均匹配",
     },
     {
-        "label": "Lib — 精灵弓箭手莉娜",
+        "label": "Null — 精灵弓箭手莉娜（无精灵模型）",
         "asset_type": AssetType.CHAR_PORTRAIT,
         "target_name": "精灵弓箭手莉娜",
         "target_desc": "一个身材纤细的女性精灵，一头金色长发，翠绿色的眼睛，身穿绿色斗篷，背着精致的长弓",
         "roster": _CHAR_ROSTER,
         "forced": False,
-        "accept": None,
-        "note": "精灵角色——系统素材中有精灵弓箭手",
+        "accept": {None},
+        "note": "库中无精灵种族模型——任何人类角色匹配均不合理，应返回 null",
     },
     # ── Library match — BG ───────────────────────────────────────────
     {
@@ -115,8 +115,8 @@ TEST_CASES: list[dict] = [
         "target_desc": "一间阴暗潮湿的地下牢房，墙壁上挂着生锈的铁链和镣铐，唯一的光源是走廊上摇曳的火把",
         "roster": _BG_ROSTER,
         "forced": False,
-        "accept": None,  # → BG_IDS at runtime
-        "note": "地牢场景——系统素材中 dungeon 类背景可能匹配",
+        "accept": {"sys_ruins", "sys_corridor"},
+        "note": "地下石造空间→Ruins或Corridor——材质和氛围接近",
     },
     {
         "label": "Lib — 月光森林小径",
@@ -125,8 +125,8 @@ TEST_CASES: list[dict] = [
         "target_desc": "一条穿过茂密森林的蜿蜒小径，月光透过层层树叶洒下斑驳光影，路旁长满了发光蘑菇",
         "roster": _BG_ROSTER,
         "forced": False,
-        "accept": None,
-        "note": "森林/自然场景——常见背景原型",
+        "accept": {"sys_forest"},
+        "note": "森林场景→Forest——直接匹配",
     },
     {
         "label": "Lib — 圣玛丽乡村教堂",
@@ -135,8 +135,8 @@ TEST_CASES: list[dict] = [
         "target_desc": "一座简朴的石砌小教堂，木制长椅上摆着破旧的赞美诗集，阳光透过彩色玻璃窗洒在圣坛上",
         "roster": _BG_ROSTER,
         "forced": False,
-        "accept": None,
-        "note": "宗教建筑——系统素材中 temple 可能匹配",
+        "accept": {"sys_temple"},
+        "note": "教堂→Temple——宗教建筑直接匹配",
     },
     # ── Null ~30% ─────────────────────────────────────────────────────
     {
@@ -177,8 +177,14 @@ TEST_CASES: list[dict] = [
         "target_desc": "一团不定形的暗影，由无数蠕动的触手和若隐若现的眼睛组成",
         "roster": _CHAR_ROSTER,
         "forced": True,
-        "accept": None,  # → CHAR_IDS at runtime (forced must pick from library)
-        "note": "强制模式——即使没有合理匹配也必须从素材库选一个",
+        "accept": {
+            "sys_adult_male", "sys_adult_female",
+            "sys_elderly_male", "sys_elderly_female",
+            "sys_middle_male", "sys_middle_female",
+            "sys_clergy_male",
+            "sys_noble_male", "sys_noble_female",
+        },
+        "note": "强制模式——应选成年人或长者等中立角色，不应选儿童/学生/运动员等明显不合适的",
     },
 ]
 
@@ -221,12 +227,12 @@ def main():
     print(f"Library BG   : {len(BG_IDS)} total, top {len(bg_lib)} used in prompt")
     print()
 
-    # ── Resolve accept=None in test cases ────────────────────────────
+    # ── Resolve accept=None (forced: all library IDs) ────────────────
     for case in TEST_CASES:
         if case["accept"] is not None:
             continue
-        atype = case["asset_type"]
-        case["accept"] = CHAR_IDS if atype == AssetType.CHAR_PORTRAIT else BG_IDS
+        ids = CHAR_IDS if case["asset_type"] == AssetType.CHAR_PORTRAIT else BG_IDS
+        case["accept"] = ids
 
     # ── Run tests ────────────────────────────────────────────────────
     passed = 0
@@ -357,10 +363,11 @@ def main():
 def _describe_accept(accept_set: set, asset_type: AssetType) -> str:
     if accept_set == {None}:
         return "null only"
-    size = len(accept_set)
-    if size <= 6:
-        return f"{{{', '.join(sorted(str(x) for x in accept_set))}}}"
-    return f"<any of {size} {asset_type.value} library IDs>"
+    has_null = None in accept_set
+    ids_only = accept_set - {None}
+    size = len(ids_only)
+    base = f"<any of {size} {asset_type.value} library IDs>"
+    return base + " (null also acceptable)" if has_null else base
 
 
 if __name__ == "__main__":
