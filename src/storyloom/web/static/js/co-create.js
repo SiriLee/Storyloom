@@ -182,20 +182,22 @@ const CoCreateView = (function () {
         return { cards: cards, progressEl: progressEl };
     }
 
-    /** Build inner HTML for one entity card. */
+    /** Build inner HTML for one entity card.
+     *  Uses single-quote delimiters for data-entity to avoid breakage
+     *  if the entity name contains double-quote characters. */
     function _buildCardHtml(name, assetType, index) {
         var escName = esc(name);
         var delay = (index * 0.04).toFixed(2);
         return (
-            '<div class="pb-card waiting" data-entity="' + escName + '"' +
-            '     data-asset-type="' + assetType + '"' +
-            '     style="animation-delay:' + delay + 's">' +
-                '<div class="pb-card-name">' + escName + '</div>' +
-                '<div class="pb-card-status">' +
-                    '<span class="pb-status-dot"></span>' +
-                    '<span class="pb-status-text"></span>' +
-                '</div>' +
-            '</div>'
+            "<div class='pb-card waiting' data-entity='" + escName + "'" +
+            "     data-asset-type='" + assetType + "'" +
+            "     style='animation-delay:" + delay + "s'>" +
+                "<div class='pb-card-name'>" + escName + "</div>" +
+                "<div class='pb-card-status'>" +
+                    "<span class='pb-status-dot'></span>" +
+                    "<span class='pb-status-text'></span>" +
+                "</div>" +
+            "</div>"
         );
     }
 
@@ -276,8 +278,8 @@ const CoCreateView = (function () {
     }
 
     /** Connect to the prebuild SSE stream and drive the card UI.
-     *  Returns the ``prebuild_complete`` event data, or null on
-     *  connection error. */
+     *  Returns ``{event, error}`` — *event* is the ``prebuild_complete``
+     *  data on success; *error* is a string on connection / HTTP failure. */
     async function _connectPrebuildStream(gameId, cards, progressEl) {
         var url = '/api/co-create/prebuild/' + encodeURIComponent(gameId) + '/stream';
         var completeEvent = null;
@@ -286,11 +288,16 @@ const CoCreateView = (function () {
         try {
             response = await fetch(url);
         } catch (err) {
-            return null;  // network error — caller handles
+            return { event: null, error: String(err) };
         }
 
         if (!response.ok) {
-            return null;
+            var detail = '';
+            try {
+                var errData = await response.json();
+                detail = errData.detail || '';
+            } catch (_) { /* body may not be JSON */ }
+            return { event: null, error: detail || ('HTTP ' + response.status) };
         }
 
         var reader = response.body.getReader();
@@ -332,7 +339,7 @@ const CoCreateView = (function () {
             try { reader.cancel(); } catch (_) { /* ok */ }
         }
 
-        return completeEvent;
+        return { event: completeEvent, error: null };
     }
 
     /** Render a prebuild error with Retry + Back to Menu buttons.
@@ -386,10 +393,16 @@ const CoCreateView = (function () {
 
                 if (hasEntities) {
                     var pbState = _renderPrebuildView(storyConfig);
-                    var completeEvent = await _connectPrebuildStream(
+                    var pbResult = await _connectPrebuildStream(
                         genData.game_id, pbState.cards, pbState.progressEl
                     );
 
+                    if (pbResult.error) {
+                        _renderPrebuildError(pbResult.error, _retryGenerate);
+                        return;
+                    }
+
+                    var completeEvent = pbResult.event;
                     if (!completeEvent || !completeEvent.success) {
                         var errors = (completeEvent && completeEvent.errors) || [_("Prebuild failed")];
                         _renderPrebuildError(errors, _retryGenerate);
@@ -434,10 +447,16 @@ const CoCreateView = (function () {
 
                 if (hasEntities) {
                     var pbState = _renderPrebuildView(storyConfig);
-                    var completeEvent = await _connectPrebuildStream(
+                    var pbResult = await _connectPrebuildStream(
                         genData.game_id, pbState.cards, pbState.progressEl
                     );
 
+                    if (pbResult.error) {
+                        _renderPrebuildError(pbResult.error, _retryGenerate);
+                        return;
+                    }
+
+                    var completeEvent = pbResult.event;
                     if (!completeEvent || !completeEvent.success) {
                         var errors = (completeEvent && completeEvent.errors) || [_("Prebuild failed")];
                         _renderPrebuildError(errors, _retryGenerate);
