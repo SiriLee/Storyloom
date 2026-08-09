@@ -129,14 +129,14 @@ TEST_CASES: list[dict] = [
         "note": "库中无地牢素材——废墟或走廊差异过大",
     },
     {
-        "label": "Lib — 教室 → Classroom",
+        "label": "Lib — 六年级教室 → Classroom",
         "asset_type": AssetType.BACKGROUND,
-        "target_name": "学校教室",
-        "target_desc": "一间明亮的教室，整齐排列着课桌椅，黑板上写着数学公式，窗台上摆着几盆绿植",
+        "target_name": "六年三班教室",
+        "target_desc": "一间略显杂乱的初中教室，后墙贴着学生的手抄报，讲台上放着一摞作业本，窗外是操场",
         "roster": _BG_ROSTER,
         "forced": False,
         "accept": {"sys_classroom"},
-        "note": "教室场景——Classroom 直接匹配",
+        "note": "教室场景——名称无直接 Classroom 字样，全靠描述推断",
     },
     {
         "label": "Lib — 月光森林小径 → Forest",
@@ -149,24 +149,24 @@ TEST_CASES: list[dict] = [
         "note": "森林场景——描述与 Forest 高度匹配",
     },
     {
-        "label": "Lib — 医院病房 → Hospital",
+        "label": "Lib — 重症监护室 → Hospital",
         "asset_type": AssetType.BACKGROUND,
-        "target_name": "病房",
-        "target_desc": "一间整洁的医院病房，白色墙壁，病床边摆着心电监护仪，窗外透进午后阳光",
+        "target_name": "重症监护室",
+        "target_desc": "一间摆满医疗设备的病房，呼吸机和心电监护仪发出规律的提示音，病床上躺着插满管子的病人",
         "roster": _BG_ROSTER,
         "forced": False,
         "accept": {"sys_hospital"},
-        "note": "医院病房——Hospital Room 直接匹配",
+        "note": "ICU——名称不含 Hospital 但描述指向医疗场景",
     },
     {
-        "label": "Lib — 圣玛丽乡村教堂 → Temple",
+        "label": "Lib — 圣玛丽乡村教堂 → Church",
         "asset_type": AssetType.BACKGROUND,
         "target_name": "圣玛丽乡村教堂",
         "target_desc": "一座简朴的石砌小教堂，木制长椅上摆着破旧的赞美诗集，阳光透过彩色玻璃窗洒在圣坛上",
         "roster": _BG_ROSTER,
         "forced": False,
-        "accept": {"sys_temple"},
-        "note": "教堂——宗教建筑直接对应 Temple",
+        "accept": {"sys_church"},
+        "note": "教堂——宗教建筑直接对应 Church",
     },
     # ── Null ~30% ─────────────────────────────────────────────────────
     {
@@ -201,7 +201,7 @@ TEST_CASES: list[dict] = [
     },
     # ── Forced ~10% ───────────────────────────────────────────────────
     {
-        "label": "Forced — 虚空之影（成年人/长者范围）",
+        "label": "Forced CHAR — 虚空之影（成年人/长者范围）",
         "asset_type": AssetType.CHAR_PORTRAIT,
         "target_name": "虚空之影",
         "target_desc": "一团不定形的暗影，由无数蠕动的触手和若隐若现的眼睛组成",
@@ -215,6 +215,19 @@ TEST_CASES: list[dict] = [
             "sys_noble_male", "sys_noble_female",
         },
         "note": "强制模式——只接受成年人/长者/神职/贵族，排除儿童/学生/专业职业",
+    },
+    {
+        "label": "Forced BG — 太空站（室内/科技范围）",
+        "asset_type": AssetType.BACKGROUND,
+        "target_name": "轨道空间站",
+        "target_desc": "一个环形空间站的内部走廊，金属墙壁上镶嵌着舷窗，透过舷窗可以看到地球缓缓转动",
+        "roster": _BG_ROSTER,
+        "forced": True,
+        "accept": {
+            "sys_laboratory", "sys_corridor", "sys_station",
+            "sys_office", "sys_library",
+        },
+        "note": "强制模式——科幻场景不存在，应选实验室/走廊/车站等金属/室内场景",
     },
 ]
 
