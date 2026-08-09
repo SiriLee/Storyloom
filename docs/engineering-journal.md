@@ -6,9 +6,141 @@
 
 ---
 
+## 2026-08-09（周六）
+
+> **概述**：§7.8c Pre-build 全栈实现 + §7.8b 收尾审查 + 稳定性修复 + 游戏模式徽章 UI。核心工作是将素材预构建管道从 spec 推进到完整可用的全栈实现——批量选择提示词设计、Prebuilder 管道（parse → 2× batch selection → concurrent generation → force-select fallback）、GameSession 集成（删除 `_init_stub_roster`）、SSE 流式端点、前端卡片网格 UI。共 **50 commits**，**35 files**，**+4,145/-422 lines**，测试从 993 增至 **1,030**（+37）。
+
+### §7.8b 收尾 — Code Review 第三轮 + 重构
+
+**背景**：§7.8b GenerateProcessor 前一日完成但遗留了若干代码质量问题——重复逻辑、dead code、API 边界模糊。需要在进入 §7.8c 之前做最终清理。
+
+**决策**（commits `ee40d60` → `fbc180a` → `9b22782`，3 commits）：
+
+1. **参考图收集统一**（`ee40d60`）：`collect_reference_data_urls()` 从 `_llm_generate.py` 内联实现 → `io/img_utils.py` 公共函数——供后续 Prebuilder 复用。
+2. **第三轮审查修复**（`fbc180a`）：删除 dead code、补充缺失的 `warnings` 字段、移除未使用的 import。
+3. **Task import 修复**（`9b22782`）：`_llm_generate.py` 缺少 `Task` 导入，导致运行时 `NameError`。
+
+**依据**：`io/img_utils.py`；`tasks/_llm_generate.py`。
+
+### §7.8c Pre-build — 批量选择提示词设计与验证
+
+**背景**：`graph-mode-spec/design.md` §7.8c 定义 pre-build 管道的第一步是"批量 LLM 选择"——将 `story_config` 中的所有角色和场景一次性发给 LLM，从素材库中选出最佳匹配。这不同于 §7.8a 的逐条 MATCH（每个实体单独调用 LLM），需要设计全新的提示词模板和响应格式。
+
+**决策**（commits `11c7c66` → `caee1fb` → `c2cb843` → `17d2ed4` → `ff718f0`，~15 commits）：
+
+1. **四种独立提示词模板**（`11c7c66`）：`prebuild.py:build_batch_selection_messages()`——normal-CHAR、normal-BG、forced-CHAR、forced-BG，各自独立系统提示词 + 用户消息。模板使用真实 `sys_` ID 作为示例（如 `sys_knight`、`sys_temple`），避免 LLM 产生幻觉 ID。
+2. **`run_batch_selection()` 独立函数**（`c2cb843`）：从 Prebuilder 类中抽出为模块级函数——build messages → call LLM → parse response。独立于 Prebuilder 生命周期，可在 prompt_lab 中直接导入测试。
+3. **双格式自动检测**（`11c7c66`）：`parse_batch_selection_response()` 自动检测 forced 格式（无 `action` 字段，所有实体必须选 `selected_id`）vs normal 格式（有 `action` 字段，可选 `generate`）。
+4. **`LLM_SELECT_THINKING` 环境变量覆盖**（`70f276e`）：匹配 `_select()` 中的同名机制——允许 prompt_lab 脚本在不修改代码的情况下切换 thinking 模式进行 A/B 对比。
+5. **移除所有 `max_tokens` 限制**（`f7a715b`）：从 `run_batch_selection`、`_call_llm`（match）、prompt_lab 测试中全部移除——默认 API 限制足以防止 thinking token 消耗导致的空响应。
+6. **解析错误诊断**（`581c78f`）：`parse_batch_selection_response()` 在解析失败时附带原始响应片段（前 200 字符），便于调试 LLM 输出格式问题。
+7. **Semantic accept-sets 验证**（`53de7b7`）：prompt_lab 测试使用 per-entity `accept` 集合验证语义正确性——匹配 `test_llm_generate.py` 的测试模式。
+
+**Prompt_lab 验证结果**（`tests/prompt_lab/test_prebuild_selection.py`，472 行）：
+- 10 个场景：zh-CN 校园/武侠 + en fantasy，normal + forced 模式
+- **disabled thinking: 17/20 PASS**（2 轮平均），与 light 模式质量相当
+- 每次调用 ~1.5s（disabled）vs ~12s（light）——**8 倍速度差**
+- 使用真实 system_media 素材（25 portraits + 26 backgrounds）
+
+**依据**：`core/prebuild.py`（909 行）；`tests/prompt_lab/test_prebuild_selection.py`；[[2026-08-09-7.8c-prebuild-implementation]]。
+
+### §7.8c Pre-build — Prebuilder 管道与会话集成
+
+**背景**：批量选择只是第一步。完整的 pre-build 管道需要：parse entities → batch selection → seed roster → concurrent image generation → force-select fallback → hard verification → persist。此外需要删除旧的 `_init_stub_roster()` stub 实现，将 Prebuilder 挂入 GameSession 生命周期。
+
+**决策**（commits `e793dd2` → `3cec691`，~8 commits）：
+
+1. **`generate_asset_image()` 抽离**（`e793dd2`）：从 `GenerateProcessor._generate()` 中提取为独立函数——供 Prebuilder 在线程池中并发调用图像生成。
+2. **`select_forced` 公共 API**（隐式，`tasks/__init__.py`）：`select_forced` 提升为 `tasks` 包公开导出——P rebuild 的 force-select fallback 需要直接调用。
+3. **`img_prompts.py` 提取**（同前）：`build_generation_prompt()` 从 `_llm_generate.py` → `io/img_prompts.py`——分离提示词构建与处理器逻辑。
+4. **P rebuild 管道**（`11c7c66`）：`Prebuilder.build()` 完整管道：
+   - Phase 1: `parse_entities()` — 从 `story_config` 提取角色/场景
+   - Phase 2: 2 个并发 `run_batch_selection()` — CHAR 和 BG 独立
+   - Phase 3: `_seed_roster()` — 将选中素材注册到 GameAssetRoster
+   - Phase 4: `_concurrent_generate()` — ThreadPoolExecutor 并发图像生成
+   - Phase 5: `_force_select_all()` — 生成失败项的强制选择回退
+   - Phase 6: `_hard_verify()` — 最终验证，失败项静默降级
+   - 单次 `library.save()` 在管道末尾（线程池外部——避免 P0 竞态条件）
+5. **Phase 事件**（`3cec691`）：添加 `"seeded"` phase——在 batch selection 完成、roster 种子化后触发，让 UI 在图像生成开始前展示选中结果。
+6. **`_init_stub_roster()` 删除**（`caee1fb`）：P rebuild 替代了 stub 实现。`GameSession.prebuilt_assets()` 重写为生成器（曾为同步 stub）。
+7. **Roster 预清除**（`e0cd4ba`）：prebuild 开始前清除 roster——防止重启 prebuild 时的陈旧条目残留。
+8. **P rebuild 完成前持久化**（`5d45985`）：在 `yield prebuild_complete` 之前保存 roster——确保 SSE 客户端收到完成事件时数据已落地。
+9. **GameLoop 复用**（`bbe2e29`）：`prebuild_assets()` 复用已存储的 `GameLoop` 实例而非创建新的——添加公开 `library` 属性供 Prebuilder 访问。
+
+**测试**：`tests/test_prebuild.py`（1,086 行，44 tests）——EntitySpec 解析（9）、消息构建（6）、响应解析（10）、P rebuild 管道（11）、集成（8）。全部 mock API，零网络依赖。
+
+**依据**：`core/prebuild.py`；`core/session.py:81-143`；`core/game_loop.py`；`tests/test_prebuild.py`；[[2026-08-09-7.8c-prebuild-implementation]]。
+
+### §7.8c Pre-build — SSE 流式端点 + 前端卡片网格
+
+**背景**：prebuild 管道涉及多个 LLM 调用 + 图像生成，总耗时可能 30-60 秒。同步 HTTP 端点会导致前端超时，用户看不到进度。需要 SSE 流式端点逐 phase 推送状态更新，前端以卡片网格形式展示实时进度。
+
+**决策**（commits `0dc8a94` → `64676fb`，4 commits）：
+
+1. **SSE 端点转换**（`0dc8a94`）：`POST /api/co-create/prebuild` → `StreamingResponse`——`asyncio.Queue` + 后台线程消费 `prebuild_assets()` 生成器，逐事件推送到 SSE。格式：`data: {"phase": "...", ...}\n\n`。
+2. **生成端点数据透传**（`0ce778a`）：`/api/co-create/generate` 和 `/api/co-create/generate-stream` 在响应中返回 `characters` 和 `locations`——prebuild 端点需要这些数据构建 `story_config`。
+3. **卡片网格 UI**（`c1e30c6`）：`co-create.js` 新增 prebuild 卡片网格——每张卡片对应一个实体（角色/场景），显示名称 + 匹配/生成状态 + 缩略图。SSE 事件驱动状态更新（`prebuild_progress` → 更新卡片，`prebuild_complete` → 全部就绪）。
+4. **HTML + 错误传播加固**（`64676fb`）：卡片 HTML 模板容错（缺失字段不回退为空字符串），SSE 错误事件正确传播到前端 toast。
+
+**依据**：`web/server.py:348-357` → SSE；`web/static/js/co-create.js`；`web/static/css/main.css`。
+
+### Thinking 模式决策最终化
+
+**背景**：§7.8a/§7.8b 使用 LLM 进行素材选择和匹配。需要在速度和质量之间做权衡——light thinking 提供推理链但增加 8-12 倍延迟，disabled thinking 速度快但缺少推理步骤。
+
+**决策**（commits `ec4e51c` → `104c80b` → `4e25192` → `33ad106`，4 commits）：
+
+| 调用场景 | 模式 | 理由 |
+|----------|------|------|
+| `run_batch_selection`（prebuild Step 1） | **disabled** | 简单描述比较任务，light 增加 8x 延迟无质量增益 |
+| `_select`（DECLARE 游戏内选择） | **disabled** | 现有默认值 |
+| `_select_forced`（回退选择） | disabled → enabled → **程序化** | 沿用 `_llm_generate.py` 现有两阶段模式 |
+
+**关键**：`33ad106` 从生产代码中移除了 `LLM_SELECT_THINKING` 环境变量覆盖——env var 仅限 prompt_lab 脚本使用，生产代码走硬编码默认值。这避免了用户意外切换 thinking 模式导致行为不一致。
+
+**依据**：`tasks/_llm_generate.py`；`core/prebuild.py`；[[2026-08-09-7.8c-prebuild-implementation]]。
+
+### 系统素材工具链收尾
+
+**背景**：系统素材需要工作流文档 + 额外预设。
+
+**决策**（commits `fd97e10`，1 commit）：
+1. **工作流 README**：`system_media_src/README.md`（69 行）——素材生成→打包→集成的完整工作流文档
+2. **新增预设**：`sys_temple` 精修 + `sys_church` 新增——背景库从 25 增至 26 个
+
+**依据**：`system_media_src/README.md`；`system_media_src/background_img.json`。
+
+### 稳定性修复
+
+**背景**：多个独立 bug 在 prebuild 集成测试和日常使用中发现。
+
+**决策**（commits `5bbac39` → `ef2f877`，7 commits）：
+
+1. **PARSE_ERROR 非致命**（`5bbac39`）：LLM 返回无法解析的 XML 时，`StreamParser` 发送 `PARSE_ERROR` 事件但不应杀死游戏流——改为记录服务端日志 + 继续流式传输剩余内容。
+2. **Delete game 加载已有库**（`f2e13c9`）：`delete_game()` 错误地创建空 `AssetLibrary` 而非加载已有文件——导致删除操作覆盖了其他游戏的素材注册。修复为加载已有库后移除目标游戏条目。
+3. **统一媒体服务**（`bd59815` → `c0c590c`）：重构 FastAPI 静态文件挂载——`/media/` 端点使用 type 驱动的扩展名解析（`AssetType.default_extension`），`/media/system/` 新增 system_media 目录服务——`sys_` 素材图片可在 UI 中显示。
+4. **Typewriter 跳过修复**（`97bf03d`）：`_skipTypewriter` 显示部分文本而非完整文本——原因是跳过逻辑在文本完全累积前就截断了。修复为跳过时立即显示全部已缓冲文本。
+5. **Roster 持久化**（`ef2f877`）：`GameAssetRoster` 在每次变更（`set_target`、`clear` 等）后持久化到磁盘——匹配 `AssetLibrary` 的即时保存模式——防止进程崩溃时丢失素材映射。
+
+**依据**：`web/server.py`；`core/save_manager.py`；`assets/_roster.py`；`web/static/js/graph-renderer.js`。
+
+### UI 改进 — 游戏模式徽章
+
+**背景**：用户需要在保存列表和游戏预览中看到每个存档的游戏模式（文本/图模式），以便区分不同类型的游戏体验。
+
+**决策**（commits `2a84920` → `3db3ee6`，5 commits）：
+
+1. **徽章组件**（`2a84920`）：保存列表卡片 + 游戏预览界面显示模式徽章——文本模式显示 `TXT`，图模式显示 `VN`。通过 `game_mode` 字段从后端传递到前端。
+2. **位置迭代**（`c7c2fab` → `da7a156`）：保存列表中徽章固定在标题右侧，游戏预览中徽章放在 premise 文本之后——经过 3 轮位置调整找到最优布局。
+3. **尺寸平衡**（`3db3ee6`）：缩减徽章尺寸 + 调整间距——避免徽章过于突兀，与整体卡片布局保持视觉平衡。
+
+**依据**：`web/static/css/main.css`；`web/static/js/co-create.js`；`web/static/js/state.js`。
+
+---
+
 ## 2026-08-08（周六）
 
-> **概述**：§7.8a LLM Match 全栈实现 + §7.8b LLM Generate 全栈实现 + CI/CD 基础设施 + 系统素材工具链收尾。MatchProcessor 和 GenerateProcessor 是两个独立的 LLM 驱动任务处理器，分别负责素材匹配和素材生成选择，构成图模式素材管道的最后两块拼图。thinking presets 从任务模块抽离到 I/O 层作为共享基础设施。共 **43 commits**，**29 files**，**+3992/-412 lines**，测试从 847 增至 **993**（+146）。
+> **概述**：§7.8a LLM Match 全栈实现 + §7.8b LLM Generate 全栈实现 + CI/CD 基础设施 + 系统素材工具链收尾。MatchProcessor 和 GenerateProcessor 是两个独立的 LLM 驱动任务处理器，分别负责素材匹配和素材生成选择，构成图模式素材管道的最后两块拼图。thinking presets 从任务模块抽离到 I/O 层作为共享基础设施。共 **43 commits**，**29 files**，**+3,992/-412 lines**，测试从 847 增至 **993**（+146）。
 
 ### §7.8a MatchProcessor — LLM 素材匹配
 
