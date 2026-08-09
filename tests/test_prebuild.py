@@ -812,6 +812,7 @@ class TestPrebuilderOrchestration:
         phases = [e.get("phase") for e in events if e["type"] == "prebuild_progress"]
         assert "parse" in phases, f"phases: {phases}"
         assert "selection" in phases, f"phases: {phases}"
+        assert "seeded" in phases, f"phases: {phases}"
         # Generation only runs when entities need it (Kael is 'generate')
         assert "generate" in phases, f"phases: {phases}"
 

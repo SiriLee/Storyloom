@@ -639,7 +639,7 @@ class Prebuilder:
         ]:
             return run_batch_selection(
                 self._api, asset_type, by_type.get(asset_type, []),
-                self._library, forced=forced, thinking_mode="light",
+                self._library, forced=forced, thinking_mode="disabled",
             )
 
         # Run both selection calls concurrently
@@ -706,6 +706,21 @@ class Prebuilder:
                 if roster.lookup(entity.asset_type, entity.name) is None:
                     roster.add(entity.asset_type, entity.name, desc,
                               target=None)
+
+        # ── Yield per-entity selection results for UI ──────────────
+        yield {
+            "type": "prebuild_progress",
+            "phase": "seeded",
+            "entities": [
+                {
+                    "name": e.name,
+                    "asset_type": e.asset_type.value,
+                    "action": result_map[e.name].action if e.name in result_map else "generate",
+                    "asset_id": result_map[e.name].asset_id if e.name in result_map else None,
+                }
+                for e in entities
+            ],
+        }
 
         # ── Step 3: Generate unmatched entities (concurrent) ───────
         unmatched = [
