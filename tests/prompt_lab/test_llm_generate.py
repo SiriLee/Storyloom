@@ -170,6 +170,19 @@ TEST_CASES: list[dict] = [
         },
     },
     {
+        "label": "Lib — 乡村教堂 (Country church)",
+        "asset_type": AssetType.BACKGROUND,
+        "target_name": "圣玛丽乡村教堂",
+        "target_desc": "一座简朴的石砌小教堂，木制长椅上摆着破旧的赞美诗集，阳光透过彩色玻璃窗洒在圣坛上",
+        "roster": _BG_ROSTER,
+        "forced": False,
+        "expect": {
+            "scope": "global",
+            "accept": None,
+            "note": "宗教建筑场景——系统素材中可能有类似内容",
+        },
+    },
+    {
         "label": "Null — 外星飞船指挥室 (Sci-fi bridge)",
         "asset_type": AssetType.BACKGROUND,
         "target_name": "星际巡洋舰指挥室",
@@ -342,15 +355,17 @@ def main():
 
             # ── Display ──────────────────────────────────────────────
             mode_tag = "FORCED" if forced else "normal"
-            print(f"\n[{i + 1}] [{mode_tag}] {label}")
+            scope_tag = {"game": "ROSTER", "global": "LIB", "null": "NULL",
+                         None: "??"}.get(parsed_scope, str(parsed_scope))
+
+            print(f"\n[{i + 1}] [{mode_tag}] [{scope_tag}] {label}")
             print(f"  Target   : {target_name!r}")
-            print(f"  Desc     : {target_desc[:80]}...")
+            print(f"            {target_desc[:80]}...")
+            print(f"  Selected : {parsed_scope!r} → {parsed_selected!r}")
+            if parsed_id and parsed_id != parsed_selected:
+                print(f"            resolved to asset_id: {parsed_id}")
             print(f"  Roster   : {list(roster_entries.keys())}")
-            print(f"  TTFT     : {ttft:.2f}s" if ttft else "  TTFT     : —")
-            print(f"  Total    : {elapsed:.1f}s")
-            print(f"  Raw      : {raw.strip()}")
-            print(f"  Scope    : {parsed_scope!r}  Selected: {parsed_selected!r}  "
-                  f"Parsed ID: {parsed_id!r}  {verdict}")
+            print(f"  TTFT     : {ttft:.2f}s  |  Total: {elapsed:.1f}s  |  {verdict}")
             if expect.get("note"):
                 print(f"  Note     : {expect['note']}")
 
@@ -396,15 +411,18 @@ def main():
             print(f"  {r['case']}")
             print(f"    → {r['selected']!r}  (parsed: {r['parsed_id']!r})")
 
-    print(f"\nAll results:")
+    print(f"\n{'─' * 72}")
+    print(f"Target → Selection map:")
     for r in results:
-        status = "PASS" if r["ok"] else "FAIL"
+        status = "\033[32m✓\033[0m" if r["ok"] else "\033[31m✗\033[0m"
         err = r.get("error", "")
         if err:
-            print(f"  [{status}] {r['case']} — {err}")
+            print(f"  {status} {r['case']}")
+            print(f"         ERROR: {err}")
         else:
-            print(f"  [{status}] {r['case']} — scope={r.get('scope')}, "
-                  f"selected={r.get('selected')!r}")
+            print(f"  {status} {r['case']}")
+            print(f"         scope={r.get('scope')!r}  selected={r.get('selected')!r}"
+                  f"  → {r.get('parsed_id')!r}")
 
     print("Done.")
 
