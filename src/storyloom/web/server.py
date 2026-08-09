@@ -92,6 +92,17 @@ _MEDIA_DIR = os.environ.get("STORYLOOM_MEDIA_DIR",
 if os.path.isdir(_MEDIA_DIR):
     app.mount(_MEDIA_PATH, StaticFiles(directory=_MEDIA_DIR), name=DEFAULT_MEDIA_DIR)
 
+# System assets (sys_ prefix) live in a separate directory so they
+# survive media cleanup.  Mount alongside /media so the UI can serve
+# both user-generated and system images.
+from storyloom.config import DEFAULT_SYSTEM_MEDIA_DIR
+_SYS_MEDIA_PATH = "/" + DEFAULT_SYSTEM_MEDIA_DIR
+_SYS_MEDIA_DIR = os.environ.get("STORYLOOM_SYSTEM_MEDIA_DIR",
+                                 os.path.join(_APP_DIR, DEFAULT_SYSTEM_MEDIA_DIR))
+if os.path.isdir(_SYS_MEDIA_DIR):
+    app.mount(_SYS_MEDIA_PATH, StaticFiles(directory=_SYS_MEDIA_DIR),
+              name=DEFAULT_SYSTEM_MEDIA_DIR)
+
 
 @app.get("/")
 async def index():
