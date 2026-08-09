@@ -38,6 +38,7 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | `docs/superpowers/` | Archived design specs & implementation plans |
 | **Code** | |
 | `src/storyloom/core/game_loop.py` | Game loop, GameState, ending detection, serialization — pipeline orchestrator |
+| `src/storyloom/core/prebuild.py` | Prebuilder — §7.8c co-creation asset pre-build pipeline |
 | `src/storyloom/core/state_manager.py` | StateManager — SET/CHECKPOINT/BRANCH/CHOICE_END processing, data accumulation |
 | `src/storyloom/core/event_dispatcher.py` | EventDispatcher — Event → UI dict conversion, Phase 2 Task alignment entry point |
 | `src/storyloom/core/context_manager.py` | Messages array, sliding window, compression |
@@ -71,6 +72,7 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | `tests/test_img_api_client.py` | Image generation API client tests (§7.3) |
 | `tests/test_img_utils.py` | Image utilities — format detection, bg removal tests |
 | `tests/test_task_framework.py` | Task framework tests — lifecycle, program match, §4.3 algorithm, E2E |
+| `tests/test_prebuild.py` | §7.8c pre-build pipeline tests — parsing, prompt, selection, orchestration, integration |
 | `tests/test_co_create.py` | Co-creation flow unit tests |
 | `tests/test_save_manager.py` | Save manager — atomic JSON save/load/delete/list tests |
 | `tests/test_prompt_builder.py` | Prompt builder unit tests |
