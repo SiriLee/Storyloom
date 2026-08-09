@@ -1455,13 +1455,14 @@ button.accent:hover, .btn-accent:hover {
 /* ── Mode badge (game preview) ──────────────────────────────── */
 
 .gp-mode-badge {
+    display: inline-block;
     font-family: var(--font-mono);
     font-size: 0.75rem;
     padding: 0.15em 0.65em;
     border-radius: 3px;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    margin-bottom: 2rem;
+    margin-bottom: var(--space-xl);
     background: rgba(78, 204, 163, 0.12);
     color: var(--text-accent);
     border: 1px solid rgba(78, 204, 163, 0.25);
@@ -1641,14 +1642,15 @@ button.accent:hover, .btn-accent:hover {
 /* ── Mode badge (save list) ─────────────────────────────────── */
 
 .sv-mode-badge {
-    flex-shrink: 0;
+    display: inline-block;
     font-family: var(--font-mono);
     font-size: 0.72rem;
     padding: 0.1em 0.55em;
     border-radius: 3px;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    margin-right: 0.8rem;
+    margin-left: 0.6em;
+    vertical-align: middle;
     background: rgba(78, 204, 163, 0.12);
     color: var(--text-accent);
     border: 1px solid rgba(78, 204, 163, 0.25);
