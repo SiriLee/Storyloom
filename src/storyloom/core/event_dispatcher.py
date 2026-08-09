@@ -8,10 +8,13 @@ Phase 2: ``consume_event()`` implements the §4.3 algorithm with Task
 Queue alignment and asset binding.
 """
 
+import logging
 from collections import deque
 from typing import TYPE_CHECKING
 
 from storyloom.parser.stream_parser import Event, EventType
+
+logger = logging.getLogger("storyloom")
 
 if TYPE_CHECKING:
     from storyloom.assets import GameAssetRoster
@@ -112,12 +115,12 @@ class EventDispatcher:
                       EventType.ROUTE):
             return {}
 
-        # PARSE_ERROR: LLM output error surfaced as a UI event.
+        # PARSE_ERROR: LLM format error — already tracked in
+        # parser._format_errors for LLM feedback next round.
+        # Must NOT be a fatal "error" event — a single malformed
+        # XML line should not kill the entire game stream.
         if etype == EventType.PARSE_ERROR:
-            return {
-                "type": "error",
-                "message": payload.get("error", "Parse error"),
-            }
+            return {}
 
         # Default: genuinely unknown event types (Phase 2 additions not
         # yet handled, program errors).  Never silently swallow.
@@ -197,12 +200,24 @@ class EventDispatcher:
             task = q.popleft()
             if task.line == 0:
                 task.wait()                    # DECLARE: wait then discard
+                if task.error:
+                    logger.warning(
+                        "consume_event: DECLARE task failed — "
+                        "asset_type=%s error=%s",
+                        task.asset_type.value, task.error,
+                    )
             # else: orphan task, discard (no wait)
 
         # 2. Aligned task at this line → wait + lookup + bind.
         if q and q[0].line == event.line:
             task = q.popleft()
             task.wait()
+            if task.error:
+                logger.warning(
+                    "consume_event: aligned task failed — "
+                    "asset_type=%s line=%d error=%s",
+                    task.asset_type.value, task.line, task.error,
+                )
             item = self._roster.lookup(task.asset_type, task.result)
             asset_id = item.target if item is not None else None
             if asset_id is not None:

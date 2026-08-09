@@ -816,8 +816,22 @@ class TestTextModeUnaffected:
             EventType.SEGMENT: "segment",
             EventType.SET: "state",
             EventType.BRIDGE: "bridge",
-            EventType.PARSE_ERROR: "error",
             EventType.SCENE: "scene",
+        }
+        # Event types that produce empty dicts (no UI output).
+        # PARSE_ERROR is tracked in parser._format_errors for LLM
+        # feedback — the UI event was removed because a single
+        # malformed XML line must not kill the game stream.
+        empty_events = {
+            EventType.PARSE_ERROR,
+            EventType.BRANCH_ENTER,
+            EventType.BRANCH_EXIT,
+            EventType.CHECKPOINT_END,
+            EventType.CHOICE_BEGIN,
+            EventType.OPT,
+            EventType.CHOICE_END,
+            EventType.CHECKPOINT,
+            EventType.ROUTE,
         }
         events = [
             Event(EventType.STORY_BEGIN, 1, {}),
@@ -841,7 +855,12 @@ class TestTextModeUnaffected:
         for event in events:
             result = d.consume_event(event)
             assert isinstance(result, dict), f"non-dict for {event.type}"
-            if event.type in expected_types:
+            if event.type in empty_events:
+                assert result == {}, (
+                    f"{event.type.name}: expected empty dict, "
+                    f"got {result}"
+                )
+            elif event.type in expected_types:
                 assert result["type"] == expected_types[event.type], (
                     f"{event.type.name}: expected type={expected_types[event.type]!r},"
                     f" got {result.get('type')!r}"

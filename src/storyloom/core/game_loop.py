@@ -6,6 +6,7 @@ LLM-suggested state changes (local source of truth).
 """
 
 import copy
+import logging
 import os
 import queue
 import re
@@ -15,6 +16,8 @@ from collections import deque
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
+
+logger = logging.getLogger("storyloom")
 
 from storyloom.config import DEFAULT_MEDIA_DIR, SAVE_VERSION, STREAM_STALL_TIMEOUT_SEC, GLOBAL_SCOPE
 from storyloom.io.api_client import ApiClient
@@ -804,6 +807,14 @@ class GameLoop:
                 self._retry_messages = messages_sent
                 self._retry_user_content = user_content
                 self._active_queue = None
+                logger.error(
+                    "stream_round: API timeout after %ds "
+                    "round=%d node=%s model=%s",
+                    STREAM_STALL_TIMEOUT_SEC,
+                    self._context_mgr.round_count,
+                    self.current_node,
+                    self.api_client.model,
+                )
                 yield {
                     "type": "error",
                     "message": (
@@ -822,6 +833,14 @@ class GameLoop:
                 self._retry_messages = messages_sent
                 self._retry_user_content = user_content
                 self._active_queue = None
+                logger.error(
+                    "stream_round: API error round=%d node=%s "
+                    "model=%s: %s",
+                    self._context_mgr.round_count,
+                    self.current_node,
+                    self.api_client.model,
+                    chunk["__api_error__"],
+                )
                 yield {
                     "type": "error",
                     "message": f"API error: {chunk['__api_error__']}",

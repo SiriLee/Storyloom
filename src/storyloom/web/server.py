@@ -37,10 +37,13 @@ GameSession construction:
 
 import asyncio
 import json
+import logging
 import os
 import sys
 import threading
 from pathlib import Path
+
+logger = logging.getLogger("storyloom")
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
@@ -608,6 +611,12 @@ async def game_stream(game_id: str):
                     elif event["type"] == "error":
                         # Error event sent to client — loop ends.
                         # Client may call POST /retry to re-launch.
+                        logger.error(
+                            "game_stream: fatal error for game=%s "
+                            "round=%d node=%s: %s",
+                            game_id, gl.round_count,
+                            gl.current_node, event.get("message", ""),
+                        )
                         return
                     elif event["type"] == "done":
                         # Round complete.  If ending, exit the while
@@ -620,6 +629,12 @@ async def game_stream(game_id: str):
                         # Otherwise, loop continues to next round.
                         break  # exit for loop, continue while loop
         except Exception as exc:
+            logger.error(
+                "game_stream: unhandled exception for game=%s "
+                "round=%d node=%s",
+                game_id, gl.round_count, gl.current_node,
+                exc_info=True,
+            )
             loop.call_soon_threadsafe(
                 q.put_nowait, {"type": "error", "message": str(exc)}
             )
@@ -725,7 +740,14 @@ async def game_retry(game_id: str):
     try:
         gl.retry()
     except RuntimeError as e:
+        logger.warning(
+            "game_retry: retry rejected for game=%s: %s", game_id, e,
+        )
         raise HTTPException(400, str(e))
+    logger.info(
+        "game_retry: retry launched for game=%s round=%d",
+        game_id, gl.round_count,
+    )
     return {"status": "ok"}
 
 
