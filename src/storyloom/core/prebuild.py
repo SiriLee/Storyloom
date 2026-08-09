@@ -642,6 +642,7 @@ class Prebuilder:
             }
 
         # ── If batch selection failed entirely → force-select all ──
+        selection_warnings: list[str] = list(selection_errors)
         if selection_errors and not all_results:
             all_results = self._force_select_all(entities, roster)
             if not all_results:
@@ -653,7 +654,7 @@ class Prebuilder:
                     "errors": errors,
                 }
                 return
-            selection_errors.clear()
+            # Force-select recovered — keep selection errors as warnings
 
         # ── Step 2: Seed roster ────────────────────────────────────
         result_map: dict[str, SelectionResult] = {}
@@ -700,7 +701,6 @@ class Prebuilder:
 
                 if asset_id is not None:
                     roster.set_target(entity.asset_type, entity.name, asset_id)
-                    self._library.save()
 
                 return PrebuildResult(
                     entity_name=entity.name,
@@ -723,13 +723,13 @@ class Prebuilder:
                         "phase": "generate",
                         "entity": result.entity_name,
                         "asset_type": result.asset_type.value,
-                        "status": "done",
+                        "status": result.status,  # "generated" or "failed"
                         "completed": completed[0],
                         "total": total,
                     }
 
         # ── Step 4: Verify + force-select fallback ─────────────────
-        from storyloom.tasks._llm_generate import _select_forced
+        from storyloom.tasks import select_forced
 
         for entity in entities:
             item = roster.lookup(entity.asset_type, entity.name)
@@ -743,20 +743,21 @@ class Prebuilder:
                 continue
 
             # Force-select fallback
-            desc = _entity_description(entity)
             try:
-                asset_id = _select_forced(
+                asset_id = select_forced(
                     self._api, entity.asset_type,
-                    entity.name, desc,
+                    entity.name, _entity_description(entity),
                     roster, self._library,
                 )
                 roster.set_target(entity.asset_type, entity.name, asset_id)
-                self._library.save()
             except Exception as e:
                 errors.append(
                     f"Force-select failed for '{entity.name}' "
                     f"({entity.asset_type.value}): {e}"
                 )
+
+        # ── Persist library (single save — thread-safe, all mutations done) ─
+        self._library.save()
 
         # ── Final: yield result ────────────────────────────────────
         if errors:
@@ -765,6 +766,7 @@ class Prebuilder:
                 "success": False,
                 "results": [],
                 "errors": errors,
+                "warnings": selection_warnings if selection_warnings else [],
             }
         else:
             results_list = []
@@ -786,6 +788,7 @@ class Prebuilder:
                 "success": True,
                 "results": results_list,
                 "errors": [],
+                "warnings": selection_warnings if selection_warnings else [],
             }
 
     # ── Force-select all (batch selection failed) ──────────────────
@@ -796,15 +799,13 @@ class Prebuilder:
         roster: GameAssetRoster,
     ) -> list[SelectionResult]:
         """Fallback: per-entity force-select when batch selection fails."""
-        from storyloom.tasks._llm_generate import _select_forced
+        from storyloom.tasks import select_forced
 
         results: list[SelectionResult] = []
         for entity in entities:
-            desc = entity.description
-            if entity.appearance:
-                desc = f"{entity.description} {entity.appearance}"
+            desc = _entity_description(entity)
             try:
-                asset_id = _select_forced(
+                asset_id = select_forced(
                     self._api, entity.asset_type,
                     entity.name, desc,
                     roster, self._library,
@@ -849,9 +850,10 @@ def _collect_library_refs(
     if preset is not None and not preset.supports_reference:
         return []
 
-    all_assets = library.list_by_type(asset_type)
+    # Use sorted-by-usage so the most representative images come first
+    assets = library.get_sorted_by_usage(asset_type, GENERATE_REF_IMAGE_COUNT * 2)
     refs: list[str] = []
-    for asset_id, asset in all_assets.items():
+    for asset in assets:
         if len(refs) >= GENERATE_REF_IMAGE_COUNT:
             break
 
@@ -872,4 +874,4 @@ def _collect_library_refs(
 
 
 # Import for type hints (kept at bottom to avoid circular imports)
-from storyloom.tasks._llm_generate import generate_asset_image  # noqa: E402
+from storyloom.tasks import generate_asset_image  # noqa: E402

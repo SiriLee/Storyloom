@@ -644,7 +644,7 @@ class TestLLMSelection:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestForcedSelection:
-    """_select_forced — must return an asset_id, with fallbacks."""
+    """select_forced — must return an asset_id, with fallbacks."""
 
     @pytest.fixture
     def fs_roster(self, library):
@@ -666,22 +666,22 @@ class TestForcedSelection:
 
     def test_forced_returns_asset_id(self, fs_roster, fs_library):
         """Successful forced selection returns asset_id."""
-        from storyloom.tasks._llm_generate import _select_forced
+        from storyloom.tasks._llm_generate import select_forced
 
         api = FakeApiClient(responses=['{"scope": "game", "selected": "hero"}'])
-        result = _select_forced(api, AssetType.CHAR_PORTRAIT, "hero_knight",
+        result = select_forced(api, AssetType.CHAR_PORTRAIT, "hero_knight",
                                 "A brave knight", fs_roster, fs_library)
         assert result == "hero_001"
 
     def test_api_error_retries(self, fs_roster, fs_library):
         """First call raises ApiError → retry with enabled thinking → success."""
-        from storyloom.tasks._llm_generate import _select_forced
+        from storyloom.tasks._llm_generate import select_forced
 
         api = FakeApiClient(responses=[
             ApiError("timeout"),
             '{"scope": "global", "selected": "lib_elf_01"}',
         ])
-        result = _select_forced(api, AssetType.CHAR_PORTRAIT, "elf",
+        result = select_forced(api, AssetType.CHAR_PORTRAIT, "elf",
                                 "An elf", fs_roster, fs_library)
         assert result == "lib_elf_01"
         assert len(api.calls) == 2
@@ -692,20 +692,20 @@ class TestForcedSelection:
 
     def test_both_attempts_fail_picks_system(self, fs_roster, fs_library):
         """Both LLM calls fail → programmatic pick from system catalog."""
-        from storyloom.tasks._llm_generate import _select_forced
+        from storyloom.tasks._llm_generate import select_forced
 
         api = FakeApiClient(responses=[
             ApiError("network error"),
             ApiError("timeout"),
         ])
-        result = _select_forced(api, AssetType.CHAR_PORTRAIT, "hero",
+        result = select_forced(api, AssetType.CHAR_PORTRAIT, "hero",
                                 "desc", fs_roster, fs_library)
         # Should pick sys_default (first sys_ asset)
         assert result == "sys_default"
 
     def test_empty_library_fallback(self, library):
         """Library with no assets → raises RuntimeError (defensive)."""
-        from storyloom.tasks._llm_generate import _select_forced
+        from storyloom.tasks._llm_generate import select_forced
 
         api = FakeApiClient(responses=[
             ApiError("error"),
@@ -715,7 +715,7 @@ class TestForcedSelection:
         roster = GameAssetRoster("test_empty", library)
         import pytest as _pytest
         with _pytest.raises(RuntimeError, match="No assets available"):
-            _select_forced(api, AssetType.CHAR_PORTRAIT, "hero",
+            select_forced(api, AssetType.CHAR_PORTRAIT, "hero",
                            "desc", roster, library)
 
 

@@ -343,7 +343,7 @@ def _parse_selection_response(
     return None
 
 
-def _select_forced(
+def select_forced(
     api_client,  # ApiClient
     asset_type: AssetType,
     target_name: str,
@@ -598,7 +598,7 @@ class GenerateProcessor:
 
             # Phase 3: Forced fallback
             if asset_id is None:
-                asset_id = _select_forced(
+                asset_id = select_forced(
                     api, asset_type, local_name, description,
                     roster, lib,
                 )
