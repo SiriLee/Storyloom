@@ -78,7 +78,7 @@ class GameSession:
         gl = self.load_game(game_id, "_init.json")
         return gl, game_id
 
-    def prebuild_assets(self, game_id: str):
+    def prebuild_assets(self, game_id: str, game_loop=None):
         """Run AI material pre-build for a graph-mode game.  (§7.8c)
 
         Loads the game (triggers ``mount_graph_pipeline``), then runs the
@@ -88,6 +88,13 @@ class GameSession:
         Called by the UI after story generation completes, BEFORE entering
         the game loop.  Yields progress events for the UI to display.
 
+        Args:
+            game_id: Game directory name under ``saves/``.
+            game_loop: Optional existing ``GameLoop`` to reuse.  When
+                provided, skips ``load_game()`` and uses this instance's
+                roster + library.  When ``None`` (default), loads from
+                disk (backward-compatible for tests).
+
         Yields:
             ``{"type": "prebuild_progress", "phase": str, ...}``
             ``{"type": "prebuild_complete", "success": bool, ...}``
@@ -95,7 +102,10 @@ class GameSession:
         sm = SaveManager(os.path.join(self._saves_root, game_id))
         data = sm.load("_init.json")
 
-        gl = self.load_game(game_id, "_init.json")
+        if game_loop is not None:
+            gl = game_loop
+        else:
+            gl = self.load_game(game_id, "_init.json")
 
         if gl._roster is None:
             yield {
@@ -127,7 +137,7 @@ class GameSession:
             img_client_background=ImgApiClient(
                 raw_cfg, remove_bg=RemoveBgPolicy.NEVER,
             ),
-            library=gl._roster._library,
+            library=gl._roster.library,
             img_generation_enabled=img_enabled,
         )
 
@@ -138,9 +148,12 @@ class GameSession:
             data.get("locations", []),
             gl._roster,
         ):
-            yield event
+            # Save roster BEFORE yielding prebuild_complete — the SSE
+            # consumer abandons the generator on prebuild_complete, so
+            # any code after the yield would never execute.
             if event["type"] == "prebuild_complete" and event["success"]:
                 gl._roster.save(roster_path)
+            yield event
 
     def load_game(self, game_id: str, filename: str) -> GameLoop:
         """Load a save file and return a ready-to-play ``GameLoop``.
