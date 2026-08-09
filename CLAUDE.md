@@ -15,6 +15,7 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | `docs/theory/` | Design theory — first principles, bridge mechanism, streaming parse, asset generation |
 | `docs/spec/` | Phase 1 text mode spec — execution pipeline, XML format, prompts, data model |
 | `docs/graph-mode-spec/` | Phase 2 graph mode spec — data model, pipeline, events/tasks, AI roles |
+| `system_media_src/` | System asset source-of-truth (prompts, workflow → `README.md`) |
 
 ## Documentation
 

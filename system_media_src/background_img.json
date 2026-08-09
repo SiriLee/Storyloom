@@ -81,8 +81,13 @@
   },
   "sys_temple": {
     "name": "Temple",
-    "description": "Temple interior with altar, solemn atmosphere",
-    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Temple interior with altar, solemn atmosphere. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+    "description": "East Asian temple interior with incense altar and Buddha statue, solemn atmosphere",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. East Asian Buddhist temple interior with incense altar, Buddha statue, red wooden pillars, and dim candlelight, solemn atmosphere. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
+  },
+  "sys_church": {
+    "name": "Church",
+    "description": "Western church interior with wooden pews, stone altar, and stained glass windows, solemn atmosphere",
+    "prompt": "Japanese anime visual novel style. Background art, wide establishing shot. Western Gothic church interior with rows of dark wooden pews, stone altar with golden cross, tall stained glass windows, and high vaulted arches, solemn and peaceful atmosphere. Atmospheric lighting, natural colors. Clean lineart, soft cel shading. No characters, no people, no text. High quality professional illustration."
   },
   "sys_city_street": {
     "name": "City Street",
