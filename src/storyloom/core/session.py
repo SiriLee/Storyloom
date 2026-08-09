@@ -103,10 +103,10 @@ class GameSession:
                 "success": False,
                 "results": [],
                 "errors": ["Graph-mode pipeline not mounted"],
+                "warnings": [],
             }
             return
 
-        from storyloom.assets import AssetType
         from storyloom.core.prebuild import Prebuilder
         from storyloom.io._types import RemoveBgPolicy
         from storyloom.io.img_api_client import ImgApiClient

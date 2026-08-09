@@ -542,6 +542,7 @@ class Prebuilder:
                 "success": True,
                 "results": [],
                 "errors": [],
+                "warnings": [],
             }
             return
 
@@ -625,7 +626,6 @@ class Prebuilder:
         # Yield selection progress
         type_results: dict[AssetType, dict] = {}
         for at in selection_types:
-            type_ents = by_type[at]
             at_results = [r for r in all_results if r.asset_type == at]
             type_results[at] = {
                 "matched": sum(1 for r in at_results if r.action == "matched"),
