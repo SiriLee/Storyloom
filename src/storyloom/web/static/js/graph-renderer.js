@@ -56,15 +56,12 @@ const GraphRenderer = (function () {
     /* ── DOM helpers ────────────────────────────────────────────── */
     function $(sel) { return _container ? _container.querySelector(sel) : null; }
 
-    /** Build a /media/ URL for an asset.  Uses the AssetType value as the
-     *  subdirectory name (e.g. "char_portrait", "background_img").  */
+    /** Build a URL for an asset image.  Uses the shared MEDIA_PATH
+     *  constant (state.js).  No file extension — the server resolves
+     *  the correct file via AssetType.default_extension.  */
     function assetUrl(assetType, assetId) {
-        return "/" + DEFAULT_MEDIA_DIR + "/" + assetType + "/" + assetId + ".png";
+        return MEDIA_PATH + "/" + assetType + "/" + assetId;
     }
-
-    /** Available via state.js initConfig → read from config.  Must match
-     *  server-side DEFAULT_MEDIA_DIR (src/storyloom/config.py).  */
-    var DEFAULT_MEDIA_DIR = "media";
 
     /* ═══════════════════════════════════════════════════════════════
        Public API

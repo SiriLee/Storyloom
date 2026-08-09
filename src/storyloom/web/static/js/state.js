@@ -19,6 +19,15 @@
      src/storyloom/i18n_compile.py §generate_js_dict (build-time generation)
    ═══════════════════════════════════════════════════════════════════ */
 
+/* ── Shared constants ─────────────────────────────────────────────── */
+/* Must match server-side values (src/storyloom/config.py).  */
+
+/** Virtual path prefix for all asset images.  The server resolves this
+ *  to the correct filesystem directory (media/ or system_media/).  */
+const MEDIA_PATH = "/media";
+
+/* ═══════════════════════════════════════════════════════════════════ */
+
 const GameState = {
     gameId: null,
     gameMode: null,           // §7.7: "text" | "graph" — set from API response

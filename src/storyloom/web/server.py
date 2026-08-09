@@ -85,23 +85,56 @@ _game_session = GameSession(_api_client, saves_dir=os.path.join(_APP_DIR, "saves
 
 app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
 
-# §7.7: graph mode — serve media assets
-_MEDIA_PATH = "/" + DEFAULT_MEDIA_DIR
+# §7.7: graph mode — serve media assets under a single /media namespace.
+# User-generated assets live in media/; system assets (sys_ prefix) in
+# system_media/.  The route resolves asset IDs to files without the
+# frontend knowing the file extension — the server looks up the correct
+# file in both directories.
+from storyloom.config import DEFAULT_SYSTEM_MEDIA_DIR
+
 _MEDIA_DIR = os.environ.get("STORYLOOM_MEDIA_DIR",
                             os.path.join(_APP_DIR, DEFAULT_MEDIA_DIR))
-if os.path.isdir(_MEDIA_DIR):
-    app.mount(_MEDIA_PATH, StaticFiles(directory=_MEDIA_DIR), name=DEFAULT_MEDIA_DIR)
-
-# System assets (sys_ prefix) live in a separate directory so they
-# survive media cleanup.  Mount alongside /media so the UI can serve
-# both user-generated and system images.
-from storyloom.config import DEFAULT_SYSTEM_MEDIA_DIR
-_SYS_MEDIA_PATH = "/" + DEFAULT_SYSTEM_MEDIA_DIR
 _SYS_MEDIA_DIR = os.environ.get("STORYLOOM_SYSTEM_MEDIA_DIR",
                                  os.path.join(_APP_DIR, DEFAULT_SYSTEM_MEDIA_DIR))
-if os.path.isdir(_SYS_MEDIA_DIR):
-    app.mount(_SYS_MEDIA_PATH, StaticFiles(directory=_SYS_MEDIA_DIR),
-              name=DEFAULT_SYSTEM_MEDIA_DIR)
+
+@app.get("/" + DEFAULT_MEDIA_DIR + "/{asset_type}/{asset_id}")
+async def serve_media(asset_type: str, asset_id: str):
+    """Serve an asset file by ID, checking user media then system media.
+
+    Frontend uses a single URL pattern: ``/media/{type}/{id}`` — no
+    file extension.  The route resolves the correct filesystem path
+    regardless of asset type, format, or storage directory.
+
+    Uses ``AssetType.default_extension`` as the primary lookup, then
+    falls back to other common image extensions for robustness
+    (manually imported files may not use the canonical format).
+    """
+    from fastapi.responses import FileResponse
+
+    from storyloom.assets import AssetType
+
+    # Security: reject path traversal
+    if ".." in asset_type or ".." in asset_id or "/" in asset_type or "\\" in asset_type:
+        raise HTTPException(400, "Invalid asset path")
+
+    # Build extension list: canonical first, then common fallbacks
+    try:
+        atype = AssetType(asset_type)
+        canonical_ext = atype.default_extension
+    except ValueError:
+        canonical_ext = ".png"
+    extensions = [canonical_ext] + [
+        e for e in (".png", ".jpg", ".jpeg", ".webp")
+        if e != canonical_ext
+    ]
+
+    for base_dir in (_MEDIA_DIR, _SYS_MEDIA_DIR):
+        for ext in extensions:
+            path = os.path.join(base_dir, asset_type, f"{asset_id}{ext}")
+            if os.path.isfile(path):
+                return FileResponse(path)
+
+    raise HTTPException(404, f"Asset not found: {asset_type}/{asset_id}")
 
 
 @app.get("/")

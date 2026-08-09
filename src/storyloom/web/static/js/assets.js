@@ -262,10 +262,7 @@ const AssetManagerView = (function () {
     /* ── Image viewer overlay ─────────────────────────────────────── */
 
     function _openViewer(assetId, name, assetType) {
-        // System assets (sys_ prefix) live in system_media/;
-        // user-generated assets live in media/.
-        var base = (assetId.indexOf("sys_") === 0) ? "/system_media" : "/media";
-        var url = base + "/" + assetType + "/" + assetId + ".png";
+        var url = MEDIA_PATH + "/" + assetType + "/" + assetId;
 
         var overlay = document.createElement("div");
         overlay.className = "am-viewer-overlay";
