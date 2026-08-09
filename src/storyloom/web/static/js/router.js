@@ -657,9 +657,9 @@
                 </div>
 
                 <div class="gp-content">
-                    <span class="gp-mode-badge" data-mode="${esc(GameState.gameMode || "text")}">${esc(_(GameState.gameMode === "graph" ? "Graph" : "Text"))}</span>
                     <h1 class="gp-label">${esc(config.title)}</h1>
                     <p class="gp-setting">${esc(config.premise || "")}</p>
+                    <span class="gp-mode-badge" data-mode="${esc(GameState.gameMode || "text")}">${esc(_(GameState.gameMode === "graph" ? "Graph" : "Text"))}</span>
 
                     <button class="gp-start-btn" id="gp-start">
                         ${esc(_("Begin Adventure"))}
@@ -741,10 +741,10 @@
                     <div class="sv-card-main">
                         <span class="sv-card-label">${esc(g.title)}</span>
                         <div class="sv-card-meta">
-                            <span class="sv-mode-badge" data-mode="${esc(g.mode || "text")}">${esc(_(g.mode === "graph" ? "Graph" : "Text"))}</span>
                             <span>${esc(g.premise || "?")}</span>
                         </div>
                     </div>
+                    <span class="sv-mode-badge" data-mode="${esc(g.mode || "text")}">${esc(_(g.mode === "graph" ? "Graph" : "Text"))}</span>
                     ${g.last_played_at ? `<span class="sv-card-time">${formatDate(g.last_played_at)}</span>` : ""}
                     <button class="sv-card-trash" title="${esc(_("Delete"))}">${TRASH_ICON}</button>
                 </div>

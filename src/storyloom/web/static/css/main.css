@@ -1461,7 +1461,7 @@ button.accent:hover, .btn-accent:hover {
     border-radius: 3px;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    margin-bottom: var(--space-md);
+    margin-bottom: 2rem;
     background: rgba(78, 204, 163, 0.12);
     color: var(--text-accent);
     border: 1px solid rgba(78, 204, 163, 0.25);
@@ -1648,6 +1648,7 @@ button.accent:hover, .btn-accent:hover {
     border-radius: 3px;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+    margin-right: 0.8rem;
     background: rgba(78, 204, 163, 0.12);
     color: var(--text-accent);
     border: 1px solid rgba(78, 204, 163, 0.25);
