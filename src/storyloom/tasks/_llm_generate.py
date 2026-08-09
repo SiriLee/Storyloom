@@ -277,8 +277,6 @@ def _select(
     from storyloom.io.api_client import ApiError
     from storyloom.io.thinking import get_thinking_params
 
-    thinking_mode = os.environ.get("LLM_SELECT_THINKING", thinking_mode)
-
     prompt = build_selection_prompt(
         asset_type, target_name, target_description,
         roster, library, forced=forced,

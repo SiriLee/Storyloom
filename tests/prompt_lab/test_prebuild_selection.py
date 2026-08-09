@@ -388,9 +388,7 @@ def main():
 
     print(f"Model      : {model}")
     print(f"Base URL   : {base_url}")
-    import os as _os
-    mode = _os.environ.get("LLM_SELECT_THINKING", "light")
-    print(f"Thinking   : {mode} (LLM_SELECT_THINKING env, via run_batch_selection)")
+    print(f"Thinking   : light (passed explicitly to run_batch_selection)")
     print("=" * 72)
 
     library = load_system_library()

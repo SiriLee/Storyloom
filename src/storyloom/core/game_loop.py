@@ -1071,11 +1071,20 @@ class GameLoop:
             user_content: The user message content (stored for
                           ``add_round`` in the next round).
         """
+        import os as _os
+
+        from storyloom.io.thinking import get_thinking_params
+
         result_queue: queue.Queue = queue.Queue()
+        extra_params = get_thinking_params(
+            self.api_client.model, "enabled",
+        )
 
         def _fetch() -> None:
             try:
-                for chunk in self.api_client.stream_chat_iter(messages):
+                for chunk in self.api_client.stream_chat_iter(
+                    messages, extra_params=extra_params,
+                ):
                     result_queue.put(chunk)
             except Exception as exc:
                 result_queue.put({"__api_error__": str(exc)})

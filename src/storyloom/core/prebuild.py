@@ -498,12 +498,8 @@ def run_batch_selection(
     if not entities:
         return [], None
 
-    import os as _os
-
     from storyloom.io.api_client import ApiError
     from storyloom.io.thinking import get_thinking_params
-
-    thinking_mode = _os.environ.get("LLM_SELECT_THINKING", thinking_mode)
 
     try:
         msgs = build_batch_selection_messages(
