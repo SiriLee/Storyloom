@@ -15,10 +15,10 @@ import uuid
 
 from storyloom.assets import AssetLibrary, AssetType, GameAssetRoster
 from storyloom.config import GENERATE_LIBRARY_TOP_N, GENERATE_REF_IMAGE_COUNT
-from storyloom.tasks._types import Task
+from storyloom.io.img_prompts import build_generation_prompt  # canonical location
 
 # ═══════════════════════════════════════════════════════════════════════
-# Prompt templates (per prompt-design-llm-generate.md)
+# Selection prompt templates (per prompt-design-llm-generate.md)
 # ═══════════════════════════════════════════════════════════════════════
 
 _SELECTION_SYSTEM_CHAR = """\
@@ -207,28 +207,6 @@ def build_selection_prompt(
     )
 
     return "\n\n".join([system, output, example, rules, task_section])
-
-
-def build_generation_prompt(
-    asset_type: AssetType,
-    name: str,
-    description: str,
-    has_reference: bool,
-) -> str:
-    """Build the AI image generation prompt.
-
-    Args:
-        asset_type: CHAR_PORTRAIT or BACKGROUND.
-        name: Name from the DECLARE tag.
-        description: Description from the DECLARE tag.
-        has_reference: Whether reference images will be provided.
-
-    Returns:
-        Complete prompt string ready for ImgApiClient.generate().
-    """
-    style_line = _STYLE_WITH_REF if has_reference else _STYLE_WITHOUT_REF
-    template = _GEN_CHAR if asset_type == AssetType.CHAR_PORTRAIT else _GEN_BG
-    return template.format(style_line=style_line, name=name, description=description)
 
 
 # ═══════════════════════════════════════════════════════════════════════

@@ -262,7 +262,7 @@ class TestGeneratePrompts:
 
     def test_gen_char_has_transparent_bg_requirement(self):
         """CHAR generation prompt includes transparent background requirement."""
-        from storyloom.tasks._llm_generate import build_generation_prompt
+        from storyloom.io.img_prompts import build_generation_prompt
 
         prompt = build_generation_prompt(
             AssetType.CHAR_PORTRAIT, "Alice",
@@ -274,7 +274,7 @@ class TestGeneratePrompts:
 
     def test_gen_bg_no_transparent_requirement(self):
         """BACKGROUND generation prompt does NOT mention transparent bg."""
-        from storyloom.tasks._llm_generate import build_generation_prompt
+        from storyloom.io.img_prompts import build_generation_prompt
 
         prompt = build_generation_prompt(
             AssetType.BACKGROUND, "Forest",
@@ -286,7 +286,7 @@ class TestGeneratePrompts:
 
     def test_gen_char_has_character_section(self):
         """CHAR generation prompt uses '## Character' heading."""
-        from storyloom.tasks._llm_generate import build_generation_prompt
+        from storyloom.io.img_prompts import build_generation_prompt
 
         prompt = build_generation_prompt(
             AssetType.CHAR_PORTRAIT, "Alice", "Desc", has_reference=True,
@@ -297,7 +297,7 @@ class TestGeneratePrompts:
 
     def test_gen_bg_has_scene_section(self):
         """BACKGROUND generation prompt uses '## Scene' heading."""
-        from storyloom.tasks._llm_generate import build_generation_prompt
+        from storyloom.io.img_prompts import build_generation_prompt
 
         prompt = build_generation_prompt(
             AssetType.BACKGROUND, "Forest", "Desc", has_reference=True,
@@ -308,7 +308,7 @@ class TestGeneratePrompts:
 
     def test_style_line_with_reference(self):
         """has_reference=True → art style reference line."""
-        from storyloom.tasks._llm_generate import build_generation_prompt
+        from storyloom.io.img_prompts import build_generation_prompt
 
         prompt = build_generation_prompt(
             AssetType.CHAR_PORTRAIT, "Alice", "Desc", has_reference=True,
@@ -318,7 +318,7 @@ class TestGeneratePrompts:
 
     def test_style_line_without_reference(self):
         """has_reference=False → standard anime style line."""
-        from storyloom.tasks._llm_generate import build_generation_prompt
+        from storyloom.io.img_prompts import build_generation_prompt
 
         prompt = build_generation_prompt(
             AssetType.CHAR_PORTRAIT, "Alice", "Desc", has_reference=False,
@@ -327,7 +327,7 @@ class TestGeneratePrompts:
 
     def test_gen_prompt_role_declaration(self):
         """Generation prompt opens with artist role declaration."""
-        from storyloom.tasks._llm_generate import build_generation_prompt
+        from storyloom.io.img_prompts import build_generation_prompt
 
         prompt = build_generation_prompt(
             AssetType.CHAR_PORTRAIT, "Alice", "Desc", has_reference=True,
