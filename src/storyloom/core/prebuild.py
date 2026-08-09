@@ -119,9 +119,9 @@ Reply ONLY with a valid JSON object:
 ## Example
 
 Global Library:
-- [fe000001] "Adult Woman": Adult woman, neutral expression, business attire
-- [a1b2c3d4] "Elf Archer": Female elf archer in a green cloak, holding a bow
-- [e5f6g7h8] "Knight Captain": Tall woman in silver plate armor, short-cropped hair
+- [sys_adult_male] "Adult Man": Adult man, neutral expression
+- [sys_adult_female] "Adult Woman": Adult woman, neutral expression
+- [sys_elderly_male] "Elderly Man": Elderly man, gray hair, neutral expression
 
 Target Characters:
 - "Kael": Former corporate security consultant turned freelance operative. Tall, sharp-eyed, with short dark hair and a faint scar across the jaw. Wears a worn synth-leather coat.
@@ -131,7 +131,7 @@ Target Characters:
 -> {"results": [
   {"name": "Kael", "action": "generate", "asset_id": null},
   {"name": "Mouse", "action": "generate", "asset_id": null},
-  {"name": "Michiko", "action": "match", "asset_id": "fe000001"}
+  {"name": "Michiko", "action": "match", "asset_id": "sys_adult_female"}
 ]}
 
 ## Matching Rules
@@ -154,9 +154,9 @@ Reply ONLY with a valid JSON object:
 ## Example
 
 Global Library:
-- [cl000001] "Classroom": Empty classroom with desks and blackboard
-- [a1b2c3d4] "Dungeon": Dark stone dungeon with torches and iron bars
-- [e5f6g7h8] "Forest Clearing": Sunlit clearing in a dense forest, moss-covered stones
+- [sys_classroom] "Classroom": Empty classroom with desks and blackboard, bright lighting
+- [sys_library] "Library": Library interior with bookshelves and reading tables
+- [sys_rooftop] "School Rooftop": School rooftop with railing and open sky
 
 Target Scenes:
 - "Neo-Tokyo Streets": Rain-slicked neon-lit streets at midnight. Holographic ads flicker across skyscraper faces.
@@ -190,9 +190,9 @@ Reply ONLY with a valid JSON object:
 ## Example
 
 Global Library:
-- [fe000001] "Adult Woman": Adult woman, neutral expression, business attire
-- [a1b2c3d4] "Elf Archer": Female elf archer in a green cloak, holding a bow
-- [e5f6g7h8] "Knight Captain": Tall woman in silver plate armor, short-cropped hair
+- [sys_adult_male] "Adult Man": Adult man, neutral expression
+- [sys_adult_female] "Adult Woman": Adult woman, neutral expression
+- [sys_elderly_male] "Elderly Man": Elderly man, gray hair, neutral expression
 
 Target Characters:
 - "Kael": Former corporate security consultant turned freelance operative. Tall, sharp-eyed, with short dark hair and a faint scar across the jaw. Wears a worn synth-leather coat.
@@ -200,9 +200,9 @@ Target Characters:
 - "Michiko": Arasaka security director and former mentor. Impeccably sharp in a tailored black suit, silver-streaked hair pulled tight.
 
 -> {"results": [
-  {"name": "Kael", "asset_id": "fe000001"},
-  {"name": "Mouse", "asset_id": "a1b2c3d4"},
-  {"name": "Michiko", "asset_id": "fe000001"}
+  {"name": "Kael", "asset_id": "sys_adult_male"},
+  {"name": "Mouse", "asset_id": "sys_adult_female"},
+  {"name": "Michiko", "asset_id": "sys_adult_female"}
 ]}
 
 ## Matching Rules
@@ -224,9 +224,9 @@ Reply ONLY with a valid JSON object:
 ## Example
 
 Global Library:
-- [cl000001] "Classroom": Empty classroom with desks and blackboard
-- [a1b2c3d4] "Dungeon": Dark stone dungeon with torches and iron bars
-- [e5f6g7h8] "Forest Clearing": Sunlit clearing in a dense forest, moss-covered stones
+- [sys_classroom] "Classroom": Empty classroom with desks and blackboard, bright lighting
+- [sys_library] "Library": Library interior with bookshelves and reading tables
+- [sys_rooftop] "School Rooftop": School rooftop with railing and open sky
 
 Target Scenes:
 - "Neo-Tokyo Streets": Rain-slicked neon-lit streets at midnight. Holographic ads flicker across skyscraper faces.
@@ -234,9 +234,9 @@ Target Scenes:
 - "Underground Parking": A dim parking garage with flickering fluorescent lights and concrete pillars.
 
 -> {"results": [
-  {"name": "Neo-Tokyo Streets", "asset_id": "cl000001"},
-  {"name": "The Rat's Nest", "asset_id": "cl000001"},
-  {"name": "Underground Parking", "asset_id": "a1b2c3d4"}
+  {"name": "Neo-Tokyo Streets", "asset_id": "sys_rooftop"},
+  {"name": "The Rat's Nest", "asset_id": "sys_classroom"},
+  {"name": "Underground Parking", "asset_id": "sys_library"}
 ]}
 
 ## Matching Rules

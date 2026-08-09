@@ -365,19 +365,18 @@ def main():
             print("  SKIP: no entities for this type")
             continue
 
-        # ── Call API ────────────────────────────────────────────────
+        # ── Call API (non-streaming — matches production _select_type) ──
         thinking_params = get_thinking_params(model, "enabled")
         t_start = time.perf_counter()
         try:
-            result = api.stream_chat(
+            raw = api.chat(
                 messages=messages,
                 max_tokens=1024,
                 response_format={"type": "json_object"},
                 extra_params=thinking_params,
             )
             elapsed = time.perf_counter() - t_start
-            raw = result.content
-            ttft = result.ttft
+            ttft = None  # chat() is non-streaming, no TTFT
         except Exception as exc:
             elapsed = time.perf_counter() - t_start
             print(f"\n[{i + 1}] {label}")
@@ -413,7 +412,6 @@ def main():
 
         print(f"\n[{i + 1}] {label}")
         print(f"  Mode      : {mode} ({n_entities} entities, {n_lib} in library)")
-        print(f"  TTFT      : {ttft:.2f}s" if ttft else "  TTFT      : —")
         print(f"  Total     : {elapsed:.1f}s")
         print(f"  Raw       : {raw.strip()[:200]}{'...' if len(raw) > 200 else ''}")
 
