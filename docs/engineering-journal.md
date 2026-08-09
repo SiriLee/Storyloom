@@ -8,7 +8,7 @@
 
 ## 2026-08-09（周六）
 
-> **概述**：§7.8c Pre-build 全栈实现 + §7.8b 收尾审查 + 稳定性修复 + 游戏模式徽章 UI。核心工作是将素材预构建管道从 spec 推进到完整可用的全栈实现——批量选择提示词设计、Prebuilder 管道（parse → 2× batch selection → concurrent generation → force-select fallback）、GameSession 集成（删除 `_init_stub_roster`）、SSE 流式端点、前端卡片网格 UI。共 **50 commits**，**35 files**，**+4,145/-422 lines**，测试从 993 增至 **1,030**（+37）。
+> **概述**：§7.8c Pre-build 全栈实现 + §7.8b 收尾审查 + 稳定性修复 + 游戏模式徽章 UI。核心工作是将素材预构建管道从 spec 推进到完整可用的全栈实现——批量选择提示词设计、Prebuilder 管道（parse → 2× batch selection → concurrent generation → force-select fallback）、GameSession 集成（删除 `_init_stub_roster`）、SSE 流式端点、前端卡片网格 UI。共 **51 commits**，**36 files**，**+4,186/-427 lines**，测试从 993 增至 **1,030**（+37）。
 
 ### §7.8b 收尾 — Code Review 第三轮 + 重构
 
@@ -123,6 +123,8 @@
 5. **Roster 持久化**（`ef2f877`）：`GameAssetRoster` 在每次变更（`set_target`、`clear` 等）后持久化到磁盘——匹配 `AssetLibrary` 的即时保存模式——防止进程崩溃时丢失素材映射。
 
 **依据**：`web/server.py`；`core/save_manager.py`；`assets/_roster.py`；`web/static/js/graph-renderer.js`。
+
+6. **CI 测试自包含修复**（`c29c7b7`）：`test_game_loop.py` 中 2 个 GraphPipeline 测试依赖 `system_media/` 目录（生成产物，不入库），导致 CI 上 1028/1030 失败。修复：`test_mount_registers_system_assets` 构建临时 manifest + patch `DEFAULT_SYSTEM_MEDIA_DIR`；`test_mount_sets_process_factory` 用 `fake_global` 素材种子库替代对 `sys_adult_female` 的外部依赖。
 
 ### UI 改进 — 游戏模式徽章
 
