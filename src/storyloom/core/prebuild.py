@@ -466,6 +466,73 @@ def parse_batch_selection_response(
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# Batch selection runner (standalone — used by Prebuilder + prompt_lab)
+# ═══════════════════════════════════════════════════════════════════════
+
+def run_batch_selection(
+    api_client,              # ApiClient
+    asset_type: AssetType,
+    entities: list[EntitySpec],
+    library: AssetLibrary,
+    forced: bool = False,
+    thinking_mode: str = "enabled",
+) -> tuple[list[SelectionResult], str | None]:
+    """Run a single batch LLM selection call.  Returns ``(results, error)``.
+
+    Standalone function — callable from ``Prebuilder.build()`` (production)
+    and from prompt_lab tests (validation).  Encapsulates the full
+    selection path: build messages → call LLM → parse response.
+
+    Args:
+        api_client: Configured ``ApiClient``.
+        asset_type: CHAR_PORTRAIT or BACKGROUND.
+        entities: All entities of this type.
+        library: Global ``AssetLibrary`` for library entries + validation.
+        forced: If True, use forced-mode prompt (match-only).
+        thinking_mode: ``"enabled"`` (production) | ``"light"`` | ``"disabled"``.
+
+    Returns:
+        ``(results, error_message)`` — *results* is empty on failure;
+        *error_message* is ``None`` on success.
+    """
+    if not entities:
+        return [], None
+
+    from storyloom.io.api_client import ApiError
+    from storyloom.io.thinking import get_thinking_params
+
+    try:
+        msgs = build_batch_selection_messages(
+            asset_type, entities, library, forced=forced,
+        )
+        if not msgs:
+            return [], None
+
+        raw = api_client.chat(
+            messages=msgs,
+            max_tokens=1024,
+            response_format={"type": "json_object"},
+            extra_params=get_thinking_params(api_client.model, thinking_mode),
+        )
+        parsed = parse_batch_selection_response(raw, entities, library)
+        if parsed is not None:
+            return parsed, None
+        else:
+            return [], (
+                f"Failed to parse batch selection response "
+                f"for {asset_type.value}"
+            )
+    except ApiError as e:
+        return [], (
+            f"Batch selection API error for {asset_type.value}: {e}"
+        )
+    except Exception as e:
+        return [], (
+            f"Batch selection failed for {asset_type.value}: {e}"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -561,53 +628,15 @@ class Prebuilder:
         all_results: list[SelectionResult] = []
         selection_errors: list[str] = []
 
-        def _select_type(asset_type: AssetType) -> tuple[
+        forced = not self._img_gen_enabled
+
+        def _select_one(asset_type: AssetType) -> tuple[
             list[SelectionResult], str | None
         ]:
-            """Run batch selection for one asset type.  Returns (results, error)."""
-            ents = by_type.get(asset_type, [])
-            if not ents:
-                return [], None
-
-            try:
-                msgs = build_batch_selection_messages(
-                    asset_type, ents, self._library,
-                    forced=not self._img_gen_enabled,
-                )
-                if not msgs:
-                    return [], None
-
-                from storyloom.io.api_client import ApiError
-                from storyloom.io.thinking import get_thinking_params
-
-                raw = self._api.chat(
-                    messages=msgs,
-                    max_tokens=1024,
-                    response_format={"type": "json_object"},
-                    extra_params=get_thinking_params(
-                        self._api.model, "enabled",
-                    ),
-                )
-                parsed = parse_batch_selection_response(
-                    raw, ents, self._library,
-                )
-                if parsed is not None:
-                    return parsed, None
-                else:
-                    return [], (
-                        f"Failed to parse batch selection response "
-                        f"for {asset_type.value}"
-                    )
-            except ApiError as e:
-                return [], (
-                    f"Batch selection API error for "
-                    f"{asset_type.value}: {e}"
-                )
-            except Exception as e:
-                return [], (
-                    f"Batch selection failed for "
-                    f"{asset_type.value}: {e}"
-                )
+            return run_batch_selection(
+                self._api, asset_type, by_type.get(asset_type, []),
+                self._library, forced=forced, thinking_mode="enabled",
+            )
 
         # Run both selection calls concurrently
         selection_types = [
@@ -615,7 +644,7 @@ class Prebuilder:
             if t in by_type
         ]
         with ThreadPoolExecutor(max_workers=min(len(selection_types), 2)) as ex:
-            futures = {ex.submit(_select_type, t): t for t in selection_types}
+            futures = {ex.submit(_select_one, t): t for t in selection_types}
             for future in as_completed(futures):
                 results, err = future.result()
                 if err:

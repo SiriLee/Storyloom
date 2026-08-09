@@ -28,15 +28,13 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from storyloom.assets import AssetLibrary, AssetType, GameAssetRoster
+from storyloom.assets import AssetLibrary, AssetType
 from storyloom.config import DEFAULT_SYSTEM_MEDIA_DIR
 from storyloom.core.prebuild import (
     EntitySpec,
-    build_batch_selection_messages,
-    parse_batch_selection_response,
+    run_batch_selection,
 )
 from storyloom.io.api_client import ApiClient
-from storyloom.io.thinking import get_thinking_params
 from storyloom.user_config import UserConfig
 
 
@@ -336,7 +334,7 @@ def main():
 
     print(f"Model      : {model}")
     print(f"Base URL   : {base_url}")
-    print(f"Thinking   : enabled (full — batch selection needs quality)")
+    print(f"Thinking   : light (via run_batch_selection)")
     print("=" * 72)
 
     library = load_system_library()
@@ -347,7 +345,6 @@ def main():
     passed = 0
     failed = 0
     total_elapsed = 0.0
-    shown_prompt = {"normal": False, "forced": False}
 
     for i, sc in enumerate(scenarios):
         label = sc["label"]
@@ -356,46 +353,22 @@ def main():
         entities = sc["entities"]
         forced = (mode == "forced")
 
-        # ── Build messages ──────────────────────────────────────────
-        messages = build_batch_selection_messages(
-            asset_type, entities, library, forced=forced,
-        )
-        if not messages:
-            print(f"\n[{i + 1}] {label}")
-            print("  SKIP: no entities for this type")
-            continue
-
-        # ── Call API (non-streaming — matches production _select_type) ──
-        thinking_params = get_thinking_params(model, "enabled")
+        # ── Call production function (handles prompt + API + parse) ──
         t_start = time.perf_counter()
-        try:
-            raw = api.chat(
-                messages=messages,
-                max_tokens=1024,
-                response_format={"type": "json_object"},
-                extra_params=thinking_params,
-            )
-            elapsed = time.perf_counter() - t_start
-            ttft = None  # chat() is non-streaming, no TTFT
-        except Exception as exc:
-            elapsed = time.perf_counter() - t_start
-            print(f"\n[{i + 1}] {label}")
-            print(f"  API ERROR ({elapsed:.1f}s): {exc}")
-            failed += 1
-            continue
-
+        results, error = run_batch_selection(
+            api, asset_type, entities, library,
+            forced=forced, thinking_mode="light",
+        )
+        elapsed = time.perf_counter() - t_start
         total_elapsed += elapsed
 
-        # ── Parse ───────────────────────────────────────────────────
-        parsed = parse_batch_selection_response(raw, entities, library)
-
         # ── Validate ────────────────────────────────────────────────
-        if parsed is None:
-            validation_errors = ["parse_batch_selection_response returned None"]
+        if error is not None:
+            validation_errors = [error]
         elif forced:
-            validation_errors = validate_forced_response(parsed, entities, library)
+            validation_errors = validate_forced_response(results, entities, library)
         else:
-            validation_errors = validate_normal_response(parsed, entities, library)
+            validation_errors = validate_normal_response(results, entities, library)
 
         ok = len(validation_errors) == 0
         if ok:
@@ -406,20 +379,18 @@ def main():
             verdict = "\033[31mFAIL\033[0m"
 
         # ── Display ─────────────────────────────────────────────────
-        at_label = asset_type.value
         n_entities = len(entities)
         n_lib = len(library.list_by_type(asset_type))
 
         print(f"\n[{i + 1}] {label}")
         print(f"  Mode      : {mode} ({n_entities} entities, {n_lib} in library)")
         print(f"  Total     : {elapsed:.1f}s")
-        print(f"  Raw       : {raw.strip()[:200]}{'...' if len(raw) > 200 else ''}")
 
-        if parsed is not None:
-            actions = [f"{r.entity_name}={r.action}" for r in parsed]
+        if results:
+            actions = [f"{r.entity_name}={r.action}" for r in results]
             print(f"  Actions   : {', '.join(actions)}")
             assets = [
-                f"{r.entity_name}→{r.asset_id}" for r in parsed
+                f"{r.entity_name}→{r.asset_id}" for r in results
                 if r.asset_id is not None
             ]
             if assets:
@@ -431,21 +402,6 @@ def main():
 
         print(f"  {verdict}")
 
-        # ── Show prompt on first case of each mode ──────────────────
-        first_key = "forced" if forced else "normal"
-        if not shown_prompt[first_key]:
-            shown_prompt[first_key] = True
-            print(f"\n{'─' * 60}")
-            print(f"  [{mode.upper()} MODE SYSTEM PROMPT]:")
-            for line in messages[0]["content"].splitlines():
-                print(f"    | {line}")
-            print(f"\n  [{mode.upper()} MODE USER MESSAGE (first {n_entities} entities)]:")
-            for line in messages[1]["content"].splitlines()[:30]:
-                print(f"    | {line}")
-            if len(messages[1]["content"].splitlines()) > 30:
-                print(f"    | ... ({len(messages[1]['content'].splitlines()) - 30} more lines)")
-            print(f"{'─' * 60}")
-
     # ── Summary ─────────────────────────────────────────────────────
     n_total = passed + failed
     print(f"\n{'=' * 72}")
@@ -454,7 +410,6 @@ def main():
         print(f"Failed : {failed}/{n_total}")
     if n_total > 0:
         print(f"Avg    : {total_elapsed / n_total:.1f}s per call")
-    print(f"Mode   : enabled (full) thinking")
     print("Done.")
 
 
