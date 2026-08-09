@@ -242,15 +242,16 @@ def _format_roster_entries(
 ) -> str:
     """Format roster entries for the selection prompt.
 
-    Excludes entries with target=None (placeholders) and the entry
-    matching exclude_name (the current DECLARE's own placeholder).
+    Includes all entries except *exclude_name* (the current DECLARE's own
+    placeholder — we don't want the LLM to "match" against the very entry
+    we're trying to fill).  Placeholders (target=None) are included —
+    they represent declared entities that the game knows about, and their
+    names are valid matching targets.
     """
     entries = roster.list_by_type(asset_type)
     lines: list[str] = []
     for local_name, item in entries.items():
         if local_name == exclude_name:
-            continue
-        if item.target is None:
             continue
         desc = item.local_description or "(no description)"
         lines.append(f'- "{local_name}": {desc}')

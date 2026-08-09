@@ -171,7 +171,7 @@ class TestGeneratePrompts:
     # ── Selection prompt — entries formatting ───────────────────────────
 
     def test_roster_entries_format(self, roster_with_entries, library_with_entries):
-        """Roster entries: '- "name": description', placeholder excluded."""
+        """Roster entries: '- "name": description', all entries included."""
         from storyloom.tasks._llm_generate import build_selection_prompt
 
         prompt = build_selection_prompt(
@@ -181,8 +181,10 @@ class TestGeneratePrompts:
         )
         assert '- "Alice": A young woman with silver hair' in prompt
         assert '- "Bob": A tall warrior in plate armor' in prompt
-        # Placeholder (target=None) must be excluded
-        assert "NewChar" not in prompt
+        # Placeholder entries (target=None) are included — they represent
+        # entities the game knows about.  Only the current DECLARE's own
+        # entry (exclude_name) is excluded.
+        assert '"NewChar"' in prompt
 
     def test_library_entries_format(self, roster_with_entries, library_with_entries):
         """Library entries: '- [asset_id] "name": description'."""
