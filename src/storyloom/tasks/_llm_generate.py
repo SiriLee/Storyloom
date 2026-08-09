@@ -536,7 +536,8 @@ class GenerateProcessor:
         img_client_portrait,   # ImgApiClient (remove_bg from user config)
         img_client_background,  # ImgApiClient (remove_bg=NEVER)
         library: AssetLibrary,
-        img_generation_enabled: bool,
+        roster_path: str | None = None,
+        img_generation_enabled: bool = False,
     ):
         self._api = api_client
         self._img_clients = {
@@ -544,6 +545,7 @@ class GenerateProcessor:
             AssetType.BACKGROUND: img_client_background,
         }
         self._library = library
+        self._roster_path = roster_path
         self._img_generation_enabled = img_generation_enabled
 
     def __call__(
@@ -557,6 +559,7 @@ class GenerateProcessor:
         lib = self._library
         img_gen_enabled = self._img_generation_enabled
         img_client = self._img_clients[asset_type]
+        roster_path = self._roster_path
 
         def process(task: Task) -> None:
             desc = roster.lookup(asset_type, local_name)
@@ -571,6 +574,8 @@ class GenerateProcessor:
             if asset_id is not None:
                 roster.set_target(asset_type, local_name, asset_id)
                 lib.save()
+                if roster_path:
+                    roster.save(roster_path)
                 task.complete()
                 return
 
@@ -590,6 +595,8 @@ class GenerateProcessor:
 
             roster.set_target(asset_type, local_name, asset_id)
             lib.save()
+            if roster_path:
+                roster.save(roster_path)
             task.complete()
 
         return process

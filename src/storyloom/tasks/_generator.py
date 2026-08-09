@@ -42,12 +42,14 @@ class TaskGenerator:
     def __init__(self, task_queue: deque[Task], roster: GameAssetRoster,
                  match_processor=None,
                  generate_processor=None,
-                 task_pool: TaskPool | None = None):
+                 task_pool: TaskPool | None = None,
+                 roster_path: str | None = None):
         self._queue = task_queue
         self._roster = roster
         self._pool = task_pool
         self._match_processor = match_processor
         self._generate_processor = generate_processor
+        self._roster_path = roster_path
 
     # ── Public API ───────────────────────────────────────────────────────
 
@@ -118,6 +120,8 @@ class TaskGenerator:
         elif local_name:
             # Placeholder first — sync, before pool submit (design.md §6.4)
             self._roster.add(asset_type, local_name, desc, target=None)
+            if self._roster_path:
+                self._roster.save(self._roster_path)
             if self._generate_processor is not None:
                 task.process = self._generate_processor(asset_type, local_name,
                                                                   self._roster)

@@ -522,6 +522,7 @@ class GameLoop:
         # and inject task_queue + roster into EventDispatcher.
         self._game_mode: str = "text"  # written to every save file
         self._roster: GameAssetRoster | None = None
+        self._roster_path: str | None = None  # §7.8c: _asset_roster.json path
         self._task_pool: TaskPool | None = None
         self._last_scene: str | None = None  # §7.7: persisted in save, emitted on load
         self._match_processor: Callable | None = None
@@ -761,7 +762,8 @@ class GameLoop:
             task_gen = TaskGenerator(task_queue, self._roster,
                                      match_processor=self._match_processor,
                                      generate_processor=self._generate_processor,
-                                     task_pool=self._task_pool)
+                                     task_pool=self._task_pool,
+                                     roster_path=self._roster_path)
         else:
             task_queue = None
             task_gen = None
@@ -1307,8 +1309,11 @@ class GameLoop:
 
         self._game_mode = "graph"
         library = AssetLibrary(DEFAULT_MEDIA_DIR)
-        roster_path = os.path.join(saves_root, game_id, "_asset_roster.json")
-        self._roster = GameAssetRoster.load(roster_path, library, game_id)
+        if self._save_manager is not None:
+            self._roster_path = self._save_manager.roster_path
+        else:
+            self._roster_path = os.path.join(saves_root, game_id, "_asset_roster.json")
+        self._roster = GameAssetRoster.load(self._roster_path, library, game_id)
         self._task_pool = TaskPool()
 
         # ── System assets (§7.8 framework) ──────────────────────────
@@ -1337,6 +1342,7 @@ class GameLoop:
             img_client_portrait=ImgApiClient(raw_cfg, remove_bg=portrait_policy),
             img_client_background=ImgApiClient(raw_cfg, remove_bg=RemoveBgPolicy.NEVER),
             library=library,
+            roster_path=self._roster_path,
             img_generation_enabled=img_enabled,
         )
 

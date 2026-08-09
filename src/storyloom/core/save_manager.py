@@ -48,6 +48,11 @@ class SaveManager:
         """*game_dir* is a per-game path, e.g. ``saves/my_story_20260711T.../``."""
         self._dir = Path(game_dir)
 
+    @property
+    def roster_path(self) -> str:
+        """Full path to ``_asset_roster.json`` in this game directory."""
+        return str(self._dir / "_asset_roster.json")
+
     def _ensure_dir(self) -> None:
         self._dir.mkdir(parents=True, exist_ok=True)
 
