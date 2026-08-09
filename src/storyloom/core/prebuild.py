@@ -94,19 +94,27 @@ def parse_entities(
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Batch selection prompt
+# Batch selection prompts
+# ═══════════════════════════════════════════════════════════════════════
+#
+# Two completely separate prompt sets — normal mode (may return
+# "generate") and forced mode (must pick a library match for every
+# entity).  Forced mode never mentions "generate" or "null" — the LLM
+# only sees the "match" path.
 # ═══════════════════════════════════════════════════════════════════════
 
-_SELECTION_SYSTEM_CHAR = """\
+# ── Normal mode: match OR generate ──────────────────────────────────
+
+_SELECTION_NORMAL_CHAR = """\
 You are the asset selector in a real-time visual novel game. Given a list of target characters and a global asset library, decide for each character whether a suitable portrait already exists in the library or whether a new image must be generated.
 
 ## Output Format
 
 Reply ONLY with a valid JSON object:
-{"results": [{"name": "<character name>", "action": "<match|generate>", "asset_id": "<id|null>"}]}
+{"results": [{"name": "<character name>", "action": "<match|generate>", "asset_id": "<id or null>"}]}
 
 - **action** — `"match"` if a suitable asset exists in the library; `"generate"` if none fits.
-- **asset_id** — The exact `[bracketed]` asset ID when action is `"match"`, or `null` when action is `"generate"`.__FORCED_SUFFIX__
+- **asset_id** — The exact `[bracketed]` asset ID when action is `"match"`, or `null` when action is `"generate"`.
 
 ## Example
 
@@ -129,19 +137,19 @@ Target Characters:
 ## Matching Rules
 
 1. Match by **appearance description first** — the target's visual features (clothing, build, hair style, facial features) are the primary matching signal. Names may differ across games.
-2. Be **conservative** — only return `"match"` when the library asset is a genuine visual fit. When in doubt, return `"generate"` — a new generated image is better than a mismatched one.__FORCED_RULES__
+2. Be **conservative** — only return `"match"` when the library asset is a genuine visual fit. When in doubt, return `"generate"` — a new generated image is better than a mismatched one.
 3. Every target character MUST appear in the results array."""
 
-_SELECTION_SYSTEM_BG = """\
+_SELECTION_NORMAL_BG = """\
 You are the asset selector in a real-time visual novel game. Given a list of target scenes and a global asset library, decide for each scene whether a suitable background already exists in the library or whether a new image must be generated.
 
 ## Output Format
 
 Reply ONLY with a valid JSON object:
-{"results": [{"name": "<scene name>", "action": "<match|generate>", "asset_id": "<id|null>"}]}
+{"results": [{"name": "<scene name>", "action": "<match|generate>", "asset_id": "<id or null>"}]}
 
 - **action** — `"match"` if a suitable asset exists in the library; `"generate"` if none fits.
-- **asset_id** — The exact `[bracketed]` asset ID when action is `"match"`, or `null` when action is `"generate"`.__FORCED_SUFFIX__
+- **asset_id** — The exact `[bracketed]` asset ID when action is `"match"`, or `null` when action is `"generate"`.
 
 ## Example
 
@@ -164,18 +172,80 @@ Target Scenes:
 ## Matching Rules
 
 1. Match by **description** — atmosphere, lighting, environment type, era, and key visual features. Names are not important.
-2. Be **conservative** — only return `"match"` when the library asset is a genuine visual fit. When in doubt, return `"generate"`.__FORCED_RULES__
+2. Be **conservative** — only return `"match"` when the library asset is a genuine visual fit. When in doubt, return `"generate"`.
 3. Every target scene MUST appear in the results array."""
 
-_NORMAL_SUFFIX = ""
-_FORCED_SUFFIX = "\n- **Important**: You MUST return `\"match\"` for every entity. `\"generate\"` is NOT allowed in this mode."
+# ── Forced mode: match ONLY ──────────────────────────────────────────
 
-_NORMAL_RULES = ""
-_FORCED_RULES = (
-    "\n3. **Forced mode** — you MUST pick the best available library asset "
-    "for each target, even if it is not a perfect match. The `\"generate\"` "
-    "action is NOT available."
-)
+_SELECTION_FORCED_CHAR = """\
+You are the asset selector in a real-time visual novel game. Given a list of target characters and a global asset library, pick the best matching portrait from the library for each character.
+
+## Output Format
+
+Reply ONLY with a valid JSON object:
+{"results": [{"name": "<character name>", "asset_id": "<id>"}]}
+
+- **asset_id** — The exact `[bracketed]` asset ID from the library. You MUST pick one for every character.
+
+## Example
+
+Global Library:
+- [fe000001] "Adult Woman": Adult woman, neutral expression, business attire
+- [a1b2c3d4] "Elf Archer": Female elf archer in a green cloak, holding a bow
+- [e5f6g7h8] "Knight Captain": Tall woman in silver plate armor, short-cropped hair
+
+Target Characters:
+- "Kael": Former corporate security consultant turned freelance operative. Tall, sharp-eyed, with short dark hair and a faint scar across the jaw. Wears a worn synth-leather coat.
+- "Mouse": Underground info broker with old debts. Short and wiry, with augmented eyes that flicker blue.
+- "Michiko": Arasaka security director and former mentor. Impeccably sharp in a tailored black suit, silver-streaked hair pulled tight.
+
+-> {"results": [
+  {"name": "Kael", "asset_id": "fe000001"},
+  {"name": "Mouse", "asset_id": "a1b2c3d4"},
+  {"name": "Michiko", "asset_id": "fe000001"}
+]}
+
+## Matching Rules
+
+1. Match by **appearance description first** — the target's visual features (clothing, build, hair style, facial features) are the primary matching signal.
+2. You MUST pick a library asset for every target character, even if it is not a perfect match. Pick the closest available.
+3. Every target character MUST appear in the results array. The same library asset may be used for multiple characters."""
+
+_SELECTION_FORCED_BG = """\
+You are the asset selector in a real-time visual novel game. Given a list of target scenes and a global asset library, pick the best matching background from the library for each scene.
+
+## Output Format
+
+Reply ONLY with a valid JSON object:
+{"results": [{"name": "<scene name>", "asset_id": "<id>"}]}
+
+- **asset_id** — The exact `[bracketed]` asset ID from the library. You MUST pick one for every scene.
+
+## Example
+
+Global Library:
+- [cl000001] "Classroom": Empty classroom with desks and blackboard
+- [a1b2c3d4] "Dungeon": Dark stone dungeon with torches and iron bars
+- [e5f6g7h8] "Forest Clearing": Sunlit clearing in a dense forest, moss-covered stones
+
+Target Scenes:
+- "Neo-Tokyo Streets": Rain-slicked neon-lit streets at midnight. Holographic ads flicker across skyscraper faces.
+- "The Rat's Nest": Dimly lit bar beneath a noodle shop. Cracked synth-leather booths, smell of synthetic alcohol.
+- "Underground Parking": A dim parking garage with flickering fluorescent lights and concrete pillars.
+
+-> {"results": [
+  {"name": "Neo-Tokyo Streets", "asset_id": "cl000001"},
+  {"name": "The Rat's Nest", "asset_id": "cl000001"},
+  {"name": "Underground Parking", "asset_id": "a1b2c3d4"}
+]}
+
+## Matching Rules
+
+1. Match by **description** — atmosphere, lighting, environment type, era, and key visual features.
+2. You MUST pick a library asset for every target scene, even if it is not a perfect match. Pick the closest available.
+3. Every target scene MUST appear in the results array. The same library asset may be used for multiple scenes."""
+
+# ── User message template (shared) ────────────────────────────────────
 
 _USER_TEMPLATE = """\
 ## Global Library
@@ -195,16 +265,13 @@ def build_batch_selection_messages(
 ) -> list[dict]:
     """Build messages array for a batch LLM selection call.
 
-    One call handles ALL entities of a single *asset_type*.  The LLM
-    sees every entity plus the library top-N, then decides match/generate
-    for each.
+    One call handles ALL entities of a single *asset_type*.
 
     Args:
         asset_type: CHAR_PORTRAIT or BACKGROUND.
         entities: All entities of this type (from parse_entities()).
         library: Global AssetLibrary (source of library entries).
-        forced: If True, all entities MUST get a library match
-            (``img_generation_enabled=False`` path).
+        forced: If True, use forced-mode prompt (match-only, no generate).
 
     Returns:
         List of message dicts, or empty list when *entities* is empty.
@@ -212,17 +279,16 @@ def build_batch_selection_messages(
     if not entities:
         return []
 
-    forced_suffix = _FORCED_SUFFIX if forced else _NORMAL_SUFFIX
-    forced_rules = _FORCED_RULES if forced else _NORMAL_RULES
-
-    system_template = (
-        _SELECTION_SYSTEM_CHAR if asset_type == AssetType.CHAR_PORTRAIT
-        else _SELECTION_SYSTEM_BG
-    )
-    # Use str.replace instead of .format() — the prompt contains JSON
-    # braces that would need escaping.
-    system_msg = system_template.replace("__FORCED_SUFFIX__", forced_suffix)
-    system_msg = system_msg.replace("__FORCED_RULES__", forced_rules)
+    if forced:
+        system_msg = (
+            _SELECTION_FORCED_CHAR if asset_type == AssetType.CHAR_PORTRAIT
+            else _SELECTION_FORCED_BG
+        )
+    else:
+        system_msg = (
+            _SELECTION_NORMAL_CHAR if asset_type == AssetType.CHAR_PORTRAIT
+            else _SELECTION_NORMAL_BG
+        )
 
     entity_label = (
         "Characters" if asset_type == AssetType.CHAR_PORTRAIT else "Scenes"
@@ -279,9 +345,6 @@ def _format_library_entries(
 # Response parsing
 # ═══════════════════════════════════════════════════════════════════════
 
-_VALID_ACTIONS = {"match", "generate"}
-
-
 def parse_batch_selection_response(
     raw: str,
     entities: list[EntitySpec],
@@ -289,15 +352,16 @@ def parse_batch_selection_response(
 ) -> list[SelectionResult] | None:
     """Parse the LLM batch-selection JSON response.
 
-    Validates:
-    - Valid JSON (handles markdown code fences).
-    - ``results`` key present and is a list.
-    - Every entry has ``name``, valid ``action`` (match/generate), and
-      ``asset_id`` (non-null for match, must exist in library).
-    - All input entities are covered in the response.
-    - No actions are ``"generate"`` when forced mode is on (detected by
-      whether any entity has action="generate" — the caller validates
-      against *forced*).
+    Handles two response formats:
+
+    **Normal mode** (``action`` field present):
+    ``{"results": [{"name": "...", "action": "match|generate", "asset_id": "..."|null}]}``
+
+    **Forced mode** (no ``action`` field — all entries are implicit matches):
+    ``{"results": [{"name": "...", "asset_id": "..."}]}``
+
+    Validates asset_id references against *library* and ensures all
+    input entities are covered.
 
     Args:
         raw: Raw LLM response text.
@@ -309,7 +373,6 @@ def parse_batch_selection_response(
     """
     # ── 1. JSON parse ──────────────────────────────────────────────
     text = raw.strip()
-    # Strip markdown code fences
     if text.startswith("```"):
         first_nl = text.find("\n")
         if first_nl != -1:
@@ -327,17 +390,23 @@ def parse_batch_selection_response(
         return None
 
     results_raw = data.get("results")
-    if not isinstance(results_raw, list):
+    if not isinstance(results_raw, list) or not results_raw:
         return None
 
-    # ── 2. Expected entities set ───────────────────────────────────
-    entity_names = {e.name for e in entities}
+    # ── 2. Detect format: forced mode has no "action" field ─────────
+    first_entry = results_raw[0]
+    if not isinstance(first_entry, dict):
+        return None
+    is_forced = "action" not in first_entry
 
-    # ── 3. Parse each result entry ─────────────────────────────────
-    results: list[SelectionResult] = []
-    seen: set[str] = set()
+    # ── 3. Expected entities set ───────────────────────────────────
+    entity_names = {e.name for e in entities}
     asset_type = entities[0].asset_type if entities else AssetType.CHAR_PORTRAIT
     lib_entries = library.list_by_type(asset_type)
+
+    # ── 4. Parse each result entry ─────────────────────────────────
+    results: list[SelectionResult] = []
+    seen: set[str] = set()
 
     for entry in results_raw:
         if not isinstance(entry, dict):
@@ -348,36 +417,48 @@ def parse_batch_selection_response(
             return None
         name = name.strip()
 
-        action = entry.get("action")
-        if action not in _VALID_ACTIONS:
-            return None
-
-        asset_id = entry.get("asset_id")
-
-        if action == "match":
+        if is_forced:
+            # Forced mode: no action field, every entry is a match.
+            asset_id = entry.get("asset_id")
             if not isinstance(asset_id, str) or not asset_id.strip():
                 return None
             asset_id = asset_id.strip()
             if asset_id not in lib_entries:
                 return None
-        elif action == "generate":
-            if asset_id is not None:
-                return None  # must be explicit null for generate
+            action = "matched"
+        else:
+            # Normal mode: action must be "match" or "generate".
+            action_raw = entry.get("action")
+            if action_raw not in ("match", "generate"):
+                return None
+
+            asset_id = entry.get("asset_id")
+            if action_raw == "match":
+                if not isinstance(asset_id, str) or not asset_id.strip():
+                    return None
+                asset_id = asset_id.strip()
+                if asset_id not in lib_entries:
+                    return None
+                action = "matched"
+            else:  # generate
+                if asset_id is not None:
+                    return None
+                action = "generate"
+                asset_id = None
 
         if name in seen:
-            return None  # duplicate entity
+            return None
         seen.add(name)
 
-        # Only include entities that were in the input
         if name in entity_names:
             results.append(SelectionResult(
                 entity_name=name,
-                action="matched" if action == "match" else "generate",
-                asset_id=asset_id if action == "match" else None,
+                action=action,
+                asset_id=asset_id,
                 asset_type=asset_type,
             ))
 
-    # ── 4. Coverage check: all input entities must appear ──────────
+    # ── 5. Coverage check ──────────────────────────────────────────
     if not entity_names.issubset(seen):
         return None
 
