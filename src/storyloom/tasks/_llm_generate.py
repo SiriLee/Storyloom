@@ -9,7 +9,6 @@ Prompts are specified in docs/graph-mode-spec/prompt-design-llm-generate.md.
 
 from __future__ import annotations
 
-import base64
 import os
 import uuid
 
@@ -397,51 +396,38 @@ def _collect_reference_images(
 
     Source: roster entries of the same *asset_type* that have a real
     target (not None).  The current DECLARE's own entry is excluded.
-
-    Returns:
-        List of base64 data URL strings (MIME type derived from asset type),
-        or empty list if the model doesn't support references or no
-        suitable images exist.
     """
     from storyloom.io.img_api_client import MODEL_PRESETS
+    from storyloom.io.img_utils import collect_reference_data_urls
 
     preset = MODEL_PRESETS.get(model)
     if preset is not None and not preset.supports_reference:
         return []
 
+    # Resolve roster entries → absolute file paths
     entries = roster.list_by_type(asset_type)
-    refs: list[str] = []
+    paths: list[str] = []
     for local_name, item in entries.items():
         if local_name == current_name:
             continue
         if item.target is None:
             continue
-        if len(refs) >= GENERATE_REF_IMAGE_COUNT:
+        if len(paths) >= GENERATE_REF_IMAGE_COUNT:
             break
 
-        # Resolve file path via the roster's library
         asset = roster._library.get(asset_type, item.target)
         if asset is None:
             continue
         path = roster._library.asset_path(asset)
-        if path is None or not os.path.isfile(path):
-            continue
+        if path is not None:
+            paths.append(path)
 
-        try:
-            raw = open(path, "rb").read()
-        except OSError:
-            continue
-
-        b64 = base64.b64encode(raw).decode("ascii")
-        refs.append(f"data:{_mime_for(asset_type)};base64,{b64}")
-
-    return refs
-
-
-def _mime_for(asset_type: AssetType) -> str:
-    """Return the MIME type for *asset_type* based on its default extension."""
     ext = asset_type.default_extension.lstrip(".")
-    return f"image/{ext}"
+    return collect_reference_data_urls(
+        paths,
+        mime_type=f"image/{ext}",
+        max_count=GENERATE_REF_IMAGE_COUNT,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════

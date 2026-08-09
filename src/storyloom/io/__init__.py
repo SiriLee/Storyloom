@@ -10,6 +10,7 @@ from storyloom.io.img_api_client import (
 )
 from storyloom.io.img_utils import (
     check_model,
+    collect_reference_data_urls,
     detect_alpha,
     detect_format,
     get_dimensions,
@@ -30,6 +31,7 @@ __all__ = [
     "MODEL_PRESETS",
     "RemoveBgPolicy",
     "check_model",
+    "collect_reference_data_urls",
     "detect_alpha",
     "detect_format",
     "get_dimensions",

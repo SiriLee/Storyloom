@@ -687,10 +687,7 @@ class Prebuilder:
 
             def _generate_one(entity: EntitySpec) -> PrebuildResult:
                 img_client = self._img_clients[entity.asset_type]
-                refs = _collect_library_refs(
-                    entity.asset_type, entity.name, img_client.model,
-                    self._library,
-                )
+                refs = self._collect_library_refs(entity.asset_type, img_client.model)
                 desc = _entity_description(entity)
 
                 asset_id = generate_asset_image(
@@ -822,55 +819,40 @@ class Prebuilder:
         return results
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# Reference image collection (pre-build variant — library-based)
-# ═══════════════════════════════════════════════════════════════════════
+    # ── Reference image collection (library-based) ──────────────────
 
-def _collect_library_refs(
-    asset_type: AssetType,
-    current_name: str,
-    model: str,
-    library: AssetLibrary,
-) -> list[str]:
-    """Collect reference image URLs from the global library.
+    def _collect_library_refs(
+        self,
+        asset_type: AssetType,
+        model: str,
+    ) -> list[str]:
+        """Collect reference image data URLs from the global library.
 
-    Unlike ``_collect_reference_images`` (which reads from the roster
-    during gameplay), pre-build reads from the library — the roster is
-    empty at this stage.
+        Pre-build variant — the roster is empty at this stage, so we
+        read from the library instead.  Uses sorted-by-usage for
+        representative style guidance.
+        """
+        from storyloom.config import GENERATE_REF_IMAGE_COUNT
+        from storyloom.io.img_api_client import MODEL_PRESETS
+        from storyloom.io.img_utils import collect_reference_data_urls
 
-    Returns up to ``GENERATE_REF_IMAGE_COUNT`` base64 data URLs.
-    """
-    import base64
-    import os
+        preset = MODEL_PRESETS.get(model)
+        if preset is not None and not preset.supports_reference:
+            return []
 
-    from storyloom.config import GENERATE_REF_IMAGE_COUNT
-    from storyloom.io.img_api_client import MODEL_PRESETS
-
-    preset = MODEL_PRESETS.get(model)
-    if preset is not None and not preset.supports_reference:
-        return []
-
-    # Use sorted-by-usage so the most representative images come first
-    assets = library.get_sorted_by_usage(asset_type, GENERATE_REF_IMAGE_COUNT * 2)
-    refs: list[str] = []
-    for asset in assets:
-        if len(refs) >= GENERATE_REF_IMAGE_COUNT:
-            break
-
-        path = library.asset_path(asset)
-        if path is None or not os.path.isfile(path):
-            continue
-
-        try:
-            raw = open(path, "rb").read()
-        except OSError:
-            continue
-
-        b64 = base64.b64encode(raw).decode("ascii")
+        assets = self._library.get_sorted_by_usage(
+            asset_type, GENERATE_REF_IMAGE_COUNT * 2,
+        )
+        paths = [
+            p for asset in assets
+            if (p := self._library.asset_path(asset)) is not None
+        ]
         ext = asset_type.default_extension.lstrip(".")
-        refs.append(f"data:image/{ext};base64,{b64}")
-
-    return refs
+        return collect_reference_data_urls(
+            paths,
+            mime_type=f"image/{ext}",
+            max_count=GENERATE_REF_IMAGE_COUNT,
+        )
 
 
 # Import for type hints (kept at bottom to avoid circular imports)

@@ -395,3 +395,47 @@ def normalize_background(raw: bytes) -> bytes:
     save_fmt = "PNG" if (fmt in ("png", "webp") or img.mode == "RGBA") else "JPEG"
     cropped.save(buf, format=save_fmt)
     return buf.getvalue()
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Reference image collection (shared by GenerateProcessor + Prebuilder)
+# ═══════════════════════════════════════════════════════════════════════
+
+def collect_reference_data_urls(
+    file_paths: list[str],
+    mime_type: str = "image/png",
+    max_count: int = 3,
+) -> list[str]:
+    """Read up to *max_count* image files, return as base64 data URLs.
+
+    Pure I/O function — callers are responsible for:
+    - Checking whether the model supports reference images
+    - Resolving asset entries to absolute file paths
+    - Determining the correct MIME type
+
+    Args:
+        file_paths: Absolute paths to candidate image files.  Entries
+            that don't exist or can't be read are silently skipped.
+        mime_type: MIME type for the data URL (e.g. ``"image/png"``).
+        max_count: Maximum number of data URLs to return.
+
+    Returns:
+        List of ``"data:{mime_type};base64,{b64}"`` strings (may be
+        shorter than *max_count* if fewer valid files are found).
+    """
+    import base64
+    import os
+
+    refs: list[str] = []
+    for path in file_paths:
+        if len(refs) >= max_count:
+            break
+        if not os.path.isfile(path):
+            continue
+        try:
+            raw = open(path, "rb").read()
+        except OSError:
+            continue
+        b64 = base64.b64encode(raw).decode("ascii")
+        refs.append(f"data:{mime_type};base64,{b64}")
+    return refs
