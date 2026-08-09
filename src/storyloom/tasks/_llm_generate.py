@@ -15,6 +15,7 @@ import uuid
 from storyloom.assets import AssetLibrary, AssetType, GameAssetRoster
 from storyloom.config import GENERATE_LIBRARY_TOP_N, GENERATE_REF_IMAGE_COUNT
 from storyloom.io.img_prompts import build_generation_prompt  # canonical location
+from storyloom.tasks._types import Task
 
 # ═══════════════════════════════════════════════════════════════════════
 # Selection prompt templates (per prompt-design-llm-generate.md)
