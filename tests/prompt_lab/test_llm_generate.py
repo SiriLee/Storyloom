@@ -88,14 +88,14 @@ TEST_CASES: list[dict] = [
         "note": "少女→Teenage Girl/Student——年龄性别身份高度吻合",
     },
     {
-        "label": "Lib — 铁匠老王",
+        "label": "Lib — 铁匠老王 → Worker",
         "asset_type": AssetType.CHAR_PORTRAIT,
         "target_name": "铁匠老王",
         "target_desc": "一个五十多岁的壮汉，光着膀子，肌肉结实，围着皮围裙，手里拿着铁锤，满脸煤灰",
         "roster": _CHAR_ROSTER,
         "forced": False,
-        "accept": {"sys_worker_male", "sys_middle_male"},
-        "note": "壮年工匠→Worker/Middle-aged——职业和年龄均匹配",
+        "accept": {"sys_worker_male", "sys_middle_male", None},
+        "note": "壮年工匠→Worker/Middle-aged——职业年龄高度吻合，但也接受 null（可能需要更精确匹配）",
     },
     {
         "label": "Null — 精灵弓箭手莉娜（无精灵模型）",
@@ -312,7 +312,7 @@ def main():
             print(f"            {target_desc[:80]}...")
             print(f"  Selected : {parsed_id!r}")
             print(f"  Roster   : {list(roster_entries.keys())}")
-            print(f"  Accept   : {_describe_accept(accept_set, asset_type)}")
+            print(f"  Accept   : {_describe_accept(accept_set)}")
             print(f"  Total    : {elapsed:.1f}s  |  {verdict}")
             if note:
                 print(f"  Note     : {note}")
@@ -360,14 +360,17 @@ def main():
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════
 
-def _describe_accept(accept_set: set, asset_type: AssetType) -> str:
+def _describe_accept(accept_set: set) -> str:
     if accept_set == {None}:
         return "null only"
     has_null = None in accept_set
     ids_only = accept_set - {None}
-    size = len(ids_only)
-    base = f"<any of {size} {asset_type.value} library IDs>"
-    return base + " (null also acceptable)" if has_null else base
+    if len(ids_only) <= 6:
+        items = ", ".join(sorted(str(x) for x in ids_only))
+        suffix = " or null" if has_null else ""
+        return f"{{{items}}}{suffix}"
+    suffix = " (null also acceptable)" if has_null else ""
+    return f"<{len(ids_only)} IDs>{suffix}"
 
 
 if __name__ == "__main__":

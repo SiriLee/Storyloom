@@ -109,14 +109,14 @@ _SELECTION_RULES_NORMAL = """\
 ## Rules
 
 1. **Game Roaster** — the current game's assets. Match by **name first**. Return `"scope": "game"` with the exact `name`.
-2. **Global Library** — all available assets across games. Match by **description first**. Return `"scope": "global"` with the exact `asset_id` (the [bracketed] prefix from the list).
+2. **Global Library** — all available assets across games. Match by **description first**. Descriptions may be in different languages — compare by meaning. Return `"scope": "global"` with the exact `asset_id` (the [bracketed] prefix from the list).
 3. **No Match** - If no entry in either source is a reasonable fit, return `"scope": "null", "selected": null`."""
 
 _SELECTION_RULES_FORCED = """\
 ## Rules
 
 1. **Game Roaster** — the current game's assets. Match by **name first**. Return `"scope": "game"` with the exact `name`.
-2. **Global Library** — all available assets across games. Match by **description first**. Return `"scope": "global"` with the exact `asset_id` (the [bracketed] prefix from the list).
+2. **Global Library** — all available assets across games. Match by **description first**. Descriptions may be in different languages — compare by meaning. Return `"scope": "global"` with the exact `asset_id` (the [bracketed] prefix from the list).
 3. **You MUST pick one.** If neither roster nor library has a great match, pick the closest from the global library. Do NOT return null."""
 
 _SELECTION_TASK_HEADER = """\
@@ -302,7 +302,6 @@ def _select(
     try:
         raw = api_client.chat(
             messages=messages,
-            max_tokens=128,
             response_format={"type": "json_object"},
             extra_params=get_thinking_params(api_client.model, thinking_mode),
         )
