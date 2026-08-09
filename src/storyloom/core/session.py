@@ -78,33 +78,69 @@ class GameSession:
         gl = self.load_game(game_id, "_init.json")
         return gl, game_id
 
-    def prebuild_assets(self, game_id: str) -> dict:
-        """Run material pre-build for a graph-mode game.  (§7.7 / §7.8c)
+    def prebuild_assets(self, game_id: str):
+        """Run AI material pre-build for a graph-mode game.  (§7.8c)
 
-        Loads the game (triggers ``mount_graph_pipeline``), then seeds the
-        roster from ``story_config`` via ``_init_stub_roster()``.  Called by
-        the UI after story generation completes, BEFORE entering the game.
+        Loads the game (triggers ``mount_graph_pipeline``), then runs the
+        full pre-build pipeline: batch LLM selection → AI image generation
+        → force-select fallback → roster persistence.
 
-        §7.8c replaces the stub seeding with real AI pre-build (LLM
-        selection + image generation per entity).
+        Called by the UI after story generation completes, BEFORE entering
+        the game loop.  Yields progress events for the UI to display.
 
-        Returns:
-            ``{"status": "ok"}`` on success.
+        Yields:
+            ``{"type": "prebuild_progress", "phase": str, ...}``
+            ``{"type": "prebuild_complete", "success": bool, ...}``
         """
         sm = SaveManager(os.path.join(self._saves_root, game_id))
         data = sm.load("_init.json")
 
         gl = self.load_game(game_id, "_init.json")
 
-        # §7.8c DELETE BLOCK START — replaced by real AI pre-build
-        if gl._roster is not None:
-            from storyloom.core.game_loop import _init_stub_roster
-            _init_stub_roster(gl._roster, data)
-            roster_path = os.path.join(self._saves_root, game_id, "_asset_roster.json")
-            gl._roster.save(roster_path)
-        # §7.8c DELETE BLOCK END
+        if gl._roster is None:
+            yield {
+                "type": "prebuild_complete",
+                "success": False,
+                "results": [],
+                "errors": ["Graph-mode pipeline not mounted"],
+            }
+            return
 
-        return {"status": "ok"}
+        from storyloom.assets import AssetType
+        from storyloom.core.prebuild import Prebuilder
+        from storyloom.io._types import RemoveBgPolicy
+        from storyloom.io.img_api_client import ImgApiClient
+        from storyloom.user_config import UserConfig
+
+        # Create ImgApiClient instances with appropriate bg-removal policies
+        raw_cfg = getattr(self._api_client, '_cfg', None)
+        if raw_cfg is None or not isinstance(raw_cfg, UserConfig):
+            raw_cfg = UserConfig()
+        portrait_policy = RemoveBgPolicy(raw_cfg.portrait_remove_bg)
+        img_enabled = raw_cfg.img_generation_enabled
+
+        prebuilder = Prebuilder(
+            api_client=self._api_client,
+            img_client_portrait=ImgApiClient(
+                raw_cfg, remove_bg=portrait_policy,
+            ),
+            img_client_background=ImgApiClient(
+                raw_cfg, remove_bg=RemoveBgPolicy.NEVER,
+            ),
+            library=gl._roster._library,
+            img_generation_enabled=img_enabled,
+        )
+
+        roster_path = os.path.join(self._saves_root, game_id, "_asset_roster.json")
+
+        for event in prebuilder.build(
+            data.get("characters", []),
+            data.get("locations", []),
+            gl._roster,
+        ):
+            yield event
+            if event["type"] == "prebuild_complete" and event["success"]:
+                gl._roster.save(roster_path)
 
     def load_game(self, game_id: str, filename: str) -> GameLoop:
         """Load a save file and return a ready-to-play ``GameLoop``.

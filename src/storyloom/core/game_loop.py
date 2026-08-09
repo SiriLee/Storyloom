@@ -1543,39 +1543,3 @@ class GameLoop:
         waiting / timeout" (this property is ``None``).
         """
         return self._adv_error
-
-
-# ═══════════════════════════════════════════════════════════════════
-# §7.8c DELETE BLOCK START — replaced by real AI pre-build
-# ═══════════════════════════════════════════════════════════════════
-
-def _init_stub_roster(roster, story_config):
-    """Seed roster placeholders from story_config.
-
-    Characters → CHAR_PORTRAIT, locations → BACKGROUND.  All entries
-    start as placeholders (target=None) — the GenerateProcessor fills
-    them when the Director LLM issues DECLARE during the first round.
-
-    Idempotent — skips if local_name already exists.
-
-    §7.8c replaces this with real AI pre-build (LLM selection + image
-    generation for each story_config entity).
-    """
-    from storyloom.assets import AssetType
-
-    for char in story_config.get("characters", []):
-        name = char.get("name", "")
-        if name and roster.lookup(AssetType.CHAR_PORTRAIT, name) is None:
-            roster.add(AssetType.CHAR_PORTRAIT, name,
-                       char.get("description", ""),
-                       target=None)
-    for loc in story_config.get("locations", []):
-        name = loc.get("name", "")
-        if name and roster.lookup(AssetType.BACKGROUND, name) is None:
-            roster.add(AssetType.BACKGROUND, name,
-                       loc.get("description", ""),
-                       target=None)
-
-# ═══════════════════════════════════════════════════════════════════
-# §7.8c DELETE BLOCK END
-# ═══════════════════════════════════════════════════════════════════

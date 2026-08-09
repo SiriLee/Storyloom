@@ -7,18 +7,23 @@ from storyloom.core.prompt_builder import PromptBuilder
 from storyloom.core.session import GameSession
 from storyloom.core.state_manager import StateManager
 from storyloom.core.event_dispatcher import EventDispatcher
+from storyloom.core.prebuild import Prebuilder, EntitySpec, SelectionResult, PrebuildResult
 
 __all__ = [
     "CoCreateFlow",
     "CoCreateError",
     "CoCreateValidator",
     "ContextManager",
+    "EntitySpec",
     "EventDispatcher",
     "GameLoop",
     "GameSession",
     "GameState",
+    "Prebuilder",
+    "PrebuildResult",
     "PromptBuilder",
     "RoundRecord",
     "RoundResult",
+    "SelectionResult",
     "StateManager",
 ]

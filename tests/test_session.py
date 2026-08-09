@@ -212,75 +212,29 @@ class TestGameSessionLifecycle:
 # ═══════════════════════════════════════════════════════════════════
 
 class TestPrebuildAssets:
-    """§7.7: material pre-build — temporary stub, §7.8c replaces with AI."""
+    """§7.8c: AI material pre-build — generator-based pipeline.
 
-    # Self-contained test data — does not depend on SAMPLE_RESULT
-    _DATA = {
-        "story_config": {"title": "test"},
-        "characters": [
-            {"name": "Kael", "description": "A warrior"},
-            {"name": "Lira", "description": "A mage"},
-        ],
-        "locations": [
-            {"name": "Forest", "description": "Dark woods"},
-            {"name": "Castle", "description": "Ancient fortress"},
-        ],
-        "variables": [],
-        "outline": [],
-        "outline_text": "",
-    }
+    Pre-build logic is thoroughly tested in test_prebuild.py with mocked
+    APIs.  These tests verify the session-level wiring only.
+    """
 
-    def test_prebuild_seeds_roster_from_story_config(self, tmp_path):
-        """prebuild_assets() calls _init_stub_roster and persists roster."""
-        from storyloom.assets import AssetType
-
-        api = _test_api_client()
-        session = GameSession(api, saves_dir=str(tmp_path))
-        data = dict(self._DATA)  # copy — start_game mutates it
-
-        gl, game_id = session.start_game(data, game_mode="graph")
-        assert gl._roster is not None
-
-        result = session.prebuild_assets(game_id)
-        assert result == {"status": "ok"}
-
-        # prebuild_assets() loads a new GameLoop internally — use it
-        gl2 = session.game_loop
-        assert gl2 is not None
-        roster = gl2._roster
-        # §7.8b: placeholders (target=None) — GenerateProcessor fills on first DECLARE
-        assert roster.lookup(AssetType.CHAR_PORTRAIT, "Kael").target is None
-        assert roster.lookup(AssetType.CHAR_PORTRAIT, "Lira").target is None
-        assert roster.lookup(AssetType.BACKGROUND, "Forest").target is None
-        assert roster.lookup(AssetType.BACKGROUND, "Castle").target is None
-
-        import os as _os
-        roster_path = _os.path.join(session._saves_root, game_id, "_asset_roster.json")
-        assert _os.path.isfile(roster_path)
-
-    def test_prebuild_idempotent(self, tmp_path):
-        """Calling prebuild twice is safe."""
+    def test_prebuild_text_mode_skips_with_error(self, tmp_path):
+        """prebuild_assets() on text-mode game yields failure (roster is None)."""
         api = _test_api_client()
         session = GameSession(api, saves_dir=str(tmp_path))
 
-        gl, game_id = session.start_game(dict(self._DATA), game_mode="graph")
-        assert gl._roster is not None
-
-        first = session.prebuild_assets(game_id)
-        second = session.prebuild_assets(game_id)
-        assert first == second == {"status": "ok"}
-
-    def test_prebuild_text_mode_is_noop(self, tmp_path):
-        """prebuild_assets() on text-mode game returns ok (roster is None)."""
-        api = _test_api_client()
-        session = GameSession(api, saves_dir=str(tmp_path))
-
-        gl, game_id = session.start_game(dict(self._DATA), game_mode="text")
+        data = {
+            "story_config": {"title": "test"},
+            "characters": [{"name": "Kael", "description": "A warrior"}],
+            "locations": [{"name": "Forest", "description": "Dark woods"}],
+            "variables": [],
+            "outline": [],
+        }
+        gl, game_id = session.start_game(data, game_mode="text")
         assert gl._roster is None
 
-        data = session.prebuild_assets(game_id)
-        assert data == {"status": "ok"}
-
-# ═══════════════════════════════════════════════════════════════════
-# §7.8c DELETE BLOCK END
-# ═══════════════════════════════════════════════════════════════════
+        events = list(session.prebuild_assets(game_id))
+        assert len(events) == 1
+        assert events[0]["type"] == "prebuild_complete"
+        assert events[0]["success"] is False
+        assert "not mounted" in events[0]["errors"][0]
