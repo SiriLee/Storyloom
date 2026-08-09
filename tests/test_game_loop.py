@@ -1351,8 +1351,13 @@ class TestGameLoopGraphPipeline:
 
         # GENERATE: §7.8b — GenerateProcessor.  Use 'global' scope to avoid
         # triggering AI image generation (which would need a real API).
-        # The mock must return a valid asset_id from the system catalog.
-        gl.api_client.response = '{"scope": "global", "selected": "sys_adult_female"}'
+        # Seed the library with a fake global asset so the mock has a valid
+        # target — avoids depending on system_media/ (generated, not in git).
+        gl._roster._library.add(
+            AssetType.CHAR_PORTRAIT, "Fake Global Asset",
+            "Test asset for generate", asset_id="fake_global",
+        )
+        gl.api_client.response = '{"scope": "global", "selected": "fake_global"}'
         g = Task(TaskType.GENERATE, 0, AssetType.CHAR_PORTRAIT)
         gl._roster.add(AssetType.CHAR_PORTRAIT, "new_hero",
                        "New character", target=None)
@@ -1372,12 +1377,43 @@ class TestGameLoopGraphPipeline:
 
     def test_mount_registers_system_assets(self, tmp_path):
         """§7.8: mount_graph_pipeline() imports system assets into the library."""
-        gl = self._make_gl()
-        gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
+        import json
+        from unittest import mock
+
+        # Build a minimal system_media/ with a valid manifest so the test
+        # is self-contained — system_media/ is a generated artifact (not in
+        # git), so tests must not depend on it being present.
+        sys_dir = tmp_path / "system_media"
+        sys_dir.mkdir()
+        manifest = {
+            "version": "1.0.0",
+            "min_app_version": "1.3.0",
+            "assets": {
+                "char_portrait": {
+                    "sys_adult_female": {
+                        "name": "Adult Female",
+                        "description": "A generic adult female character.",
+                    },
+                    "sys_adult_male": {
+                        "name": "Adult Male",
+                        "description": "A generic adult male character.",
+                    },
+                },
+            },
+        }
+        (sys_dir / "_manifest.json").write_text(
+            json.dumps(manifest), encoding="utf-8",
+        )
+        (sys_dir / "VERSION").write_text("1.0.0\n", encoding="utf-8")
+
+        with mock.patch("storyloom.config.DEFAULT_SYSTEM_MEDIA_DIR", str(sys_dir)):
+            gl = self._make_gl()
+            gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
+
         assert gl._roster is not None
         from storyloom.assets import AssetType
         lib = gl._roster._library
-        # System assets should be imported (system_media/ exists in project)
+        # System assets should be imported from the manifest
         char_assets = lib.list_by_type(AssetType.CHAR_PORTRAIT)
         assert len(char_assets) > 0, "System CHAR_PORTRAIT assets should be imported"
         # Roster should be empty at mount time
