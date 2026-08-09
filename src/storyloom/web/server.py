@@ -312,6 +312,8 @@ def co_create_generate():
         "game_id": game_id,
         "game_mode": cfg.game_mode,
         "story_config": result["story_config"],
+        "characters": result["characters"],
+        "locations": result["locations"],
         "outline_text": result["outline_text"],
     }
 
@@ -338,6 +340,8 @@ def co_create_retry_generate():
         "game_id": game_id,
         "game_mode": cfg.game_mode,
         "story_config": result["story_config"],
+        "characters": result["characters"],
+        "locations": result["locations"],
         "outline_text": result["outline_text"],
     }
 
@@ -360,10 +364,15 @@ async def co_create_prebuild_stream(game_id: str):
     q: asyncio.Queue = asyncio.Queue()
     loop = asyncio.get_running_loop()
 
+    # ── Reuse the stored GameLoop (from co_create_generate) instead
+    # of loading a throwaway copy — its roster is the one the game
+    # will use after prebuild completes.
+    gl = sessions.get_game(game_id)
+
     # ── Background thread: run prebuild pipeline ────────────────────
     def run_prebuild() -> None:
         try:
-            for event in _game_session.prebuild_assets(game_id):
+            for event in _game_session.prebuild_assets(game_id, game_loop=gl):
                 loop.call_soon_threadsafe(q.put_nowait, event)
                 if event["type"] == "prebuild_complete":
                     return

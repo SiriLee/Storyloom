@@ -132,12 +132,12 @@ const CoCreateView = (function () {
        card grid from story_config, then streams per-entity status updates
        via SSE until prebuild_complete. */
 
-    /** Render the prebuild card grid from story_config entities.
+    /** Render the prebuild card grid from entity arrays.
      *  Returns { cards: {name → DOM element}, progressEl } so the SSE
      *  handler can update individual cards in O(1). */
-    function _renderPrebuildView(config) {
-        var characters = config.characters || [];
-        var locations = config.locations || [];
+    function _renderPrebuildView(characters, locations) {
+        characters = characters || [];
+        locations = locations || [];
 
         var charCardsHtml = '';
         characters.forEach(function (ch, i) {
@@ -387,12 +387,12 @@ const CoCreateView = (function () {
 
             // ── Phase 2: Material pre-build (§7.8c SSE) ──────────
             if (genData.game_mode === "graph") {
-                var storyConfig = genData.story_config || {};
-                var hasEntities = (storyConfig.characters && storyConfig.characters.length > 0) ||
-                                  (storyConfig.locations && storyConfig.locations.length > 0);
+                var characters = genData.characters || [];
+                var locations = genData.locations || [];
+                var hasEntities = characters.length > 0 || locations.length > 0;
 
                 if (hasEntities) {
-                    var pbState = _renderPrebuildView(storyConfig);
+                    var pbState = _renderPrebuildView(characters, locations);
                     var pbResult = await _connectPrebuildStream(
                         genData.game_id, pbState.cards, pbState.progressEl
                     );
@@ -441,12 +441,12 @@ const CoCreateView = (function () {
 
             // ── Phase 2: Material pre-build (§7.8c SSE) ──────────
             if (genData.game_mode === "graph") {
-                var storyConfig = genData.story_config || {};
-                var hasEntities = (storyConfig.characters && storyConfig.characters.length > 0) ||
-                                  (storyConfig.locations && storyConfig.locations.length > 0);
+                var characters = genData.characters || [];
+                var locations = genData.locations || [];
+                var hasEntities = characters.length > 0 || locations.length > 0;
 
                 if (hasEntities) {
-                    var pbState = _renderPrebuildView(storyConfig);
+                    var pbState = _renderPrebuildView(characters, locations);
                     var pbResult = await _connectPrebuildStream(
                         genData.game_id, pbState.cards, pbState.progressEl
                     );
