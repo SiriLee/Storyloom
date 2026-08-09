@@ -375,15 +375,13 @@ def _select_forced(
 ) -> str:
     """Run forced LLM selection — must return an ``asset_id``.
 
-    Two attempts: light-thinking then enabled-thinking.  If both fail,
-    programmatic pick: first ``sys_`` asset in the library of the given
-    type, then first user asset, or raises ``RuntimeError`` if the
-    library is empty.
+    Attempt 1: disabled thinking (fast).  If that fails, retry with
+    enabled thinking.  If both fail, programmatic pick.
     """
-    # Attempt 1: light thinking
+    # Attempt 1: disabled thinking (fast)
     result = _select(
         api_client, asset_type, target_name, target_description,
-        roster, library, forced=True, thinking_mode="light",
+        roster, library, forced=True, thinking_mode="disabled",
     )
     if result is not None:
         return result

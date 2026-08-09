@@ -686,7 +686,7 @@ class TestForcedSelection:
         assert result == "lib_elf_01"
         assert len(api.calls) == 2
         # First attempt: light thinking
-        assert api.calls[0]["extra_params"]["thinking"]["type"] == "enabled"  # DeepSeek light
+        assert api.calls[0]["extra_params"]["thinking"]["type"] == "disabled"  # fast attempt
         # Retry: enabled (heavier) thinking
         assert api.calls[1]["extra_params"] == {}
 
