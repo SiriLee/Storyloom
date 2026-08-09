@@ -283,10 +283,10 @@ def _make_scenarios(library: AssetLibrary) -> list[dict]:
         ],
         # Forced must pick SOMETHING — verify plausible choices.
         "accept": {
-            "Aldric": {"sys_officer_male", "sys_middle_male", "sys_adult_male"},
+            "Aldric": {"sys_officer_male", "sys_middle_male", "sys_adult_male", "sys_elderly_male"},
             "Lyra": {"sys_young_female", "sys_adult_female"},
             "Grimm": {"sys_worker_male", "sys_middle_male", "sys_adult_male"},
-            "Morgana": {"sys_adult_female", "sys_middle_female", "sys_young_female"},
+            "Morgana": {"sys_adult_female", "sys_middle_female", "sys_young_female", "sys_noble_female"},
         },
     })
 
@@ -388,7 +388,9 @@ def main():
 
     print(f"Model      : {model}")
     print(f"Base URL   : {base_url}")
-    print(f"Thinking   : light (via run_batch_selection)")
+    import os as _os
+    mode = _os.environ.get("LLM_SELECT_THINKING", "light")
+    print(f"Thinking   : {mode} (LLM_SELECT_THINKING env, via run_batch_selection)")
     print("=" * 72)
 
     library = load_system_library()
