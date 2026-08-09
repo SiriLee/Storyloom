@@ -436,9 +436,14 @@ class TestCoCreateAbort:
 class TestCoCreatePrebuild:
     def test_prebuild_stream_returns_sse(self, client, app_dir):
         """GET /api/co-create/prebuild/{id}/stream → SSE progress events."""
+        from storyloom.web import sessions
         from storyloom.web.server import _game_session
 
-        def _fake_prebuild(game_id):
+        # Store a fake game in the session so the endpoint's
+        # sessions.get_game() call succeeds (added in P2 fix).
+        sessions.store_game("test-game-123", MagicMock())
+
+        def _fake_prebuild(game_id, game_loop=None):
             yield {
                 "type": "prebuild_progress",
                 "phase": "parse",

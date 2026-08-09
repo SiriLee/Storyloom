@@ -36,6 +36,11 @@ class GameAssetRoster:
         self._items: dict[AssetType, dict[str, AssetItem]] = {}
         self._lock = threading.Lock()
 
+    @property
+    def library(self) -> "AssetLibrary":
+        """The global ``AssetLibrary`` this roster references.  (Read-only.)"""
+        return self._library
+
     # ── CRUD ────────────────────────────────────────────────────────
 
     def add(
