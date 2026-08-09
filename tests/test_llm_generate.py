@@ -594,15 +594,15 @@ class TestLLMSelection:
                          "desc", sel_roster, sel_library, forced=False)
         assert result is None
 
-    def test_uses_light_thinking(self, sel_roster, sel_library):
-        """LLM call includes light thinking params."""
+    def test_uses_disabled_thinking_by_default(self, sel_roster, sel_library):
+        """LLM call uses disabled thinking by default (prompt_lab 15/15 pass)."""
         from storyloom.tasks._llm_generate import _select
 
         api = FakeApiClient(responses=['{"scope": "game", "selected": "hero"}'])
         _select(api, AssetType.CHAR_PORTRAIT, "hero", "desc",
                 sel_roster, sel_library, forced=False)
         extra = api.calls[0]["extra_params"]
-        assert extra == {"thinking": {"type": "enabled"}}  # DeepSeek light
+        assert extra == {"thinking": {"type": "disabled"}}  # DeepSeek disabled
 
     def test_uses_json_response_format(self, sel_roster, sel_library):
         """LLM call includes response_format={'type': 'json_object'}."""

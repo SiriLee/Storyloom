@@ -1,8 +1,8 @@
 """LLM-based asset generation — selection + AI image generation for GENERATE tasks.
 
 Per design.md §5.5: two-phase — LLM selection (roster + library) then AI image
-generation.  Single light-thinking LLM call for selection.  Silent degradation
-via forced selection on failure.
+generation.  Single disabled-thinking LLM call for selection (prompt_lab
+15/15 pass).  Silent degradation via forced selection on failure.
 
 Prompts are specified in docs/graph-mode-spec/prompt-design-llm-generate.md.
 """
@@ -283,12 +283,18 @@ def _select(
     roster: GameAssetRoster,
     library,  # AssetLibrary
     forced: bool = False,
-    thinking_mode: str = "light",
+    thinking_mode: str = "disabled",
 ) -> str | None:
     """Run LLM selection.  Returns ``asset_id`` or ``None``.
 
     On ApiError or unparseable response, returns ``None``
     (caller handles fallback).
+
+    Defaults to disabled thinking — the selection task (pick from a
+    known list by name/description) is straightforward enough that
+    reasoning overhead adds latency without improving accuracy.
+    prompt_lab 15/15 pass at disabled, including zh↔en cross-lingual
+    and church/temple disambiguation.
     """
     from storyloom.io.api_client import ApiError
     from storyloom.io.thinking import get_thinking_params
@@ -503,8 +509,8 @@ class GenerateProcessor:
         gen = TaskGenerator(queue, roster, generate_processor=processor)
 
     Per design.md §5.5: two-phase — LLM selection (roster + library)
-    then AI image generation.  Single light-thinking LLM call for
-    selection.  Silent degradation via forced selection on failure.
+    then AI image generation.  Single disabled-thinking LLM call for
+    selection (prompt_lab 15/15).  Silent degradation via forced selection on failure.
     """
 
     def __init__(
