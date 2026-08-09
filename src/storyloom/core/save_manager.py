@@ -351,7 +351,7 @@ class SaveManager:
 
         Returns:
             List of ``{game_id, title, language, premise, tier,
-            created_at, save_count[, last_played_at]}`` dicts.
+            created_at, save_count, mode[, last_played_at]}`` dicts.
         """
         root_path = Path(root)
         if not root_path.exists():
@@ -380,6 +380,7 @@ class SaveManager:
                 "tier": sc.get("tier", ""),
                 "created_at": meta.get("created_at", ""),
                 "save_count": save_count,
+                "mode": data.get("config", {}).get("mode", "text"),
             }
             if enrich and save_files:
                 try:

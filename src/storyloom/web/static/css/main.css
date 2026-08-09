@@ -1452,6 +1452,27 @@ button.accent:hover, .btn-accent:hover {
     padding-bottom: var(--space-3xl);
 }
 
+/* ── Mode badge (game preview) ──────────────────────────────── */
+
+.gp-mode-badge {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 0.15em 0.65em;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: var(--space-md);
+    background: rgba(78, 204, 163, 0.12);
+    color: var(--text-accent);
+    border: 1px solid rgba(78, 204, 163, 0.25);
+}
+
+.gp-mode-badge[data-mode="graph"] {
+    background: rgba(204, 163, 78, 0.12);
+    color: #cca34e;
+    border-color: rgba(204, 163, 78, 0.25);
+}
+
 .gp-label {
     font-family: var(--font-mono);
     font-size: var(--font-3xl);
@@ -1615,6 +1636,27 @@ button.accent:hover, .btn-accent:hover {
     white-space: nowrap;
     height: 1.3em;
     transition: height var(--trans-slow);
+}
+
+/* ── Mode badge (save list) ─────────────────────────────────── */
+
+.sv-mode-badge {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.1em 0.55em;
+    border-radius: 3px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: rgba(78, 204, 163, 0.12);
+    color: var(--text-accent);
+    border: 1px solid rgba(78, 204, 163, 0.25);
+}
+
+.sv-mode-badge[data-mode="graph"] {
+    background: rgba(204, 163, 78, 0.12);
+    color: #cca34e;
+    border-color: rgba(204, 163, 78, 0.25);
 }
 
 .sv-card-time {

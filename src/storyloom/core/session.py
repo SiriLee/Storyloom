@@ -224,7 +224,7 @@ class GameSession:
 
         Returns:
             List of ``{game_id, title, language, premise, tier,
-            created_at, save_count[, last_played_at]}`` dicts.
+            created_at, save_count, mode[, last_played_at]}`` dicts.
         """
         games = SaveManager.list_games(self._saves_root, enrich=enrich_last_played)
         if enrich_last_played:

@@ -657,6 +657,7 @@
                 </div>
 
                 <div class="gp-content">
+                    <span class="gp-mode-badge" data-mode="${esc(GameState.gameMode || "text")}">${esc(_(GameState.gameMode === "graph" ? "Graph" : "Text"))}</span>
                     <h1 class="gp-label">${esc(config.title)}</h1>
                     <p class="gp-setting">${esc(config.premise || "")}</p>
 
@@ -740,6 +741,7 @@
                     <div class="sv-card-main">
                         <span class="sv-card-label">${esc(g.title)}</span>
                         <div class="sv-card-meta">
+                            <span class="sv-mode-badge" data-mode="${esc(g.mode || "text")}">${esc(_(g.mode === "graph" ? "Graph" : "Text"))}</span>
                             <span>${esc(g.premise || "?")}</span>
                         </div>
                     </div>
