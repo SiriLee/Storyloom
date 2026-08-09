@@ -510,7 +510,6 @@ def run_batch_selection(
 
         raw = api_client.chat(
             messages=msgs,
-            max_tokens=1024,
             response_format={"type": "json_object"},
             extra_params=get_thinking_params(api_client.model, thinking_mode),
         )

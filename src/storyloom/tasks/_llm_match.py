@@ -250,7 +250,6 @@ def _call_llm(
     try:
         raw = api.chat(
             messages=messages,
-            max_tokens=64,
             response_format={"type": "json_object"},
             extra_params=get_thinking_params(api.model, thinking_mode),
         )

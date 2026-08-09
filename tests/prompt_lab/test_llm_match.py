@@ -217,7 +217,6 @@ def main():
             try:
                 result = api.stream_chat(
                     messages=messages,
-                    max_tokens=64,
                     response_format={"type": "json_object"},
                     extra_params=disabled_params,
                 )
