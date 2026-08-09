@@ -601,7 +601,13 @@ class Prebuilder:
 
         errors: list[str] = []
 
-        # ── Step 0: Parse ──────────────────────────────────────────
+        # ── Step 0: Clear + Parse ──────────────────────────────────
+        # Per design.md §6.1 Step 4: the roster must be empty when
+        # prebuild starts.  Clear any stale entries from a previous
+        # prebuild (retry-generate path) so leftover entity names
+        # don't match wrong assets during gameplay.
+        roster.clear()
+
         entities = parse_entities(characters=characters, locations=locations)
         if not entities:
             yield {
