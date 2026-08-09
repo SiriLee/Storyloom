@@ -1234,6 +1234,189 @@ button.accent:hover, .btn-accent:hover {
     font-size: var(--font-3xl);
 }
 
+/* ── Prebuild Screen (§7.8c) ─────────────────────────────────────── */
+/* Card grid showing entity status during AI material pre-building.
+   Two-column layout: characters | backgrounds.  Cards appear at
+   parse time and update as selection / generation events arrive.     */
+
+.pb-view {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 4rem);
+    max-width: 900px;
+    margin: 0 auto;
+    animation: fadeIn var(--trans-slow);
+}
+
+.pb-header {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 0 0.4rem;
+}
+
+.pb-title {
+    font-family: var(--font-sans);
+    font-size: var(--font-lg);
+    color: var(--text-accent);
+    margin-left: 0.8rem;
+}
+
+/* ── Two-column grid ────────────────────────────────────────────── */
+
+.pb-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem 0 1rem;
+    align-content: start;
+}
+
+.pb-column-label {
+    font-family: var(--font-sans);
+    font-size: var(--font-xs);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.3rem;
+    padding-left: 0.2rem;
+}
+
+/* ── Card ───────────────────────────────────────────────────────── */
+
+.pb-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem 0.9rem;
+    margin-bottom: 0.5rem;
+    transition: border-color 0.4s, box-shadow 0.4s, opacity 0.3s;
+    animation: pbCardIn 0.35s ease-out both;
+    position: relative;
+    overflow: hidden;
+}
+
+.pb-card-name {
+    font-family: var(--font-serif);
+    font-size: var(--font-base);
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.pb-card-status {
+    font-family: var(--font-mono);
+    font-size: var(--font-xs);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+/* ── Card states ────────────────────────────────────────────────── */
+
+/* waiting: gray, subtle pulse */
+.pb-card.waiting {
+    border-color: var(--border-color);
+}
+.pb-card.waiting .pb-card-status { color: var(--text-secondary); }
+.pb-card.waiting .pb-status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+    animation: pbPulse 1.5s ease-in-out infinite;
+}
+
+/* selecting: accent pulse (brief — during LLM batch selection) */
+.pb-card.selecting {
+    border-color: rgba(78, 204, 163, 0.3);
+}
+.pb-card.selecting .pb-card-status { color: var(--text-accent); }
+.pb-card.selecting .pb-status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-accent);
+    animation: pbPulse 0.8s ease-in-out infinite;
+}
+
+/* matched: green glow once, then steady */
+.pb-card.matched {
+    border-color: rgba(78, 204, 163, 0.4);
+    box-shadow: 0 0 8px rgba(78, 204, 163, 0.12);
+}
+.pb-card.matched .pb-card-status { color: var(--text-accent); }
+
+/* generating: warm pulse */
+.pb-card.generating {
+    border-color: rgba(240, 160, 80, 0.4);
+}
+.pb-card.generating .pb-card-status { color: var(--text-warning); }
+.pb-card.generating .pb-status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-warning);
+    animation: pbPulse 0.8s ease-in-out infinite;
+}
+
+/* generated: green steady */
+.pb-card.generated {
+    border-color: rgba(78, 204, 163, 0.5);
+    box-shadow: 0 0 10px rgba(78, 204, 163, 0.15);
+}
+.pb-card.generated .pb-card-status { color: var(--text-accent); }
+
+/* failed: red */
+.pb-card.failed {
+    border-color: rgba(224, 85, 85, 0.5);
+    box-shadow: 0 0 8px rgba(224, 85, 85, 0.12);
+}
+.pb-card.failed .pb-card-status { color: var(--text-error); }
+
+/* ── Progress bar ───────────────────────────────────────────────── */
+
+.pb-progress {
+    font-family: var(--font-mono);
+    font-size: var(--font-xs);
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 0.5rem 0 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+}
+
+.pb-progress .cc-dots {
+    font-size: var(--font-xs);
+}
+
+/* ── Animations ─────────────────────────────────────────────────── */
+
+@keyframes pbCardIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pbPulse {
+    0%, 100% { opacity: 0.35; transform: scale(1); }
+    50%      { opacity: 1.0;  transform: scale(1.4); }
+}
+
+/* Staggered entrance delays (JS sets inline style for nth-child) */
+
+/* ── Responsive: single column on narrow screens ─────────────────── */
+@media (max-width: 600px) {
+    .pb-grid {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+}
+
 /* ── Game Preview Screen ────────────────────────────────────────── */
 /* Transition page between co-creation generate and game/new.
    Shows story label and setting, centered, with a back button

@@ -127,13 +127,234 @@ const CoCreateView = (function () {
 
     /* ── Start button — Phase 1: generate story setup ────────────── */
 
-    /** Minimum display time for the material pre-build transition (ms).
-     *  §7.7: engine signals completion quickly (stub), UI pads to 2 s. */
-    const PREBUILD_MIN_DISPLAY_MS = 2000;
+    /* ── Prebuild phase (§7.8c SSE) ────────────────────────────────── */
+    /* Replaces the old sync POST + static transition screen.  Renders a
+       card grid from story_config, then streams per-entity status updates
+       via SSE until prebuild_complete. */
 
-    /** Wait until at least *ms* have elapsed since *start* (wall-clock). */
-    function _sleep(ms) {
-        return new Promise(function (resolve) { setTimeout(resolve, ms); });
+    /** Render the prebuild card grid from story_config entities.
+     *  Returns { cards: {name → DOM element}, progressEl } so the SSE
+     *  handler can update individual cards in O(1). */
+    function _renderPrebuildView(config) {
+        var characters = config.characters || [];
+        var locations = config.locations || [];
+
+        var charCardsHtml = '';
+        characters.forEach(function (ch, i) {
+            charCardsHtml += _buildCardHtml(ch.name, 'char_portrait', i);
+        });
+
+        var bgCardsHtml = '';
+        locations.forEach(function (loc, i) {
+            bgCardsHtml += _buildCardHtml(loc.name, 'background', i);
+        });
+
+        _container.innerHTML =
+            '<div class="pb-view">' +
+                '<div class="pb-header">' +
+                    '<span class="pb-title">' + esc(_("Building Your World")) + '</span>' +
+                '</div>' +
+                '<div class="pb-grid">' +
+                    '<div>' +
+                        '<div class="pb-column-label">' + esc(_("Characters")) + '</div>' +
+                        '<div id="pb-char-cards">' + charCardsHtml + '</div>' +
+                    '</div>' +
+                    '<div>' +
+                        '<div class="pb-column-label">' + esc(_("Scenes")) + '</div>' +
+                        '<div id="pb-bg-cards">' + bgCardsHtml + '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="pb-progress" id="pb-progress">' +
+                    esc(_("Connecting...")) +
+                '</div>' +
+            '</div>';
+
+        /* Build card lookup map — each card is already in the DOM,
+           we just grab references by entity name. */
+        var cards = {};
+        var allCards = _container.querySelectorAll('.pb-card');
+        allCards.forEach(function (el) {
+            cards[el.getAttribute('data-entity')] = el;
+        });
+
+        var progressEl = document.getElementById('pb-progress');
+
+        return { cards: cards, progressEl: progressEl };
+    }
+
+    /** Build inner HTML for one entity card. */
+    function _buildCardHtml(name, assetType, index) {
+        var escName = esc(name);
+        var delay = (index * 0.04).toFixed(2);
+        return (
+            '<div class="pb-card waiting" data-entity="' + escName + '"' +
+            '     data-asset-type="' + assetType + '"' +
+            '     style="animation-delay:' + delay + 's">' +
+                '<div class="pb-card-name">' + escName + '</div>' +
+                '<div class="pb-card-status">' +
+                    '<span class="pb-status-dot"></span>' +
+                    '<span class="pb-status-text"></span>' +
+                '</div>' +
+            '</div>'
+        );
+    }
+
+    /** Set a card's visual state + status text. */
+    function _setCardState(card, state, text) {
+        card.className = 'pb-card ' + state;
+        var textEl = card.querySelector('.pb-status-text');
+        if (textEl) textEl.textContent = text;
+    }
+
+    /** Update the bottom progress line. */
+    function _updatePrebuildProgress(el, text, showDots) {
+        if (showDots === undefined) showDots = true;
+        el.innerHTML =
+            '<span>' + esc(text) + '</span>' +
+            (showDots ? '<span class="cc-dots"><span>.</span><span>.</span><span>.</span></span>' : '');
+    }
+
+    /** Handle one SSE event — dispatch by phase. */
+    function _handlePrebuildEvent(data, cards, progressEl) {
+        var phase = data.phase || '';
+
+        if (phase === 'parse') {
+            /* All entities parsed — cards transition from "waiting" to "selecting". */
+            Object.values(cards).forEach(function (c) {
+                _setCardState(c, 'selecting', _("matching..."));
+            });
+            _updatePrebuildProgress(progressEl, _("Matching entities to library assets..."));
+            return;
+        }
+
+        if (phase === 'selection') {
+            /* Aggregate counts only — per-entity results arrive in "seeded". */
+            var atLabel = data.asset_type === 'char_portrait' ? _("Characters") : _("Scenes");
+            _updatePrebuildProgress(progressEl,
+                atLabel + ': ' + data.matched + ' ' + _("matched") + ', ' +
+                data.to_generate + ' ' + _("to generate"));
+            return;
+        }
+
+        if (phase === 'seeded') {
+            /* Per-entity selection results — flip all cards to final pre-generation state. */
+            var entities = data.entities || [];
+            var toGenerate = 0;
+            entities.forEach(function (e) {
+                var card = cards[e.name];
+                if (!card) return;
+                if (e.action === 'matched') {
+                    _setCardState(card, 'matched', e.asset_id || 'matched');
+                } else {
+                    _setCardState(card, 'generating', _("generating..."));
+                    toGenerate++;
+                }
+            });
+            if (toGenerate > 0) {
+                _updatePrebuildProgress(progressEl,
+                    _("Generating") + ' ' + toGenerate + ' ' + _("images..."));
+            } else {
+                _updatePrebuildProgress(progressEl,
+                    _("All assets ready"), false);
+            }
+            return;
+        }
+
+        if (phase === 'generate') {
+            /* Single entity generation completed. */
+            var card = cards[data.entity];
+            if (!card) return;
+            if (data.status === 'generated') {
+                _setCardState(card, 'generated', _("generated"));
+            } else {
+                _setCardState(card, 'failed', _("failed"));
+            }
+            _updatePrebuildProgress(progressEl,
+                _("Generating images...") + ' ' + data.completed + '/' + data.total + ' ' + _("complete"));
+            return;
+        }
+    }
+
+    /** Connect to the prebuild SSE stream and drive the card UI.
+     *  Returns the ``prebuild_complete`` event data, or null on
+     *  connection error. */
+    async function _connectPrebuildStream(gameId, cards, progressEl) {
+        var url = '/api/co-create/prebuild/' + encodeURIComponent(gameId) + '/stream';
+        var completeEvent = null;
+
+        var response;
+        try {
+            response = await fetch(url);
+        } catch (err) {
+            return null;  // network error — caller handles
+        }
+
+        if (!response.ok) {
+            return null;
+        }
+
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+
+        try {
+            while (true) {
+                var chunk = await reader.read();
+                if (chunk.done) break;
+
+                buffer += decoder.decode(chunk.value, { stream: true });
+
+                /* Parse SSE frames: split on double-newline.
+                   Incomplete final chunk stays in buffer. */
+                var parts = buffer.split('\n\n');
+                buffer = parts.pop() || '';
+
+                parts.forEach(function (frame) {
+                    if (!frame.trim()) return;
+                    var eventType = '';
+                    var lines = frame.split('\n');
+                    lines.forEach(function (line) {
+                        if (line.startsWith('event: ')) {
+                            eventType = line.slice(7).trim();
+                        } else if (line.startsWith('data: ')) {
+                            try {
+                                var data = JSON.parse(line.slice(6));
+                                _handlePrebuildEvent(data, cards, progressEl);
+                                if (eventType === 'prebuild_complete' || data.type === 'prebuild_complete') {
+                                    completeEvent = data;
+                                }
+                            } catch (_) { /* malformed JSON — skip */ }
+                        }
+                    });
+                });
+            }
+        } finally {
+            try { reader.cancel(); } catch (_) { /* ok */ }
+        }
+
+        return completeEvent;
+    }
+
+    /** Render a prebuild error with Retry + Back to Menu buttons.
+     *  (Lightweight inline version — no cards, just error message.) */
+    function _renderPrebuildError(errors, retryHandler) {
+        var msg = Array.isArray(errors) ? errors.join('; ') : String(errors);
+        _container.innerHTML =
+            '<div class="pb-view">' +
+                '<div class="cc-transition-text" style="font-size:1.4rem; color:var(--text-error); margin-bottom:1.5rem;">' +
+                    esc(msg) +
+                '</div>' +
+                '<div style="display:flex; gap:0.8rem; justify-content:center;">' +
+                    '<button class="menu-btn" id="pb-retry">' + esc(_("Retry")) + '</button>' +
+                    '<button class="menu-btn" id="pb-back">' + esc(_("Back to Menu")) + '</button>' +
+                '</div>' +
+            '</div>';
+        document.getElementById('pb-retry').addEventListener('click', function () {
+            retryHandler();
+        });
+        document.getElementById('pb-back').addEventListener('click', function () {
+            Router.navigate('menu');
+        });
     }
 
     async function _handleStart() {
@@ -157,16 +378,26 @@ const CoCreateView = (function () {
             GameState.gameMode = genData.game_mode || "text";  // §7.7
             GameState.storyConfig = genData.story_config;
 
-            // ── Phase 2: Material pre-build (§7.7 stub) ────────────
+            // ── Phase 2: Material pre-build (§7.8c SSE) ──────────
             if (genData.game_mode === "graph") {
-                _renderTransition(_("Preparing your world"));
-                var t0 = Date.now();
-                await API.post("/api/co-create/prebuild", { game_id: genData.game_id });
+                var storyConfig = genData.story_config || {};
+                var hasEntities = (storyConfig.characters && storyConfig.characters.length > 0) ||
+                                  (storyConfig.locations && storyConfig.locations.length > 0);
 
-                // §7.7: wait at least 2 s so the transition is visible
-                var elapsed = Date.now() - t0;
-                if (elapsed < PREBUILD_MIN_DISPLAY_MS) {
-                    await _sleep(PREBUILD_MIN_DISPLAY_MS - elapsed);
+                if (hasEntities) {
+                    var pbState = _renderPrebuildView(storyConfig);
+                    var completeEvent = await _connectPrebuildStream(
+                        genData.game_id, pbState.cards, pbState.progressEl
+                    );
+
+                    if (!completeEvent || !completeEvent.success) {
+                        var errors = (completeEvent && completeEvent.errors) || [_("Prebuild failed")];
+                        _renderPrebuildError(errors, _retryGenerate);
+                        return;
+                    }
+
+                    /* Brief pause so the user can see all cards as "done". */
+                    await new Promise(function (r) { setTimeout(r, 800); });
                 }
             }
 
@@ -195,14 +426,26 @@ const CoCreateView = (function () {
             GameState.gameMode = genData.game_mode || "text";  // §7.7
             GameState.storyConfig = genData.story_config;
 
-            // ── Phase 2: Material pre-build (§7.7 stub) ────────────
+            // ── Phase 2: Material pre-build (§7.8c SSE) ──────────
             if (genData.game_mode === "graph") {
-                _renderTransition(_("Preparing your world"));
-                var t0 = Date.now();
-                await API.post("/api/co-create/prebuild", { game_id: genData.game_id });
-                var elapsed = Date.now() - t0;
-                if (elapsed < PREBUILD_MIN_DISPLAY_MS) {
-                    await _sleep(PREBUILD_MIN_DISPLAY_MS - elapsed);
+                var storyConfig = genData.story_config || {};
+                var hasEntities = (storyConfig.characters && storyConfig.characters.length > 0) ||
+                                  (storyConfig.locations && storyConfig.locations.length > 0);
+
+                if (hasEntities) {
+                    var pbState = _renderPrebuildView(storyConfig);
+                    var completeEvent = await _connectPrebuildStream(
+                        genData.game_id, pbState.cards, pbState.progressEl
+                    );
+
+                    if (!completeEvent || !completeEvent.success) {
+                        var errors = (completeEvent && completeEvent.errors) || [_("Prebuild failed")];
+                        _renderPrebuildError(errors, _retryGenerate);
+                        return;
+                    }
+
+                    /* Brief pause so the user can see all cards as "done". */
+                    await new Promise(function (r) { setTimeout(r, 800); });
                 }
             }
 
