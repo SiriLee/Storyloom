@@ -62,23 +62,22 @@ def load_system_library() -> AssetLibrary:
 # Test scenarios
 # ═══════════════════════════════════════════════════════════════════════
 #
-# Each scenario: (label, asset_type, entities, mode, language)
-#   entities: list of (name, description, appearance_or_empty)
-#   mode: "normal" | "forced"
-#   language: "zh-CN" | "en" (informational, not injected into prompt)
+# accept: dict[str, str | set] — per-entity expected result.
+#   "generate"     → must have action="generate"
+#   "matched"      → must have action="matched" (forced mode, any asset)
+#   {"id", ...}    → must have action="matched" AND asset_id in this set
+#   None           → accept anything (not validated)
 
 def _make_scenarios(library: AssetLibrary) -> list[dict]:
     """Build test scenarios using real library data."""
 
-    # Quick sanity: count available assets per type
-    char_count = len(library.list_by_type(AssetType.CHAR_PORTRAIT))
-    bg_count = len(library.list_by_type(AssetType.BACKGROUND))
-
+    # ── zh-CN: realistic characters (from actual saves) ─────────────
+    # System has: sys_student_male, sys_student_female → should match
+    # students.  But wuxia outfits don't match neutral system portraits.
     scenarios: list[dict] = []
 
-    # ── zh-CN: realistic characters (from actual saves) ─────────────
     scenarios.append({
-        "label": "zh-CN CHAR normal — 校园角色 (3 entities, library has 25)",
+        "label": "zh-CN CHAR normal — 校园角色",
         "asset_type": AssetType.CHAR_PORTRAIT,
         "mode": "normal",
         "entities": [
@@ -92,10 +91,17 @@ def _make_scenarios(library: AssetLibrary) -> list[dict]:
                        "圆脸，戴黑框眼镜，总是笑嘻嘻的，穿着宽大的运动服",
                        AssetType.CHAR_PORTRAIT),
         ],
+        # Students should match student assets; library is neutral so
+        # generate is also acceptable (conservative preference).
+        "accept": {
+            "林逸": {"sys_student_male", "sys_young_male", "generate"},
+            "苏小晚": {"sys_student_female", "sys_young_female", "generate"},
+            "陈浩": {"sys_student_male", "sys_young_male", "generate"},
+        },
     })
 
     scenarios.append({
-        "label": "zh-CN CHAR forced — 校园角色 (3 entities, must match all)",
+        "label": "zh-CN CHAR forced — 校园角色",
         "asset_type": AssetType.CHAR_PORTRAIT,
         "mode": "forced",
         "entities": [
@@ -106,11 +112,16 @@ def _make_scenarios(library: AssetLibrary) -> list[dict]:
             EntitySpec("陈浩", "林逸的好友", "圆脸，黑框眼镜",
                        AssetType.CHAR_PORTRAIT),
         ],
+        "accept": {
+            "林逸": {"sys_student_male", "sys_young_male"},
+            "苏小晚": {"sys_student_female", "sys_young_female"},
+            "陈浩": {"sys_student_male", "sys_young_male"},
+        },
     })
 
     # ── zh-CN: realistic locations ─────────────────────────────────
     scenarios.append({
-        "label": "zh-CN BG normal — 校园场景 (4 entities, library has 26)",
+        "label": "zh-CN BG normal — 校园场景",
         "asset_type": AssetType.BACKGROUND,
         "mode": "normal",
         "entities": [
@@ -123,10 +134,16 @@ def _make_scenarios(library: AssetLibrary) -> list[dict]:
             EntitySpec("校园操场", "宽阔的操场，红色跑道，远处有篮球场和旗杆",
                        "", AssetType.BACKGROUND),
         ],
+        "accept": {
+            "学校天台": {"sys_rooftop", "generate"},
+            "高二教室": {"sys_classroom", "generate"},
+            "教学楼走廊": {"sys_corridor", "generate"},
+            "校园操场": {"sys_playground", "generate"},
+        },
     })
 
     scenarios.append({
-        "label": "zh-CN BG forced — 校园场景 (4 entities, must match all)",
+        "label": "zh-CN BG forced — 校园场景",
         "asset_type": AssetType.BACKGROUND,
         "mode": "forced",
         "entities": [
@@ -139,11 +156,17 @@ def _make_scenarios(library: AssetLibrary) -> list[dict]:
             EntitySpec("校园操场", "宽阔的操场，跑道，篮球场", "",
                        AssetType.BACKGROUND),
         ],
+        "accept": {
+            "学校天台": {"sys_rooftop"},
+            "高二教室": {"sys_classroom"},
+            "教学楼走廊": {"sys_corridor"},
+            "校园操场": {"sys_playground"},
+        },
     })
 
-    # ── zh-CN: wuxia/xianxia style ─────────────────────────────────
+    # ── zh-CN: wuxia style — no matching system assets ──────────────
     scenarios.append({
-        "label": "zh-CN CHAR normal — 武侠角色 (4 entities)",
+        "label": "zh-CN CHAR normal — 武侠角色",
         "asset_type": AssetType.CHAR_PORTRAIT,
         "mode": "normal",
         "entities": [
@@ -160,10 +183,18 @@ def _make_scenarios(library: AssetLibrary) -> list[dict]:
                        "全身笼罩在黑袍之中，只露出一双泛着绿光的眼睛",
                        AssetType.CHAR_PORTRAIT),
         ],
+        # Wuxia outfits/clans → no match in neutral system portraits.
+        # Conservative LLM should return "generate" for all.
+        "accept": {
+            "柳如烟": {"generate"},
+            "铁无双": {"generate"},
+            "慕容秋水": {"generate"},
+            "黑袍老祖": {"generate"},
+        },
     })
 
     scenarios.append({
-        "label": "zh-CN BG normal — 武侠场景 (4 entities)",
+        "label": "zh-CN BG normal — 武侠场景",
         "asset_type": AssetType.BACKGROUND,
         "mode": "normal",
         "entities": [
@@ -176,11 +207,17 @@ def _make_scenarios(library: AssetLibrary) -> list[dict]:
             EntitySpec("地下密室", "阴暗潮湿的地下密室，墙上挂着各种刑具，烛火摇曳",
                        "", AssetType.BACKGROUND),
         ],
+        "accept": {
+            "断魂崖": {"sys_cliff", "sys_mountain", "generate"},
+            "醉仙楼": {"sys_tavern", "sys_restaurant", "generate"},
+            "竹林深处": {"sys_forest", "sys_garden", "generate"},
+            "地下密室": {"sys_dungeon", "sys_basement", "generate"},
+        },
     })
 
     # ── en: fantasy / RPG style ────────────────────────────────────
     scenarios.append({
-        "label": "en CHAR normal — fantasy party (4 entities)",
+        "label": "en CHAR normal — fantasy party",
         "asset_type": AssetType.CHAR_PORTRAIT,
         "mode": "normal",
         "entities": [
@@ -197,10 +234,18 @@ def _make_scenarios(library: AssetLibrary) -> list[dict]:
                        "Pale skin, raven-black hair streaked with silver, violet eyes. Wears flowing dark robes with arcane symbols.",
                        AssetType.CHAR_PORTRAIT),
         ],
+        # Fantasy races (elf, dwarf) + specific gear → no neutral match.
+        # Morgana's "dark robes" might loosely match sys_adult_female.
+        "accept": {
+            "Aldric": {"sys_officer_male", "sys_middle_male", "generate"},
+            "Lyra": {"generate"},
+            "Grimm": {"generate"},
+            "Morgana": {"sys_adult_female", "sys_middle_female", "generate"},
+        },
     })
 
     scenarios.append({
-        "label": "en BG normal — fantasy locations (4 entities)",
+        "label": "en BG normal — fantasy locations",
         "asset_type": AssetType.BACKGROUND,
         "mode": "normal",
         "entities": [
@@ -213,11 +258,17 @@ def _make_scenarios(library: AssetLibrary) -> list[dict]:
             EntitySpec("Sunken Cathedral", "The ruined remains of a grand cathedral, half-submerged in a misty lake, stained glass still glinting",
                        "", AssetType.BACKGROUND),
         ],
+        "accept": {
+            "The Iron Keep": {"sys_castle", "sys_fortress", "generate"},
+            "Whispering Woods": {"sys_forest", "generate"},
+            "Dragon's Rest Tavern": {"sys_tavern", "generate"},
+            "Sunken Cathedral": {"sys_ruins", "sys_church", "generate"},
+        },
     })
 
     # ── en: forced mode ────────────────────────────────────────────
     scenarios.append({
-        "label": "en CHAR forced — fantasy party (4 entities, must match all)",
+        "label": "en CHAR forced — fantasy party",
         "asset_type": AssetType.CHAR_PORTRAIT,
         "mode": "forced",
         "entities": [
@@ -230,10 +281,17 @@ def _make_scenarios(library: AssetLibrary) -> list[dict]:
             EntitySpec("Morgana", "Sorceress, dark past, mysterious", "Pale, raven-black hair, violet eyes, dark robes",
                        AssetType.CHAR_PORTRAIT),
         ],
+        # Forced must pick SOMETHING — verify plausible choices.
+        "accept": {
+            "Aldric": {"sys_officer_male", "sys_middle_male", "sys_adult_male"},
+            "Lyra": {"sys_young_female", "sys_adult_female"},
+            "Grimm": {"sys_worker_male", "sys_middle_male", "sys_adult_male"},
+            "Morgana": {"sys_adult_female", "sys_middle_female", "sys_young_female"},
+        },
     })
 
     scenarios.append({
-        "label": "en BG forced — fantasy locations (4 entities, must match all)",
+        "label": "en BG forced — fantasy locations",
         "asset_type": AssetType.BACKGROUND,
         "mode": "forced",
         "entities": [
@@ -246,6 +304,12 @@ def _make_scenarios(library: AssetLibrary) -> list[dict]:
             EntitySpec("Sunken Cathedral", "Ruined cathedral half-submerged in a misty lake", "",
                        AssetType.BACKGROUND),
         ],
+        "accept": {
+            "The Iron Keep": {"sys_castle", "sys_fortress"},
+            "Whispering Woods": {"sys_forest"},
+            "Dragon's Rest Tavern": {"sys_tavern", "sys_restaurant"},
+            "Sunken Cathedral": {"sys_ruins", "sys_church"},
+        },
     })
 
     return scenarios
@@ -255,69 +319,59 @@ def _make_scenarios(library: AssetLibrary) -> list[dict]:
 # Validation
 # ═══════════════════════════════════════════════════════════════════════
 
-def validate_normal_response(
-    results, entities: list[EntitySpec], library: AssetLibrary,
+def validate_results(
+    results, entities: list[EntitySpec], accept: dict, mode: str,
 ) -> list[str]:
-    """Validate a normal-mode batch selection response.  Returns errors."""
+    """Validate batch selection results against expected answers.
+
+    *accept* maps entity_name → expected:
+      - ``"generate"`` → entity must have action="generate"
+      - ``"matched"`` → entity must have action="matched" (any asset_id)
+      - ``{id, ...}`` → entity must match one of these asset_ids
+        (the string ``"generate"`` in the set means generate is also OK)
+
+    Returns list of error strings (empty = all passed).
+    """
     errors: list[str] = []
-    entity_names = {e.name for e in entities}
+    result_map = {r.entity_name: r for r in results}
 
-    result_names = {r.entity_name for r in results}
-    missing = entity_names - result_names
-    extra = result_names - entity_names
+    for name, expected in accept.items():
+        r = result_map.get(name)
+        if r is None:
+            errors.append(f"{name}: missing from response")
+            continue
 
-    if missing:
-        errors.append(f"Missing entities in response: {missing}")
-    if extra:
-        errors.append(f"Extra entities in response: {extra}")
-
-    for r in results:
-        if r.action == "matched":
-            if r.asset_id is None:
-                errors.append(f"{r.entity_name}: matched but asset_id is None")
-            elif library.get(entities[0].asset_type, r.asset_id) is None:
+        if isinstance(expected, str):
+            # Single expected action: "generate" or "matched"
+            if expected == "generate" and r.action != "generate":
                 errors.append(
-                    f"{r.entity_name}: asset_id {r.asset_id!r} not in library"
+                    f"{name}: expected generate, got {r.action}→{r.asset_id}"
                 )
-        elif r.action == "generate":
-            if r.asset_id is not None:
+            elif expected == "matched" and r.action != "matched":
                 errors.append(
-                    f"{r.entity_name}: generate but asset_id is not None"
+                    f"{name}: expected matched, got {r.action}"
                 )
-        else:
-            errors.append(f"{r.entity_name}: unknown action {r.action!r}")
-
-    return errors
-
-
-def validate_forced_response(
-    results, entities: list[EntitySpec], library: AssetLibrary,
-) -> list[str]:
-    """Validate a forced-mode batch selection response.  Returns errors."""
-    errors: list[str] = []
-    entity_names = {e.name for e in entities}
-
-    result_names = {r.entity_name for r in results}
-    missing = entity_names - result_names
-    extra = result_names - entity_names
-
-    if missing:
-        errors.append(f"Missing entities in response: {missing}")
-    if extra:
-        errors.append(f"Extra entities in response: {extra}")
-
-    for r in results:
-        # Forced mode: every entry must be "matched"
-        if r.action != "matched":
-            errors.append(
-                f"{r.entity_name}: forced mode but action is {r.action!r}"
-            )
-        if r.asset_id is None:
-            errors.append(f"{r.entity_name}: forced mode but asset_id is None")
-        elif library.get(entities[0].asset_type, r.asset_id) is None:
-            errors.append(
-                f"{r.entity_name}: asset_id {r.asset_id!r} not in library"
-            )
+        elif isinstance(expected, set):
+            # Set of acceptable values — "generate" string = action OK,
+            # other strings = asset_id must be one of these
+            if "generate" in expected:
+                if r.action == "generate":
+                    continue  # OK — generate is acceptable
+                # Must match one of the asset_ids
+                if r.asset_id not in expected:
+                    errors.append(
+                        f"{name}: asset_id {r.asset_id!r} not in {expected}"
+                    )
+            else:
+                # All entries are asset_ids — must match one
+                if r.action != "matched":
+                    errors.append(
+                        f"{name}: expected matched, got {r.action}"
+                    )
+                elif r.asset_id not in expected:
+                    errors.append(
+                        f"{name}: asset_id {r.asset_id!r} not in {expected}"
+                    )
 
     return errors
 
@@ -363,12 +417,13 @@ def main():
         total_elapsed += elapsed
 
         # ── Validate ────────────────────────────────────────────────
+        accept = sc.get("accept", {})
         if error is not None:
             validation_errors = [error]
-        elif forced:
-            validation_errors = validate_forced_response(results, entities, library)
+        elif accept:
+            validation_errors = validate_results(results, entities, accept, mode)
         else:
-            validation_errors = validate_normal_response(results, entities, library)
+            validation_errors = []  # no accept = format-only (already parsed OK)
 
         ok = len(validation_errors) == 0
         if ok:
