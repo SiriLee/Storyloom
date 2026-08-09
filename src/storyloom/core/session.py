@@ -241,7 +241,37 @@ class GameSession:
         return SaveManager.list_saves_for_game(self._saves_root, game_id)
 
     def delete_game(self, game_id: str) -> bool:
-        """Delete an entire game directory. Returns True if deleted."""
+        """Delete an entire game directory. Returns True if deleted.
+
+        Loads the roster first and clears it to decrement ``use_count``
+        on every referenced asset in the global ``AssetLibrary``, then
+        persists the library BEFORE removing the directory.  Cleanup is
+        best-effort — failures are logged but never block deletion.
+        """
+        roster_path = os.path.join(self._saves_root, game_id, "_asset_roster.json")
+        if os.path.isfile(roster_path):
+            try:
+                from storyloom.assets import GameAssetRoster
+                # GameAssetRoster.load() takes a library parameter;
+                # pass a throwaway instance — clear() calls
+                # library.decrease_usage() on the same instance, so
+                # use counts are decremented in the real _asset_lib.json.
+                from storyloom.assets import AssetLibrary
+                from storyloom.config import DEFAULT_MEDIA_DIR
+                _media = os.environ.get(
+                    "STORYLOOM_MEDIA_DIR",
+                    os.path.join(self._saves_root, "..", DEFAULT_MEDIA_DIR),
+                )
+                library = AssetLibrary.load(os.path.normpath(_media))
+                roster = GameAssetRoster.load(roster_path, library, game_id)
+                roster.clear()
+                library.save()
+            except Exception as e:
+                import logging
+                logging.getLogger("storyloom").warning(
+                    "delete_game: roster cleanup failed for %s: %s", game_id, e
+                )
+
         return SaveManager.delete_game(self._saves_root, game_id)
 
     def delete_save(self, game_id: str, filename: str) -> bool:
