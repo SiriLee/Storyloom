@@ -328,6 +328,8 @@ const GraphRenderer = (function () {
         if (!_typing) return false;
         clearTimeout(_typeTimer);
         _typing = false;
+        var el = $("#vnText");
+        if (el) el.textContent = _currentText;
         var ctc = $("#vnCtc");
         if (ctc) ctc.classList.add("visible");
         return true;
