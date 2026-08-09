@@ -475,7 +475,7 @@ def run_batch_selection(
     entities: list[EntitySpec],
     library: AssetLibrary,
     forced: bool = False,
-    thinking_mode: str = "enabled",
+    thinking_mode: str = "light",
 ) -> tuple[list[SelectionResult], str | None]:
     """Run a single batch LLM selection call.  Returns ``(results, error)``.
 
@@ -518,9 +518,10 @@ def run_batch_selection(
         if parsed is not None:
             return parsed, None
         else:
+            snippet = raw.strip()[:200] if raw else "(empty response)"
             return [], (
                 f"Failed to parse batch selection response "
-                f"for {asset_type.value}"
+                f"for {asset_type.value}: {snippet}"
             )
     except ApiError as e:
         return [], (
@@ -635,7 +636,7 @@ class Prebuilder:
         ]:
             return run_batch_selection(
                 self._api, asset_type, by_type.get(asset_type, []),
-                self._library, forced=forced, thinking_mode="enabled",
+                self._library, forced=forced, thinking_mode="light",
             )
 
         # Run both selection calls concurrently
