@@ -799,6 +799,15 @@ class TestUpdateAPI:
         resp = client.post("/api/update/apply", json={"layers": "not_a_list"})
         assert resp.status_code == 422
 
+    def test_apply_rejects_unknown_layer_value(self, client):
+        resp = client.post("/api/update/apply",
+                           json={"layers": ["invalid_layer"]})
+        assert resp.status_code == 422
+
+    def test_apply_rejects_empty_layer_list(self, client):
+        resp = client.post("/api/update/apply", json={"layers": []})
+        assert resp.status_code == 422
+
     def test_apply_returns_stream_url(self, client):
         resp = client.post("/api/update/apply",
                            json={"layers": ["app", "system_media"]})

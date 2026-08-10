@@ -48,7 +48,7 @@ logger = logging.getLogger("storyloom")
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from storyloom.config import DEFAULT_IMG_BASE_URL, DEFAULT_MEDIA_DIR, SUPPORTED_LANGUAGES, CLEANUP_KEEP_COUNT, GITHUB_REPO_OWNER, GITHUB_REPO_NAME
 from storyloom.core.co_create import CoCreateError
@@ -216,18 +216,14 @@ class ConfigUpdate(BaseModel):
 class ApplyUpdateRequest(BaseModel):
     layers: list[str]  # each must be "app" or "system_media"
 
-    @classmethod
-    def __get_validators__(cls):
-        yield cls._validate_layers
-
-    @classmethod
-    def _validate_layers(cls, v):
-        for layer in v.layers:
+    @model_validator(mode="after")
+    def _validate_layers(self):
+        for layer in self.layers:
             if layer not in ("app", "system_media"):
                 raise ValueError(f"Unknown layer: {layer!r}")
-        if not v.layers:
+        if not self.layers:
             raise ValueError("layers must not be empty")
-        return v
+        return self
 
 
 @app.post("/api/config")
