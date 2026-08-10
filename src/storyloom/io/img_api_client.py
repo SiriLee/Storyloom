@@ -528,6 +528,17 @@ class ImgApiClient:
         if preset and preset.extra_body:
             payload.update(preset.extra_body)
 
+        # Always use light thinking for image generation.
+        # For models that support reasoning control (Gemini image,
+        # GPT Image 2), this keeps latency predictable without
+        # sacrificing quality.  For dedicated diffusion models
+        # (Seedream, FLUX), get_image_thinking_params returns {}
+        # — a no-op.
+        from storyloom.io.thinking import get_image_thinking_params
+        thinking = get_image_thinking_params(self.model, "light")
+        if thinking:
+            payload.update(thinking)
+
         # ── API call ──────────────────────────────────────────────
         t0 = time.perf_counter()
         try:

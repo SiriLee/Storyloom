@@ -494,6 +494,10 @@ class TestCoCreateValidatorOutline:
 class MockApiClient:
     """Mock API client that returns predefined responses."""
 
+    # model property needed by get_thinking_params() — tests use
+    # DeepSeek model name so thinking presets resolve correctly.
+    model: str = "deepseek-v4-pro"
+
     def __init__(self, responses=None):
         self.responses = responses or []
         self.call_count = 0
@@ -600,7 +604,7 @@ class TestCoCreateFlowSend:
 
     def test_send_returns_str_not_dict(self):
         api = MockApiClient()
-        api.chat = lambda msgs: "What era would you like?"
+        api.chat = lambda msgs, **kw: "What era would you like?"
         flow = CoCreateFlow(api)
         flow.start()
 
@@ -612,7 +616,7 @@ class TestCoCreateFlowSend:
 
     def test_send_from_awaiting_idea_transitions_to_awaiting_answer(self):
         api = MockApiClient()
-        api.chat = lambda msgs: "First question?"
+        api.chat = lambda msgs, **kw: "First question?"
         flow = CoCreateFlow(api)
         assert flow.phase == "init"
         flow.start()
@@ -623,7 +627,7 @@ class TestCoCreateFlowSend:
     def test_send_no_keyword_detection(self):
         """send() does NOT parse user input for start/quit keywords."""
         api = MockApiClient()
-        api.chat = lambda msgs: "Interesting, tell me more."
+        api.chat = lambda msgs, **kw: "Interesting, tell me more."
         flow = CoCreateFlow(api)
         flow._phase = "awaiting_answer"
         flow._messages = [
@@ -640,7 +644,7 @@ class TestCoCreateFlowSend:
 
     def test_send_appends_to_messages(self):
         api = MockApiClient()
-        api.chat = lambda msgs: "reply"
+        api.chat = lambda msgs, **kw: "reply"
         flow = CoCreateFlow(api)
         flow._phase = "awaiting_answer"
         flow._messages = [
@@ -799,7 +803,7 @@ class TestCoCreateFlowSendErrors:
     def test_send_raises_cocreate_error_on_api_failure(self):
         """API fails → CoCreateError raised with phase='send'."""
         api = make_mock_api_client()
-        api.chat = lambda msgs: (_ for _ in ()).throw(ApiError("fail"))
+        api.chat = lambda msgs, **kw: (_ for _ in ()).throw(ApiError("fail"))
         flow = CoCreateFlow(api)
         flow.start()
 
@@ -813,7 +817,7 @@ class TestCoCreateFlowSendErrors:
     def test_send_preserves_message_on_failure(self):
         """API failure keeps user message in _messages for retry."""
         api = make_mock_api_client()
-        api.chat = lambda msgs: (_ for _ in ()).throw(ApiError("fail"))
+        api.chat = lambda msgs, **kw: (_ for _ in ()).throw(ApiError("fail"))
         flow = CoCreateFlow(api)
         flow.start()
 
@@ -829,7 +833,7 @@ class TestCoCreateFlowSendErrors:
     def test_send_sets_retry_state_on_failure(self):
         """API failure sets _retry_state to ('send', user_input)."""
         api = make_mock_api_client()
-        api.chat = lambda msgs: (_ for _ in ()).throw(ApiError("fail"))
+        api.chat = lambda msgs, **kw: (_ for _ in ()).throw(ApiError("fail"))
         flow = CoCreateFlow(api)
         flow.start()
 
@@ -854,7 +858,7 @@ class TestCoCreateFlowSendErrors:
     def test_retry_send_reattempts_api(self):
         """After send fails, retry_send() re-calls API and returns reply."""
         api = make_mock_api_client()
-        api.chat = lambda msgs: "Hello from retry!"
+        api.chat = lambda msgs, **kw: "Hello from retry!"
         flow = CoCreateFlow(api)
         flow.start()
 
@@ -870,7 +874,7 @@ class TestCoCreateFlowSendErrors:
     def test_retry_send_clears_state_on_success(self):
         """retry_send() clears _retry_state after success."""
         api = make_mock_api_client()
-        api.chat = lambda msgs: "ok"
+        api.chat = lambda msgs, **kw: "ok"
         flow = CoCreateFlow(api)
         flow.start()
         flow._retry_state = ("send", "idea")
@@ -882,7 +886,7 @@ class TestCoCreateFlowSendErrors:
     def test_retry_send_reraises_api_error(self):
         """retry_send() raises CoCreateError again if API still fails."""
         api = make_mock_api_client()
-        api.chat = lambda msgs: (_ for _ in ()).throw(ApiError("still broken"))
+        api.chat = lambda msgs, **kw: (_ for _ in ()).throw(ApiError("still broken"))
         flow = CoCreateFlow(api)
         flow.start()
         flow._retry_state = ("send", "idea")

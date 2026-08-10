@@ -17,7 +17,7 @@ from storyloom.io.img_utils import (
     maybe_remove_background,
     remove_background,
 )
-from storyloom.io.thinking import get_thinking_params
+from storyloom.io.thinking import get_image_thinking_params, get_thinking_params
 
 __all__ = [
     "ApiClient",

@@ -6,6 +6,7 @@ from pathlib import Path
 from string import Template
 
 from storyloom.io.api_client import ApiClient, ApiError
+from storyloom.io.thinking import get_thinking_params
 from storyloom.i18n import _, get_current_lang
 from storyloom.config import (
     STORY_TITLE_MIN_CHARS,
@@ -875,8 +876,15 @@ class CoCreateFlow:
 
         self._messages.append({"role": "user", "content": stripped})
 
+        # Chat phase uses disabled thinking — Q&A conversation has no
+        # quality requirements; reasoning overhead adds latency for no
+        # benefit.  The generation phase (generate()) uses API default
+        # because structured JSON output benefits from reasoning.
         try:
-            response = self._api.chat(self._messages)
+            response = self._api.chat(
+                self._messages,
+                extra_params=get_thinking_params(self._api.model, "disabled"),
+            )
         except ApiError as e:
             # Save retry state — user message stays in _messages for retry
             self._retry_state = ("send", stripped)
@@ -909,7 +917,10 @@ class CoCreateFlow:
                 "successfully or retry_send() was already called successfully."
             )
         try:
-            response = self._api.chat(self._messages)
+            response = self._api.chat(
+                self._messages,
+                extra_params=get_thinking_params(self._api.model, "disabled"),
+            )
         except ApiError as e:
             raise CoCreateError(
                 phase="send",
