@@ -82,7 +82,7 @@
   font-family: var(--font-sans);
   font-size: 1rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: rgba(255,255,255,0.85);
   flex: 1;
 }
 
@@ -93,12 +93,12 @@
   width: 2.3rem; height: 2.3rem;
   border: none; border-radius: var(--radius-md);
   background: transparent;
-  color: var(--text-secondary);
+  color: rgba(255,255,255,0.55);
   cursor: pointer;
-  transition: color var(--trans-normal), background var(--trans-normal);
+  transition: color 0.2s, background 0.2s;
   padding: 0;
 }
-.vn-btn:hover  { color: var(--text-primary); background: var(--bg-tertiary); }
+.vn-btn:hover  { color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.08); }
 .vn-btn.active { color: var(--text-accent); }
 
 .vn-btn svg {
@@ -160,10 +160,10 @@
   font-family: var(--font-serif);
   font-size: var(--vn-font-size);
   line-height: 1.9;
-  color: var(--text-primary);
+  color: rgba(255,255,255,0.92);
   text-shadow: 0 1px 4px rgba(0,0,0,0.6);
-  contain: layout style;  /* prevent layout shifts during typewriter */
-  min-height: calc(var(--vn-font-size) * 1.9 * 3);  /* 3 lines minimum */
+  contain: layout style;
+  min-height: calc(var(--vn-font-size) * 1.9 * 3);
 }
 
 .vn-cursor {
@@ -205,7 +205,7 @@
   border: none;
   border-radius: 6px;
   background: rgba(0,0,0,0.7);
-  color: var(--text-primary);
+  color: rgba(255,255,255,0.9);
   font-family: var(--font-serif);
   font-size: var(--vn-font-size);
   text-align: center;
@@ -260,7 +260,7 @@
 .vn-backlog-text {
   font-family: var(--font-serif);
   font-size: 1.15rem;
-  color: var(--text-primary);
+  color: rgba(255,255,255,0.9);
   line-height: 1.6;
 }
 .vn-backlog-name {
