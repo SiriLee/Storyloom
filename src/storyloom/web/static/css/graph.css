@@ -14,14 +14,9 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 :root {
-  --text-primary: #e0e0e0;
-  --text-accent: #4ecca3;
-  --text-secondary: #a0a0b0;
-  --border-color: #2a2a4a;
-  --font-serif: "Georgia", "Noto Serif SC", serif;
-  --font-sans: "Segoe UI", "PingFang SC", sans-serif;
+  /* Tunable VN constants — adjusted by in-game settings panel.
+     Color + font variables inherited from variables.css + theme-*.css. */
 
-  /* Tunable constants — adjusted by settings panel */
   --vn-font-size: 1.35rem;      /* body + choice text, synced */
   --vn-choice-gap: 1.4rem;      /* vertical gap between choice buttons */
   --vn-dialog-height: 14rem;    /* fixed dialog box height */

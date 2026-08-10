@@ -20,7 +20,9 @@
     --button-bg: #21262d;
     --button-hover: #30363d;
     --bg-panel: rgba(22, 27, 34, 0.92);
+    --bg-panel-solid: rgba(22, 27, 34, 0.96);
     --overlay-bg: rgba(0, 0, 0, 0.6);
+    --overlay-bg-light: rgba(0, 0, 0, 0.6);
 }
 
 /* System default → dark */

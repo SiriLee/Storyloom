@@ -1,100 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Storyloom Web — Dark Terminal Aesthetic
+   Storyloom Web — Main Stylesheet
 
-   Color palette:
-     bg-primary:    #1a1a2e
-     bg-secondary:  #16213e
-     bg-panel:      rgba(22, 33, 62, 0.85)
-     text-primary:  #e0e0e0
-     text-secondary:#a0a0b0
-     text-accent:   #4ecca3
-     text-warning:  #f0a050
-     text-error:    #e05555
-     border-color:  #2a2a4a
-     button-bg:     #0f3460
-     button-hover:  #1a5080
-     button-accent: #4ecca3
-     font-mono:     "Consolas", "Courier New", monospace
-     font-serif:    "Georgia", "Noto Serif SC", serif
-     font-sans:     "Segoe UI", "PingFang SC", sans-serif
+   Color tokens: variables.css (agnostic) + theme-dark.css / theme-light.css.
+   All component styles reference CSS variables — no hardcoded colors.
 
-   Authority: CLAUDE.md §Tech Stack (dark theme), prototype reference.
+   Authority: CLAUDE.md §Tech Stack, prototype reference.
    ═══════════════════════════════════════════════════════════════════ */
-
-/* ── CSS Variables ──────────────────────────────────────────────── */
-
-:root {
-    /* ── Colors ──────────────────────────────────────────────────── */
-    --bg-primary: #1a1a2e;
-    --bg-secondary: #16213e;
-    --bg-panel: rgba(22, 33, 62, 0.85);
-    --bg-panel-solid: rgba(22, 33, 62, 0.92);
-    --text-primary: #e0e0e0;
-    --text-secondary: #a0a0b0;
-    --text-accent: #4ecca3;
-    --text-warning: #f0a050;
-    --text-error: #e05555;
-    --border-color: #2a2a4a;
-    --button-bg: #0f3460;
-    --button-hover: #1a5080;
-    --button-accent: #4ecca3;
-
-    /* ── Typography ──────────────────────────────────────────────── */
-    --font-mono: "Consolas", "Courier New", monospace;
-    --font-serif: "Georgia", "Noto Serif SC", serif;
-    --font-sans: "Segoe UI", "PingFang SC", sans-serif;
-    /* font-size scale */
-    --font-xs: 0.8rem;
-    --font-sm: 0.85rem;
-    --font-base: 0.95rem;
-    --font-md: 1.05rem;
-    --font-lg: 1.15rem;
-    --font-xl: 1.3rem;
-    --font-2xl: 1.8rem;
-    --font-3xl: 2.2rem;
-    --font-4xl: 3.2rem;
-
-    /* ── Spacing ─────────────────────────────────────────────────── */
-    --space-xs: 0.25rem;
-    --space-sm: 0.5rem;
-    --space-md: 0.75rem;
-    --space-lg: 1rem;
-    --space-xl: 1.5rem;
-    --space-2xl: 2rem;
-    --space-3xl: 3rem;
-
-    /* ── Layout ──────────────────────────────────────────────────── */
-    --content-width: 960px;
-    --choices-width: 420px;
-    --icon-btn-size: 2.2rem;
-
-    /* ── Border Radius ───────────────────────────────────────────── */
-    --radius-sm: 4px;
-    --radius-md: 6px;
-    --radius-lg: 8px;
-    --radius-xl: 12px;
-    --radius-round: 24px;
-
-    /* ── Transitions ─────────────────────────────────────────────── */
-    --trans-fast: 0.15s ease;
-    --trans-normal: 0.2s ease;
-    --trans-slow: 0.3s ease;
-
-    /* ── Shadows ─────────────────────────────────────────────────── */
-    --shadow-glow: 0 0 8px rgba(78, 204, 163, 0.2);
-    --shadow-glow-sm: 0 0 10px rgba(78, 204, 163, 0.15);
-    --shadow-glow-lg: 0 0 12px rgba(78, 204, 163, 0.4);
-    --shadow-glow-xl: 0 0 18px rgba(78, 204, 163, 0.4);
-    --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.4);
-    --shadow-toast: 0 4px 16px rgba(0, 0, 0, 0.3);
-    --shadow-focus: 0 0 0 2px rgba(78, 204, 163, 0.35);
-
-    /* ── Overlays ────────────────────────────────────────────────── */
-    --overlay-bg: rgba(0, 0, 0, 0.55);
-    --overlay-bg-light: rgba(0, 0, 0, 0.6);
-
-    interpolate-size: allow-keywords;
-}
 
 /* ── Reset & Base ───────────────────────────────────────────────── */
 
@@ -2570,7 +2481,7 @@ button.accent:hover, .btn-accent:hover {
     font-size: 0.95rem;
     line-height: 1.6;
     margin-bottom: 1.25rem;
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .migration-actions {
