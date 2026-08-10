@@ -1273,7 +1273,10 @@ def _open_browser(url: str) -> None:
     finally:
         os.dup2(saved, 2)
         os.close(saved)
+    print()
+    print(f"Storyloom {__version__} — application server")
     print(f"Visit: {url}")
+    print("Closing this window will exit Storyloom.")
 
 
 def _show_desktop_window(url: str) -> None:
@@ -1285,6 +1288,10 @@ def _show_desktop_window(url: str) -> None:
     import time
     time.sleep(1)  # let uvicorn bind the port
 
+    print()
+    print(f"Storyloom {__version__} — application server")
+    print("Opening desktop window.  Minimize this window to keep running.")
+
     try:
         import webview
         webview.create_window("Storyloom", url, width=1200, height=800)
@@ -1293,10 +1300,9 @@ def _show_desktop_window(url: str) -> None:
         # GUI unavailable — webview.start() raises WebViewException when
         # no display server is reachable (headless, SSH, WSL without WSLg).
         import webbrowser
-        print(
-            f"Desktop window unavailable — opening browser instead.\n"
-            f"Visit: {url}"
-        )
+        print("Desktop window unavailable — opening browser instead.")
+        print(f"Visit: {url}")
+        print("Closing this window will exit Storyloom.")
         webbrowser.open(url)
         # Block until Ctrl+C (daemon thread keeps uvicorn alive).
         import threading
