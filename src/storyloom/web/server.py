@@ -177,8 +177,8 @@ async def serve_media(asset_type: str, asset_id: str, thumb: str = "0"):
 
                     im = Image.open(path)
                     im = im.convert("RGB")
-                    im.thumbnail((280, 210), Image.LANCZOS)
-                    im.save(thumb_path, "WEBP", quality=80)
+                    im.thumbnail((560, 420), Image.LANCZOS)
+                    im.save(thumb_path, "WEBP", quality=85)
                     return FileResponse(
                         thumb_path,
                         headers={"Cache-Control": "public, max-age=86400"},
