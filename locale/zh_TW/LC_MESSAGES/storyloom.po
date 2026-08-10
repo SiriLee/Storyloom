@@ -416,3 +416,128 @@ msgstr "更新失敗"
 
 msgid "Update ready"
 msgstr "更新就緒"
+
+# ── 2026-08-10 Frontend Redesign: new strings ──
+
+msgid "General"
+msgstr "一般"
+
+msgid "API"
+msgstr "API"
+
+msgid "API Configuration"
+msgstr "API 設定"
+
+msgid "API Guide"
+msgstr "API 指南"
+
+msgid "Image"
+msgstr "影像"
+
+msgid "Image Generation"
+msgstr "影像生成"
+
+msgid "Appearance"
+msgstr "外觀"
+
+msgid "Theme"
+msgstr "主題"
+
+msgid "Theme: System"
+msgstr "主題：跟隨系統"
+
+msgid "Theme: Dark"
+msgstr "主題：深色"
+
+msgid "Theme: Light"
+msgstr "主題：淺色"
+
+msgid "Toggle Theme"
+msgstr "切換主題"
+
+msgid "System"
+msgstr "跟隨系統"
+
+msgid "Dark"
+msgstr "深色"
+
+msgid "Light"
+msgstr "淺色"
+
+msgid "Updates"
+msgstr "更新"
+
+msgid "API guide unavailable. Please check your installation."
+msgstr "API 指南無法使用。請檢查安裝。"
+
+msgid "Failed to render API guide."
+msgstr "API 指南渲染失敗。"
+
+msgid "Failed to save settings"
+msgstr "設定儲存失敗"
+
+msgid "Connection lost. Please try again."
+msgstr "連線已中斷，請重試。"
+
+msgid "Background removal model not available"
+msgstr "背景移除模型無法使用"
+
+msgid "Generating"
+msgstr "生成中"
+
+msgid "complete"
+msgstr "完成"
+
+msgid "failed"
+msgstr "失敗"
+
+msgid "generated"
+msgstr "已生成"
+
+msgid "generating..."
+msgstr "生成中..."
+
+msgid "matched"
+msgstr "已配對"
+
+msgid "matching..."
+msgstr "配對中..."
+
+msgid "images..."
+msgstr "影像..."
+
+msgid "to generate"
+msgstr "待生成"
+
+msgid "Connecting..."
+msgstr "連線中..."
+
+msgid "Download"
+msgstr "下載"
+
+msgid "unavailable"
+msgstr "無法使用"
+
+msgid "All assets ready"
+msgstr "所有素材就緒"
+
+msgid "Building Your World"
+msgstr "構建你的世界"
+
+msgid "Characters"
+msgstr "角色"
+
+msgid "Generating images..."
+msgstr "生成影像中..."
+
+msgid "Generating settings"
+msgstr "生成設定中"
+
+msgid "Matching entities to library assets..."
+msgstr "配對實體到素材庫..."
+
+msgid "Prebuild failed"
+msgstr "預構建失敗"
+
+msgid "Scenes"
+msgstr "場景"
