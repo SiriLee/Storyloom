@@ -106,6 +106,7 @@
        #adventure-log threw ReferenceError). */
     window._updateThemeButton = _updateThemeButton;
     window._updateAllThemeButtons = _updateAllThemeButtons;
+    window._applyAccentColor = _applyAccentColor;
 
     /* ═══════════════════════════════════════════════════════════════
        View: Main Menu (#menu / default)

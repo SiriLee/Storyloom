@@ -319,6 +319,11 @@ async function initConfig() {
         }
         if (data.accent_color) {
             localStorage.setItem(SETTINGS_STORE + "accent_color", data.accent_color);
+            /* Apply accent CSS variables on page load — _applyAccentColor
+               is exported by router.js (which loads before initConfig runs). */
+            if (typeof window._applyAccentColor === "function") {
+                window._applyAccentColor(data.accent_color);
+            }
         }
     } catch (err) {
         console.warn("initConfig: server unreachable, using localStorage", err);
