@@ -73,8 +73,9 @@ First launch opens the Settings page.  Enter your API key, select a mode
 (**Text** or **Graph**), and start a new game.
 
 > **System media assets** (~267 MB of character portraits and background
-> images) are bundled in the standalone binary.  Wheel and source users can
-> download them via **Settings → Updates** inside the app.
+> images) are included in the standalone release zip alongside the binary.
+> Wheel and source users can download them via **Settings → Updates**
+> inside the app.
 
 ---
 

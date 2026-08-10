@@ -6,7 +6,7 @@
 
 Storyloom is an AI-powered interactive text fiction game engine. The LLM is the narrative brain; the program is the flow manager + context steward. It is a **single Python application** (not client-server) — the core engine is UI-agnostic via generator-based event streaming.
 
-**Status (2026-08-04):** Phase 1 complete — pipeline refactored for Phase 2 (StreamParser + StateManager + EventDispatcher architecture). Web interface (FastAPI + SSE). Packaging: standalone binary (PyInstaller) + pip wheel. Version 1.3.0.
+**Status (2026-08-10):** Phase 2 complete. Web interface (FastAPI + SSE). Launcher-based auto-update. Packaging: standalone binary (PyInstaller) + pip wheel. Version 2.0.0.
 
 **Key directories:**
 
@@ -58,7 +58,9 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | `src/storyloom/tasks/_generator.py` | TaskGenerator — Event→Task dispatch, O(1) program match (§3.2) |
 | `src/storyloom/tasks/_pool.py` | TaskPool — ThreadPoolExecutor wrapper (§3.3) |
 | `src/storyloom/web/` | Web UI (FastAPI + SSE + SPA) |
-| `src/storyloom/dev_cli/` | Dev CLI — `DevObserver`, deque-buffered display |
+| `src/storyloom/dev_cli/` | Dev CLI — `DevObserver`, deque-buffered display (**v2.0.0: path detection not adapted to new layout, stale/deprecated**) |
+| `src/storyloom/core/update_manager.py` | UpdateManager — version check, download, extraction (§4) |
+| `src/storyloom/launcher.py` | Launcher — atomic app_new→app swap, self-update (§3) |
 | `src/storyloom/config.py` | Configurable constants |
 | `src/storyloom/user_config.py` | UserConfig — centralized config management |
 | `src/storyloom/i18n.py` | gettext i18n (zh-CN, zh-TW, en) |
@@ -77,6 +79,8 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | `tests/test_save_manager.py` | Save manager — atomic JSON save/load/delete/list tests |
 | `tests/test_prompt_builder.py` | Prompt builder unit tests |
 | `tests/test_user_config.py` | UserConfig unit tests |
+| `tests/test_launcher.py` | Launcher unit tests — swap, self-update, platform exe |
+| `tests/test_update_manager.py` | UpdateManager unit tests — check, download, extract |
 | `tests/test_integration.py` | End-to-end integration tests |
 | `tests/test_*.py` | Other pytest unit tests (api_client, context_manager, i18n, session) |
 

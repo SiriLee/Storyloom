@@ -18,6 +18,7 @@ from storyloom.core.update_manager import (
     _version_gt,
     check_for_updates,
     download_and_extract,
+    regenerate_launcher,
 )
 
 
@@ -425,3 +426,105 @@ def test_download_extract_cleans_stale_app_new(tmp_path):
 
     assert not os.path.exists(str(stale / "stale-file.txt"))
     assert os.path.isfile(str(target / "app_new" / "storyloom-web"))
+
+
+# ── regenerate_launcher tests ──────────────────────────────────────
+
+
+def test_regenerate_launcher_success(tmp_path, monkeypatch):
+    """Happy path: zip contains Storyloom at root, extracted to target dir."""
+    zip_dir = tmp_path / "zip"
+    zip_dir.mkdir()
+    _create_test_zip(str(zip_dir), {
+        "app/storyloom-web": b"fake-exe",
+        "Storyloom": b"fake-launcher",
+    })
+
+    def fake_check(app_version):
+        return VersionInfo(
+            current=app_version,
+            latest="2.0.0",
+            asset_url="https://example.com/release.zip",
+        )
+
+    def fake_download(url, dest, progress_callback=None):
+        import shutil
+        shutil.copy2(os.path.join(str(zip_dir), "test.zip"), dest)
+
+    with patch("storyloom.core.update_manager._check_app_update", fake_check):
+        with patch("storyloom.core.update_manager._download_file", fake_download):
+            ok = regenerate_launcher(str(tmp_path))
+
+    assert ok is True
+    assert os.path.isfile(str(tmp_path / "Storyloom"))
+
+
+def test_regenerate_launcher_no_asset_url(tmp_path):
+    """Returns False when the release has no downloadable asset (offline)."""
+
+    def fake_check(app_version):
+        return VersionInfo(current="2.0.0", latest="2.0.0", asset_url="")
+
+    with patch("storyloom.core.update_manager._check_app_update", fake_check):
+        ok = regenerate_launcher(str(tmp_path))
+
+    assert ok is False
+
+
+def test_regenerate_launcher_missing_launcher_in_zip(tmp_path):
+    """Returns False when zip doesn't contain the launcher binary."""
+    zip_dir = tmp_path / "zip"
+    zip_dir.mkdir()
+    _create_test_zip(str(zip_dir), {
+        "app/storyloom-web": b"fake-exe",
+        # No Storyloom at root
+    })
+
+    def fake_check(app_version):
+        return VersionInfo(
+            current=app_version,
+            latest="2.0.0",
+            asset_url="https://example.com/release.zip",
+        )
+
+    def fake_download(url, dest, progress_callback=None):
+        import shutil
+        shutil.copy2(os.path.join(str(zip_dir), "test.zip"), dest)
+
+    with patch("storyloom.core.update_manager._check_app_update", fake_check):
+        with patch("storyloom.core.update_manager._download_file", fake_download):
+            ok = regenerate_launcher(str(tmp_path))
+
+    assert ok is False
+
+
+def test_regenerate_launcher_windows_exe(tmp_path, monkeypatch):
+    """On Windows, looks for Storyloom.exe instead of Storyloom."""
+    monkeypatch.setattr(sys, "platform", "win32")
+    # Reset the module-level LAUNCHER_NAME computation
+    launcher_name = "Storyloom.exe"
+
+    zip_dir = tmp_path / "zip"
+    zip_dir.mkdir()
+    _create_test_zip(str(zip_dir), {
+        "app/storyloom-web.exe": b"fake-exe",
+        "Storyloom.exe": b"fake-launcher",
+    })
+
+    def fake_check(app_version):
+        return VersionInfo(
+            current=app_version,
+            latest="2.0.0",
+            asset_url="https://example.com/release.zip",
+        )
+
+    def fake_download(url, dest, progress_callback=None):
+        import shutil
+        shutil.copy2(os.path.join(str(zip_dir), "test.zip"), dest)
+
+    with patch("storyloom.core.update_manager._check_app_update", fake_check):
+        with patch("storyloom.core.update_manager._download_file", fake_download):
+            ok = regenerate_launcher(str(tmp_path))
+
+    assert ok is True
+    assert os.path.isfile(str(tmp_path / launcher_name))
