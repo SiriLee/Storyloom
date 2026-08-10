@@ -800,15 +800,15 @@
 
     /** Render a segmented control row (e.g. Theme: System | Dark | Light). */
     function _settingSegmented(key, label, options, currentVal) {
+        var n = options.length;
         var segs = options.map(function (o) {
             var cls = o.value === currentVal ? "settings-seg-btn active" : "settings-seg-btn";
             return '<button class="' + cls + '" data-value="' + esc(o.value) + '">'
                 + esc(o.label) + '</button>';
         }).join("");
-        return '<div class="settings-row">'
-            + '<span class="settings-row-label">' + esc(label) + '</span>'
-            + '<div class="settings-seg-group" data-key="' + esc(key) + '">' + segs + '</div>'
-            + '</div>';
+        // Direct child of card — fills like .lang-grid
+        return '<div class="settings-seg-group" data-key="' + esc(key) + '" '
+            + 'style="grid-template-columns:repeat(' + n + ',1fr)">' + segs + '</div>';
     }
 
     /* ═══════════════════════════════════════════════════════════════
