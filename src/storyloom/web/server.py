@@ -1247,15 +1247,20 @@ def _webview_available() -> bool:
     ``import webview`` succeeds even without a display server — the
     real test is creating a throwaway window and catching the exception.
     """
+    # Suppress noisy GTK/QT backend-probing output from pywebview.
+    saved = os.dup(2)
+    null_fd = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(null_fd, 2)
+    os.close(null_fd)
     try:
         import webview
-        # Probe: try to list windows (lightweight, no side effects).
-        # On headless systems this may still succeed until start() is
-        # called, so we be conservative and return True — the real
-        # fallback happens in _show_desktop_window() at start() time.
-        return True
     except ImportError:
         return False
+    finally:
+        os.dup2(saved, 2)
+        os.close(saved)
+
+    return True
 
 
 def _open_browser(url: str) -> None:
@@ -1292,16 +1297,7 @@ def _show_desktop_window(url: str) -> None:
     print(f"Storyloom {__version__} — application server")
     print("Opening desktop window.  You may minimize this window.")
 
-    # Suppress noisy GTK/QT import warnings from pywebview internals.
-    saved = os.dup(2)
-    null_fd = os.open(os.devnull, os.O_WRONLY)
-    os.dup2(null_fd, 2)
-    os.close(null_fd)
-    try:
-        import webview
-    finally:
-        os.dup2(saved, 2)
-        os.close(saved)
+    import webview
 
     try:
         webview.create_window("Storyloom", url, width=1200, height=800)
