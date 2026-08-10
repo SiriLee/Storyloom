@@ -127,9 +127,9 @@ async def serve_media(asset_type: str, asset_id: str, thumb: str = "0"):
     falls back to other common image extensions for robustness
     (manually imported files may not use the canonical format).
 
-    When ``?thumb=1``, returns a 280px-wide WebP thumbnail.  Generated
-    on first request and cached to disk as ``{id}_thumb.webp`` alongside
-    the original.
+    When ``?thumb=<width>``, returns a WebP thumbnail of the given width
+    (aspect ratio preserved).  Generated on first request and cached to
+    disk as ``{id}_thumb_{width}.webp`` alongside the original.
     """
     from fastapi.responses import FileResponse
     from storyloom.assets import AssetType
@@ -149,26 +149,31 @@ async def serve_media(asset_type: str, asset_id: str, thumb: str = "0"):
         if e != canonical_ext
     ]
 
-    want_thumb = thumb == "1"
+    # Thumbnail width from query param (0 or absent = full image)
+    thumb_w = 0
+    try:
+        thumb_w = int(thumb)
+    except (ValueError, TypeError):
+        pass
 
     for base_dir in (_MEDIA_DIR, _SYS_MEDIA_DIR):
         for ext in extensions:
             path = os.path.join(base_dir, asset_type, f"{asset_id}{ext}")
             if os.path.isfile(path):
-                if not want_thumb:
+                if not thumb_w:
                     return FileResponse(
                         path,
-                        headers={"Cache-Control": "public, max-age=86400"},
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"},
                     )
 
-                # Thumbnail path — same dir, _thumb.webp suffix
+                # Thumbnail path — includes width in filename for cache busting
                 thumb_path = os.path.join(
-                    base_dir, asset_type, f"{asset_id}_thumb.webp"
+                    base_dir, asset_type, f"{asset_id}_thumb_{thumb_w}.webp"
                 )
                 if os.path.isfile(thumb_path):
                     return FileResponse(
                         thumb_path,
-                        headers={"Cache-Control": "public, max-age=86400"},
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"},
                     )
 
                 # Generate thumbnail on the fly
@@ -177,17 +182,17 @@ async def serve_media(asset_type: str, asset_id: str, thumb: str = "0"):
 
                     im = Image.open(path)
                     im = im.convert("RGB")
-                    im.thumbnail((560, 420), Image.LANCZOS)
+                    im.thumbnail((thumb_w, thumb_w), Image.LANCZOS)
                     im.save(thumb_path, "WEBP", quality=85)
                     return FileResponse(
                         thumb_path,
-                        headers={"Cache-Control": "public, max-age=86400"},
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"},
                     )
                 except Exception:
                     # Fall back to full image if thumbnail fails
                     return FileResponse(
                         path,
-                        headers={"Cache-Control": "public, max-age=86400"},
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"},
                     )
 
     raise HTTPException(404, f"Asset not found: {asset_type}/{asset_id}")

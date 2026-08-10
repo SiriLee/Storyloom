@@ -187,7 +187,7 @@ const AssetManagerView = (function () {
             var uc = a.use_count || 0;
             var trashCls = uc > 0 ? "am-card-trash disabled" : "am-card-trash";
             return '<div class="am-card" data-id="' + esc(id) + '" data-name="' + esc(name) + '">'
-                + '<img class="am-card-img" src="' + imgUrl + encodeURIComponent(id) + '?thumb=1"'
+                + '<img class="am-card-img" src="' + imgUrl + encodeURIComponent(id) + '?thumb=560"'
                     + ' alt="' + esc(name) + '" loading="lazy">'
                 + '<div class="am-card-overlay">'
                     + '<span class="am-card-label" title="' + esc(name) + '">' + esc(name) + '</span>'
