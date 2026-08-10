@@ -365,3 +365,63 @@ def download_and_extract(
 
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def regenerate_launcher(target_dir: str) -> bool:
+    """Download and extract just the Launcher binary from the latest release.
+
+    Used by ``--regenerate-launcher`` to recover a deleted ``Storyloom`` /
+    ``Storyloom.exe`` without downloading the full app update.
+
+    Args:
+        target_dir: Directory to place the launcher binary (typically
+                    the app root — parent of ``app/``).
+
+    Returns:
+        ``True`` if the launcher was restored successfully.
+    """
+    launcher_name = "Storyloom.exe" if sys.platform == "win32" else "Storyloom"
+    tmp_dir = tempfile.mkdtemp(prefix="storyloom_launcher_")
+    zip_path = os.path.join(tmp_dir, "release.zip")
+
+    try:
+        # Get the download URL for the latest platform-specific release.
+        info = _check_app_update("0.0.0")  # dummy version — we need the URL
+        if not info.asset_url:
+            print(
+                "Error: could not find download URL for latest release",
+                file=sys.stderr,
+            )
+            return False
+
+        print(f"Downloading launcher from {info.asset_url} ...")
+        _download_file(info.asset_url, zip_path)
+
+        extract_tmp = os.path.join(tmp_dir, "extract")
+        os.makedirs(extract_tmp, exist_ok=True)
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            zf.extractall(extract_tmp)
+
+        # The release zip ships "Storyloom" / "Storyloom.exe" at root.
+        src = os.path.join(extract_tmp, launcher_name)
+        if not os.path.isfile(src):
+            print(
+                f"Error: {launcher_name} not found in release zip",
+                file=sys.stderr,
+            )
+            return False
+
+        dest = os.path.join(target_dir, launcher_name)
+        shutil.copy2(src, dest)
+        if sys.platform != "win32":
+            os.chmod(dest, 0o755)
+
+        print(f"Launcher restored: {dest}")
+        return True
+
+    except Exception as exc:
+        print(f"Error: failed to restore launcher: {exc}", file=sys.stderr)
+        return False
+
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)

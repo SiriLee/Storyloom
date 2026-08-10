@@ -42,43 +42,20 @@ $PYTHON -m pip install -q -e ".[bg]" build pyinstaller wheel 2>/dev/null || \
 echo "--- Building pip packages ---"
 $PYTHON -m build --no-isolation
 
-# System media: use local copy or download from GitHub Release.
-SM_VERSION=$(head -1 system_media/VERSION | tr -d '[:space:]')
+# System media — pack via pack_system_media.sh for filtered, consistent output
+# (skips runtime thumbnails, validates manifest vs. source).
+# Pre-built zip takes priority; falls back to packing from local system_media/.
+SM_VERSION=$(head -1 system_media/VERSION 2>/dev/null | tr -d '[:space:]' || true)
 SM_ZIP="system_media-v${SM_VERSION}.zip"
-SM_URL="https://github.com/SiriLee/Storyloom/releases/download/system-media/${SM_ZIP}"
 
-# Portable check: manifest exists AND both directories contain at least one PNG.
-_has_media() {
-    [ -f "system_media/_manifest.json" ] || return 1
-    [ -f "system_media/VERSION" ] || return 1
-    [ -n "$(find system_media/char_portrait -name '*.png' -print -quit 2>/dev/null)" ] || return 1
-    [ -n "$(find system_media/background_img -name '*.png' -print -quit 2>/dev/null)" ] || return 1
-}
-
-if _has_media; then
-    echo "--- System media: using local copy ---"
+if [ -n "$SM_VERSION" ] && [ -f "$SM_ZIP" ]; then
+    echo "--- System media: using $SM_ZIP ---"
+elif [ -f "system_media/_manifest.json" ]; then
+    echo "--- System media: packing from local system_media/ ---"
+    bash scripts/pack_system_media.sh --skip-check
+    SM_ZIP="system_media-v${SM_VERSION}.zip"
 else
-    echo "--- System media: downloading v${SM_VERSION} ---"
-    # Local zip (from scripts/pack_system_media.sh) takes priority over download.
-    if [ -f "$SM_ZIP" ]; then
-        echo "  Using local $SM_ZIP"
-    else
-        $PYTHON -c "
-import urllib.request, sys
-try:
-    urllib.request.urlretrieve('${SM_URL}', '${SM_ZIP}')
-    print('  Downloaded ${SM_ZIP}')
-except Exception as e:
-    print(f'  WARNING: Download failed: {e}', file=sys.stderr)
-    print('  Generate locally: python scripts/generate_system_assets.py', file=sys.stderr)
-    sys.exit(1)
-" || true  # continue build even if download fails
-    fi
-    if [ -f "$SM_ZIP" ]; then
-        mkdir -p system_media
-        $PYTHON -c "import zipfile; zipfile.ZipFile('${SM_ZIP}').extractall('system_media')"
-        echo "  Extracted to system_media/"
-    fi
+    echo "--- System media: not found (run scripts/pack_system_media.sh first) ---"
 fi
 
 # PyInstaller --add-data separator: ':' on Linux/macOS, ';' on Windows.
@@ -119,15 +96,13 @@ cp -r locale "$OUTPUT_DIR/app/"
 cp config.example.json "$OUTPUT_DIR/app/"
 cp "dist/storyloom-${VERSION}-"*.whl "dist/storyloom-${VERSION}.tar.gz" "$OUTPUT_DIR/app/"
 
-# System media — bundled as standalone directory in the release zip.
-# First-time users get a working media library without needing to
-# download it separately via the update UI.  The independent
-# system_media-v{ver}.zip asset is still published for users who
-# only need a media update without a full app upgrade.
-if _has_media; then
-    cp -r system_media "$OUTPUT_DIR/"
+# System media — extract from filtered zip into release directory.
+# Uses the same zip produced by pack_system_media.sh (skips thumbnails).
+if [ -f "$SM_ZIP" ]; then
+    echo "--- System media: extracting $SM_ZIP into release ---"
+    $PYTHON -c "import zipfile; zipfile.ZipFile('${SM_ZIP}').extractall('${OUTPUT_DIR}')"
 else
-    echo "WARNING: system_media/ not found — release will lack built-in media"
+    echo "WARNING: no system_media zip — release will lack built-in media"
 fi
 
 # 5. Create zip for GitHub Release upload

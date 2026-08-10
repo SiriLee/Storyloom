@@ -1350,7 +1350,17 @@ def main():
         "--port", type=int, default=0,
         help="TCP port (default: auto-assign a free port).",
     )
+    parser.add_argument(
+        "--regenerate-launcher", action="store_true",
+        help="Download and restore the Storyloom launcher binary.",
+    )
     args, _ = parser.parse_known_args()
+
+    # --regenerate-launcher: download launcher binary and exit
+    if args.regenerate_launcher:
+        from storyloom.core.update_manager import regenerate_launcher
+        ok = regenerate_launcher(_APP_DIR)
+        sys.exit(0 if ok else 1)
 
     HOST = "127.0.0.1"
     PORT = args.port if args.port else _find_free_port()
