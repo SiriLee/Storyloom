@@ -101,6 +101,7 @@ const GraphRenderer = (function () {
                         <svg viewBox="0 0 24 24"><polyline points="15,4 7,12 15,20"/></svg>
                     </button>
                     <span class="vn-topbar-title" id="vnTitle"></span>
+                    <button class="vn-btn theme-toggle-btn" id="vnBtnTheme" title="${_("Toggle Theme")}"></button>
                     <button class="vn-btn" id="vnBtnAuto" title="${_("Switch to Auto")}">
                         <svg viewBox="0 0 24 24" id="vnSvgAuto"><polygon points="6,4 20,12 6,20"/></svg>
                     </button>
@@ -183,6 +184,17 @@ const GraphRenderer = (function () {
         $("#vnBtnBacklog").addEventListener("click", function () { showBacklog(); });
         $("#vnBtnImmersive").addEventListener("click", function () { setImmersive(!_immersive); });
         $("#vnBtnSettings").addEventListener("click", function () { showSettings(); });
+
+        /* Theme toggle */
+        var themeBtn = document.getElementById("vnBtnTheme");
+        if (themeBtn && window._updateThemeButton) {
+            window._updateThemeButton(themeBtn);
+            themeBtn.addEventListener("click", function () {
+                ThemeState.toggle();
+                saveConfig();
+                window._updateAllThemeButtons();
+            });
+        }
         $("#vnBacklogClose").addEventListener("click", function () { hideBacklog(); });
         $("#vnSettingsClose").addEventListener("click", function () { hideSettings(); });
 
