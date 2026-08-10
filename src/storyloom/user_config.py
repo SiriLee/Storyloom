@@ -15,6 +15,7 @@ Usage::
 import json
 import os
 import shutil
+import sys
 from pathlib import Path
 
 
@@ -202,6 +203,10 @@ class UserConfig:
 
     def _example_path(self) -> Path:
         assert self._app_dir is not None
+        # When frozen, config.example.json lives next to the exe
+        # (inside app/), not at the shared root.
+        if getattr(sys, 'frozen', False):
+            return Path(sys.executable).parent / "config.example.json"
         return self._app_dir / "config.example.json"
 
     def _load(self) -> None:

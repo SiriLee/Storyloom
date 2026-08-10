@@ -116,7 +116,7 @@ mkdir -p "$OUTPUT_DIR/app"
 cp "dist/$BIN_NAME" "$OUTPUT_DIR/app/"
 cp "dist/$LAUNCHER_NAME" "$OUTPUT_DIR/$LAUNCHER_NAME"
 cp -r locale "$OUTPUT_DIR/app/"
-cp config.example.json "$OUTPUT_DIR/"
+cp config.example.json "$OUTPUT_DIR/app/"
 cp "dist/storyloom-${VERSION}-"*.whl "dist/storyloom-${VERSION}.tar.gz" "$OUTPUT_DIR/app/"
 
 # System media — bundled as standalone directory in the release zip.
