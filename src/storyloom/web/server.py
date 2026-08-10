@@ -1248,17 +1248,15 @@ def _webview_available() -> bool:
     real test is creating a throwaway window and catching the exception.
     """
     # Suppress noisy GTK/QT backend-probing output from pywebview.
-    saved = os.dup(2)
-    null_fd = os.open(os.devnull, os.O_WRONLY)
-    os.dup2(null_fd, 2)
-    os.close(null_fd)
+    import io
+    _stderr = sys.stderr
+    sys.stderr = io.StringIO()
     try:
         import webview
     except ImportError:
         return False
     finally:
-        os.dup2(saved, 2)
-        os.close(saved)
+        sys.stderr = _stderr
 
     return True
 
