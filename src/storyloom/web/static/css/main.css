@@ -983,8 +983,8 @@ button.accent:hover, .btn-accent:hover {
 
 .cc-message.user {
     align-self: flex-end;
-    background: var(--button-bg);
-    color: var(--text-primary);
+    background: var(--text-accent);
+    color: #fff;
     border-bottom-right-radius: var(--radius-sm);
 }
 
