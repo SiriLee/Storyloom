@@ -177,18 +177,19 @@
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <h2 id="overview">1. Overview</h2>
 
-<p>Storyloom needs <strong>two</strong> separate API services to run:</p>
+<p>Storyloom interacts with two kinds of API, but <strong>only one is required</strong>:</p>
 
 <div class="card">
-  <h3>🧠 Text API (LLM)</h3>
+  <h3>🧠 Text API (LLM) — required</h3>
   <p>Generates the narrative — story prose, dialogue, choices, and game state. The <strong>core engine</strong> of the game. Without a working text API, the game cannot run at all.</p>
   <p><strong>Interface:</strong> OpenAI-compatible <code>/v1/chat/completions</code></p>
   <p><strong>Settings fields:</strong> <code>API Base URL</code> · <code>API Key</code> · <code>Model</code></p>
 </div>
 
 <div class="card">
-  <h3>🎨 Image API</h3>
-  <p>Generates character portraits and scene backgrounds for visual novel / graph mode. Optional — you can disable it with the <strong>Image Generation</strong> toggle and play text-only.</p>
+  <h3>🎨 Image API — optional</h3>
+  <p>Generates character portraits and scene backgrounds for visual novel / graph mode. <strong>Entirely optional.</strong> If left unconfigured or disabled, the game uses its <strong>built-in system media library</strong> — a curated collection of pre-made character art and backgrounds bundled with the program. The game is fully playable without ever setting up an image API.</p>
+  <p>You can enable image generation later at any time via the <strong>Image Generation</strong> toggle in Settings.</p>
   <p><strong>Interface:</strong> OpenAI-compatible <code>/v1/images/generations</code></p>
   <p><strong>Settings fields:</strong> <code>Image API URL</code> · <code>Image API Key</code> · <code>Image Model</code></p>
 </div>
@@ -314,6 +315,10 @@
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <h2 id="image-api">3. Image API</h2>
+
+<div class="callout good">
+  <strong>🎭 You don't need an image API to play.</strong> Storyloom ships with a built-in system media library — a curated set of pre-made character portraits and scene backgrounds. When <strong>Image Generation</strong> is toggled off (or left unconfigured), the game draws from this library automatically. You only need to set up an image API if you want AI-generated custom artwork for your stories.
+</div>
 
 <h3>3.1 Available model families</h3>
 
