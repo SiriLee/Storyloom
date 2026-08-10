@@ -69,6 +69,62 @@ const GameState = {
     },
 };
 
+/* ── Theme State ──────────────────────────────────────────────────── */
+/* Manages data-theme attribute on <html>.  Persisted to localStorage.
+   Values: "system" (default), "dark", "light".
+   The CSS variable system (theme-dark.css / theme-light.css) reacts
+   to [data-theme] selectors, including @media prefers-color-scheme
+   when data-theme="system".                                           */
+
+const ThemeState = {
+    _key: "storyloom-theme",
+
+    /** Get the current stored preference ("system" | "dark" | "light"). */
+    get current() {
+        return document.documentElement.getAttribute("data-theme") || "system";
+    },
+
+    /** Get the effective resolved theme ("dark" or "light"). */
+    get effective() {
+        if (this.current === "system") {
+            return window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark" : "light";
+        }
+        return this.current;
+    },
+
+    /** Initialize: read localStorage, apply data-theme, listen for OS changes. */
+    init() {
+        const saved = localStorage.getItem(this._key) || "system";
+        document.documentElement.setAttribute("data-theme", saved);
+
+        // Listen for OS theme changes — only matters in "system" mode.
+        this._mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+        this._mediaQuery.addEventListener("change", () => {
+            if (this.current === "system") {
+                // Force CSS re-evaluation by re-applying the attribute.
+                document.documentElement.setAttribute("data-theme", "system");
+            }
+        });
+    },
+
+    /** Set theme to a specific value. */
+    set(value) {
+        if (value !== "system" && value !== "dark" && value !== "light") return;
+        document.documentElement.setAttribute("data-theme", value);
+        localStorage.setItem(this._key, value);
+    },
+
+    /** Cycle: system → dark → light → system.  Returns new value. */
+    cycle() {
+        const order = ["system", "dark", "light"];
+        const idx = order.indexOf(this.current);
+        const next = order[(idx + 1) % order.length];
+        this.set(next);
+        return next;
+    },
+};
+
 /* ── Settings ────────────────────────────────────────────────────── */
 /* Data-driven settings panel.  Add a new object to the SETTINGS array
    to add a row to the settings overlay — no HTML changes needed.
@@ -275,6 +331,7 @@ async function initConfig() {
     } catch (err) {
         console.warn("initConfig: server unreachable, using localStorage", err);
     }
+    ThemeState.init();
 }
 
 /**
