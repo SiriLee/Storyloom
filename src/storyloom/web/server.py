@@ -93,8 +93,12 @@ cfg = UserConfig(_APP_DIR)
 for _dir in ("saves", "media", "system_media"):
     os.makedirs(os.path.join(_APP_DIR, _dir), exist_ok=True)
 
-# ── i18n (mirrors dev_cli/dev_main.py init order) ─────────────────
-_locale_dir = os.path.join(_APP_DIR, "locale")
+# ── i18n — locale lives next to the exe (inside app/) so it gets
+#    replaced on update along with the binary.
+if getattr(sys, 'frozen', False):
+    _locale_dir = os.path.join(os.path.dirname(sys.executable), "locale")
+else:
+    _locale_dir = os.path.join(_APP_DIR, "locale")
 init_i18n(cfg.language, locale_dir=_locale_dir)
 
 # ── Engine wiring (mirrors dev_cli/dev_main.py) ──────────────────
