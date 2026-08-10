@@ -436,10 +436,21 @@ const GameView = (function () {
                         );
                     }
                 }
+                /* Speaker name always comes from "Name: text" split.
+                   event.char is only for sprite/portrait matching. */
+                var charName = null;
+                var displayText = event.text;
+                var m = displayText.match(/^([^:：]+)[：:]\s*/);
+                if (m) {
+                    charName = m[1].trim();
+                    displayText = displayText.slice(m[0].length);
+                }
+                /* Sprite: driven by event.char (parser attr), not text split.
+                   A character can be present in a scene without speaking. */
                 if (!event.char) {
                     GraphRenderer.clearSprite();
                 }
-                GraphRenderer.showSegment(event.text, event.char || null);
+                GraphRenderer.showSegment(displayText, charName);
                 return;  // typewriter controls its own pacing
             }
             Display.appendSegment(event.text);
