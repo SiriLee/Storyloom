@@ -1320,6 +1320,7 @@ class GameLoop:
         if os.path.isdir(DEFAULT_SYSTEM_MEDIA_DIR):
             try:
                 library.import_system_assets(DEFAULT_SYSTEM_MEDIA_DIR)
+                library.save()  # persist first-time import (was in stub block, lost in 456c114)
             except Exception:
                 # system_media/ exists but is broken — skip, don't block
                 pass
