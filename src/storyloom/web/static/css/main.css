@@ -1341,18 +1341,20 @@ button.accent:hover, .btn-accent:hover {
     display: flex;
     flex-direction: column;
     height: calc(100vh - 4rem);
-    max-width: var(--content-width);
+    max-width: var(--content-wide);
     margin: 0 auto;
+    padding: 0 var(--space-xl);
     animation: fadeIn var(--trans-slow);
 }
 
-/* ── Header (back button, same style as co-create) ────────────── */
+/* ── Header (back button + theme toggle, matches .sv-header) ───── */
 
 .gp-header {
     display: flex;
     align-items: center;
-    padding: var(--space-md) var(--space-xs);
+    padding: 1rem 0;
     flex-shrink: 0;
+    gap: 0.8rem;
 }
 
 /* ── Content (centered story info) ────────────────────────────── */
@@ -3248,19 +3250,17 @@ button.accent:hover, .btn-accent:hover {
     font-size: 0.92rem;
     font-weight: 600;
     cursor: pointer;
-    transition: filter var(--trans-normal), box-shadow var(--trans-normal);
+    transition: box-shadow var(--trans-normal);
     margin-top: 0.5rem;
 }
 
 .settings-update-btn:hover {
-    filter: brightness(1.1);
-    box-shadow: var(--shadow-glow);
+    box-shadow: inset 0 0 0 999px rgba(0, 0, 0, 0.1), var(--shadow-glow);
 }
 
 .settings-update-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    filter: none;
     box-shadow: none;
 }
 
