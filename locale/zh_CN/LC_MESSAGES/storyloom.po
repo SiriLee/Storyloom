@@ -542,23 +542,29 @@ msgstr "预构建失败"
 msgid "Scenes"
 msgstr "场景"
 
+msgid "Image API"
+msgstr "图像 API"
+
 msgid "Accent Color"
-msgstr ""
+msgstr "强调色"
 
 msgid "Green"
-msgstr ""
+msgstr "绿色"
 
 msgid "Emerald"
-msgstr ""
+msgstr "翡翠绿"
 
 msgid "Blue"
-msgstr ""
+msgstr "蓝色"
 
 msgid "Amber"
-msgstr ""
+msgstr "琥珀色"
 
 msgid "Rose"
-msgstr ""
+msgstr "玫瑰红"
 
 msgid "Violet"
-msgstr ""
+msgstr "紫罗兰"
+
+msgid "Image API"
+msgstr "图像 API"
