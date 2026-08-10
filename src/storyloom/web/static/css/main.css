@@ -1010,6 +1010,9 @@ button.accent:hover, .btn-accent:hover {
     flex-direction: column;
     gap: 0.8rem;
     background: var(--bg-primary);
+    max-width: 720px;
+    width: 100%;
+    margin: 0 auto;
     scrollbar-width: none;          /* Firefox */
     -ms-overflow-style: none;       /* IE / old Edge */
 }
@@ -1095,6 +1098,10 @@ button.accent:hover, .btn-accent:hover {
     padding: var(--space-md) var(--space-xs) var(--space-lg);
     flex-shrink: 0;
     background: var(--bg-primary);
+    max-width: 720px;
+    width: 100%;
+    margin: 0 auto;
+    align-self: center;
 }
 
 /* Rounded outer container holding input + circular send button */
