@@ -195,9 +195,12 @@ class AssetLibrary:
 
         manifest = SystemManifest.load(system_dir)
 
-        # Idempotent — same version, no work needed
+        # Idempotent — same version, no work needed.
+        # Still record system_dir so asset_path() resolves sys_ assets
+        # correctly after a restart (the dir is not persisted to disk).
         if self._system_assets_version == manifest.version:
             unchanged = len(self._system_ids)
+            self._system_media_dir = _os.path.abspath(system_dir)
             return SystemImportReport(
                 version=manifest.version, unchanged=unchanged,
             )
