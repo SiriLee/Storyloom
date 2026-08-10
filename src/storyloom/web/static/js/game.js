@@ -192,6 +192,7 @@ const GameView = (function () {
             window._updateThemeButton(themeBtn);
             themeBtn.addEventListener("click", function () {
                 ThemeState.toggle();
+                saveConfig();
                 window._updateAllThemeButtons();
             });
         }

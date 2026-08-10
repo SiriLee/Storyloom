@@ -943,6 +943,7 @@
         _updateThemeButton(btn);
         btn.addEventListener("click", function () {
             ThemeState.toggle();
+            saveConfig();
             _updateAllThemeButtons();
         });
     }
