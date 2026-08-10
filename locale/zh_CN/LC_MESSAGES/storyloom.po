@@ -541,3 +541,24 @@ msgstr "预构建失败"
 
 msgid "Scenes"
 msgstr "场景"
+
+msgid "Accent Color"
+msgstr ""
+
+msgid "Green"
+msgstr ""
+
+msgid "Emerald"
+msgstr ""
+
+msgid "Blue"
+msgstr ""
+
+msgid "Amber"
+msgstr ""
+
+msgid "Rose"
+msgstr ""
+
+msgid "Violet"
+msgstr ""

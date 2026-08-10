@@ -2627,11 +2627,12 @@ button.accent:hover, .btn-accent:hover {
 .settings-nav {
     display: flex;
     flex-direction: column;
-    width: 220px;
+    width: 180px;
     flex-shrink: 0;
     border-right: 1px solid var(--border-color);
-    padding: var(--space-sm) 0;
+    padding: var(--space-md) var(--space-sm);
     overflow-y: auto;
+    gap: 0.15rem;
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
@@ -2641,15 +2642,15 @@ button.accent:hover, .btn-accent:hover {
 .settings-nav-item {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0.6rem 1rem;
-    margin: 0.1rem 0.5rem;
+    gap: 0.5rem;
+    padding: 0.5rem 0.7rem;
     border: none;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     background: transparent;
     color: var(--text-secondary);
     font-family: var(--font-sans);
-    font-size: 0.9rem;
+    font-size: 0.87rem;
+    font-weight: 500;
     text-align: left;
     cursor: pointer;
     transition: background var(--trans-normal), color var(--trans-normal);
@@ -2661,13 +2662,15 @@ button.accent:hover, .btn-accent:hover {
 }
 
 .settings-nav-item.active {
-    color: var(--text-accent);
-    background: var(--bg-tertiary);
-    font-weight: 500;
+    background: var(--text-accent);
+    color: #fff;
+    font-weight: 600;
 }
 
 .settings-nav-item svg {
     flex-shrink: 0;
+    width: 17px;
+    height: 17px;
 }
 
 .settings-nav-divider {
@@ -2690,21 +2693,14 @@ button.accent:hover, .btn-accent:hover {
 
 .settings-view .settings-content::-webkit-scrollbar { display: none; }
 
-/* ── Settings Card ───────────────────────────────────────────────── */
+/* ── Settings Card (MXU-style: rounded-xl, clean, no hover) ─────── */
 
 .settings-card {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-xl);
-    padding: 1.2rem 1.4rem;
-    margin-bottom: 1.2rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-    transition: border-color var(--trans-normal), box-shadow var(--trans-normal);
-}
-
-.settings-card:hover {
-    border-color: var(--text-accent);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    padding: 1rem 1.2rem;
+    margin-bottom: 1.5rem;
 }
 
 .settings-card-title {
@@ -2828,37 +2824,39 @@ button.accent:hover, .btn-accent:hover {
     background: rgba(248, 81, 73, 0.12);
 }
 
-/* ── Segmented Control ───────────────────────────────────────────── */
+/* ── Segmented Control (MXU-style: individual rounded buttons) ──── */
 
 .settings-seg-group {
-    display: inline-flex;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-round);
-    padding: 3px;
-    gap: 2px;
+    display: flex;
+    gap: 0.5rem;
 }
 
 .settings-seg-btn {
-    padding: 0.35rem 1rem;
-    border: none;
-    border-radius: var(--radius-round);
-    background: transparent;
+    flex: 1;
+    padding: 0.45rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--bg-primary);
     color: var(--text-secondary);
     font-family: var(--font-sans);
     font-size: 0.85rem;
+    font-weight: 500;
     cursor: pointer;
     transition: all var(--trans-normal);
     white-space: nowrap;
+    text-align: center;
 }
 
-.settings-seg-btn:hover { color: var(--text-primary); }
+.settings-seg-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
 
 .settings-seg-btn.active {
     background: var(--text-accent);
-    color: var(--bg-primary);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-    font-weight: 500;
+    color: #fff;
+    border-color: var(--text-accent);
+    font-weight: 600;
 }
 
 /* ── Theme Toggle Button (global, in all topbars) ────────────────── */
@@ -3061,6 +3059,82 @@ button.accent:hover, .btn-accent:hover {
     padding: 2rem 1rem;
     color: var(--text-secondary);
     font-style: italic;
+}
+
+/* ── Accent Color Grid (Appearance section) ─────────────────────── */
+
+.accent-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+}
+
+.accent-tile {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.7rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--bg-primary);
+    cursor: pointer;
+    transition: all var(--trans-normal);
+    font-size: 0.83rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.accent-tile:hover { background: var(--bg-tertiary); }
+
+.accent-tile.active {
+    border-color: var(--text-accent);
+    box-shadow: 0 0 0 2px var(--text-accent);
+}
+
+.accent-tile-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.accent-tile-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Language Button Grid ──────────────────────────────────────── */
+
+.lang-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+}
+
+.lang-btn {
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: 0.87rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    transition: all var(--trans-normal);
+}
+
+.lang-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+
+.lang-btn.active {
+    background: var(--text-accent);
+    color: #fff;
+    border-color: var(--text-accent);
+    font-weight: 600;
 }
 
 /* ── Toast: error variant ────────────────────────────────────────── */

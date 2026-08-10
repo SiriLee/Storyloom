@@ -541,3 +541,24 @@ msgstr "預構建失敗"
 
 msgid "Scenes"
 msgstr "場景"
+
+msgid "Accent Color"
+msgstr ""
+
+msgid "Green"
+msgstr ""
+
+msgid "Emerald"
+msgstr ""
+
+msgid "Blue"
+msgstr ""
+
+msgid "Amber"
+msgstr ""
+
+msgid "Rose"
+msgstr ""
+
+msgid "Violet"
+msgstr ""

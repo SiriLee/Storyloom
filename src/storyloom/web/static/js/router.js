@@ -467,20 +467,31 @@
     }
 
     function _renderGeneralSection(container) {
+        var lang = getSetting("lang") || GameState.lang || "zh-CN";
+        var gameMode = getSetting("game_mode") || "text";
+
         container.innerHTML =
             '<div class="settings-card">'
-            + '<div class="settings-card-title">' + esc(_("General")) + '</div>'
-            + _settingSelect("lang", _("Language"), [
-                { value: "zh-CN", label: "中文" },
-                { value: "zh-TW", label: "繁體中文" },
-                { value: "en", label: "English" },
-            ])
-            + _settingSegmented("game_mode", _("Game Mode"), [
+            + '<div class="settings-card-title">' + esc(_("Language")) + '</div>'
+            + '<div class="lang-grid">'
+            + _langBtn("zh-CN", "中文", lang)
+            + _langBtn("zh-TW", "繁體中文", lang)
+            + _langBtn("en", "English", lang)
+            + '</div>'
+            + '</div>'
+            + '<div class="settings-card">'
+            + '<div class="settings-card-title">' + esc(_("Game Mode")) + '</div>'
+            + _settingSegmented("game_mode", "", [
                 { value: "text", label: _("Text") },
                 { value: "graph", label: _("Graph") },
-            ], getSetting("game_mode") || "text")
+            ], gameMode)
             + '</div>';
         _bindSettingsInputs(container);
+    }
+
+    function _langBtn(value, label, current) {
+        var cls = value === current ? "lang-btn active" : "lang-btn";
+        return '<button class="' + cls + '" data-lang="' + esc(value) + '">' + esc(label) + '</button>';
     }
 
     function _renderApiSection(container) {
@@ -521,14 +532,38 @@
     }
 
     function _renderAppearanceSection(container) {
+        var theme = ThemeState.current;
+        var accent = getSetting("accent_color") || "green";
+
+        var accentColors = [
+            { id: "green",    color: "#3fb950", label: _("Green") },
+            { id: "emerald",  color: "#10b981", label: _("Emerald") },
+            { id: "blue",     color: "#3b82f6", label: _("Blue") },
+            { id: "lava",     color: "#f59e0b", label: _("Amber") },
+            { id: "rose",     color: "#f43f5e", label: _("Rose") },
+            { id: "violet",   color: "#8b5cf6", label: _("Violet") },
+        ];
+
         container.innerHTML =
             '<div class="settings-card">'
-            + '<div class="settings-card-title">' + esc(_("Appearance")) + '</div>'
-            + _settingSegmented("theme", _("Theme"), [
+            + '<div class="settings-card-title">' + esc(_("Theme")) + '</div>'
+            + _settingSegmented("theme", "", [
                 { value: "system", label: _("System") },
                 { value: "dark", label: _("Dark") },
                 { value: "light", label: _("Light") },
-            ], ThemeState.current)
+            ], theme)
+            + '</div>'
+            + '<div class="settings-card">'
+            + '<div class="settings-card-title">' + esc(_("Accent Color")) + '</div>'
+            + '<div class="accent-grid">'
+            + accentColors.map(function (a) {
+                var cls = a.id === accent ? "accent-tile active" : "accent-tile";
+                return '<button class="' + cls + '" data-accent="' + esc(a.id) + '">'
+                    + '<span class="accent-tile-swatch" style="background:' + a.color + '"></span>'
+                    + '<span class="accent-tile-label">' + esc(a.label) + '</span>'
+                    + '</button>';
+            }).join("")
+            + '</div>'
             + '</div>';
         _bindSettingsInputs(container);
     }
@@ -766,6 +801,31 @@
             });
         });
 
+        /* Language button grid */
+        container.querySelectorAll(".lang-btn").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var val = this.dataset.lang;
+                container.querySelectorAll(".lang-btn").forEach(function (b) {
+                    b.classList.toggle("active", b.dataset.lang === val);
+                });
+                applySetting("lang", val);
+                GameState.setLang(val);
+                renderSettings();
+            });
+        });
+
+        /* Accent color tiles */
+        container.querySelectorAll(".accent-tile").forEach(function (tile) {
+            tile.addEventListener("click", function () {
+                var val = this.dataset.accent;
+                container.querySelectorAll(".accent-tile").forEach(function (t) {
+                    t.classList.toggle("active", t.dataset.accent === val);
+                });
+                applySetting("accent_color", val);
+                _applyAccentColor(val);
+            });
+        });
+
         /* Text / password edit buttons */
         container.querySelectorAll(".settings-row-edit").forEach(function (btn) {
             btn.addEventListener("click", function () {
@@ -844,6 +904,29 @@
             btn.innerHTML = Icons.sun();
             btn.title = _("Theme: Light");
         }
+    }
+
+    /* ── Accent Color System ─────────────────────────────────────── */
+
+    var ACCENT_PALETTE = {
+        green:   { main: "#3fb950", hover: "#4cc964", light: "rgba(63,185,80,0.12)", lightDark: "rgba(63,185,80,0.15)" },
+        emerald: { main: "#10b981", hover: "#34d399", light: "rgba(16,185,129,0.12)", lightDark: "rgba(16,185,129,0.15)" },
+        blue:    { main: "#3b82f6", hover: "#60a5fa", light: "rgba(59,130,246,0.12)", lightDark: "rgba(59,130,246,0.15)" },
+        amber:   { main: "#f59e0b", hover: "#fbbf24", light: "rgba(245,158,11,0.12)", lightDark: "rgba(245,158,11,0.15)" },
+        rose:    { main: "#f43f5e", hover: "#fb7185", light: "rgba(244,63,94,0.12)", lightDark: "rgba(244,63,94,0.15)" },
+        violet:  { main: "#8b5cf6", hover: "#a78bfa", light: "rgba(139,92,246,0.12)", lightDark: "rgba(139,92,246,0.15)" },
+    };
+
+    function _applyAccentColor(id) {
+        var p = ACCENT_PALETTE[id] || ACCENT_PALETTE["green"];
+        var root = document.documentElement;
+        var isDark = ThemeState.effective === "dark";
+        root.style.setProperty("--text-accent", p.main);
+        root.style.setProperty("--accent-light", isDark ? p.lightDark : p.light);
+        // Update shadow to match accent
+        root.style.setProperty("--shadow-focus", "0 0 0 2px " + p.main + "59");
+        root.style.setProperty("--shadow-glow", "0 0 8px " + p.main + "33");
+        root.style.setProperty("--shadow-glow-lg", "0 0 12px " + p.main + "66");
     }
 
     /** Update ALL theme buttons on the page. */
