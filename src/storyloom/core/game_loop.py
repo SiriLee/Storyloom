@@ -1330,9 +1330,9 @@ class GameLoop:
             try:
                 library.import_system_assets(_sys_media_dir)
                 library.save()  # persist first-time import (was in stub block, lost in 456c114)
-            except Exception:
-                # system_media/ exists but is broken — skip, don't block
-                pass
+            except Exception as exc:
+                # system_media/ exists but is broken — skip, don't block.
+                logger.warning("Failed to import system assets: %s", exc)
 
         from storyloom.io._types import RemoveBgPolicy
         from storyloom.io.img_api_client import ImgApiClient
