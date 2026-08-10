@@ -572,6 +572,33 @@
         }
     }
 
+    function _renderApiGuideSection(container) {
+        container.innerHTML =
+            '<div class="settings-card">'
+            + '<div class="settings-guide" id="guide-content">'
+            + '<p class="settings-empty-card">' + esc(_("Loading...")) + '</p>'
+            + '</div>'
+            + '</div>';
+
+        if (typeof marked !== "undefined" && typeof API_GUIDE_MD !== "undefined") {
+            try {
+                var html = marked.parse(API_GUIDE_MD);
+                document.getElementById("guide-content").innerHTML = html;
+            } catch (e) {
+                document.getElementById("guide-content").innerHTML =
+                    '<div class="settings-error-card">'
+                    + '<div class="settings-error-icon">!</div>'
+                    + '<p>' + esc(_("Failed to render API guide.")) + '</p>'
+                    + '</div>';
+            }
+        } else {
+            document.getElementById("guide-content").innerHTML =
+                '<div class="settings-error-card">'
+                + '<p>' + esc(_("API guide unavailable. Please check your installation.")) + '</p>'
+                + '</div>';
+        }
+    }
+
     /* ═══════════════════════════════════════════════════════════════
        Settings Row Factories
        ═══════════════════════════════════════════════════════════════ */
