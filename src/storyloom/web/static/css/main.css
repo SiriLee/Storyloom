@@ -344,9 +344,9 @@ button.accent:hover, .btn-accent:hover {
 .settings-header {
     display: flex;
     align-items: center;
-    padding: var(--space-md) var(--space-xs);
+    padding: 0.7rem 0;
     flex-shrink: 0;
-    gap: 0.6rem;
+    gap: 0.8rem;
 }
 
 .settings-title {
@@ -529,7 +529,7 @@ button.accent:hover, .btn-accent:hover {
 .am-header {
     display: flex;
     align-items: center;
-    padding: 1rem 0;
+    padding: 0.7rem 0;
     flex-shrink: 0;
     gap: 0.8rem;
 }
@@ -917,7 +917,7 @@ button.accent:hover, .btn-accent:hover {
 .cc-header {
     display: flex;
     align-items: center;
-    padding: 1rem 0;
+    padding: 0.7rem 0;
     flex-shrink: 0;
     background: var(--bg-primary);
     gap: 0.8rem;
@@ -925,6 +925,13 @@ button.accent:hover, .btn-accent:hover {
 
 .cc-spacer {
     flex: 1;
+}
+
+.cc-title {
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
 }
 
 .cc-back-btn {
@@ -1000,24 +1007,34 @@ button.accent:hover, .btn-accent:hover {
     box-shadow: none;
 }
 
-/* ── Messages area (no border, seamless with header) ──────────── */
+/* ── Chat panel (border card wrapping messages + input) ───────── */
+
+.cc-chat-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    max-width: 860px;
+    width: 100%;
+    margin: 0 auto var(--space-lg);
+    background: var(--bg-primary);
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* ── Messages area ─────────────────────────────────────────────── */
 
 .cc-messages {
     flex: 1;
     overflow-y: auto;
-    padding: var(--space-lg) var(--space-xs);
+    padding: var(--space-lg) var(--space-lg);
     display: flex;
     flex-direction: column;
     gap: 0.8rem;
-    background: var(--bg-primary);
-    max-width: 720px;
-    width: 100%;
-    margin: 0 auto;
-    scrollbar-width: none;          /* Firefox */
-    -ms-overflow-style: none;       /* IE / old Edge */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 .cc-messages::-webkit-scrollbar {
-    display: none;                  /* Chrome / Safari */
+    display: none;
 }
 
 .cc-message {
@@ -1095,13 +1112,8 @@ button.accent:hover, .btn-accent:hover {
 .cc-input-bar {
     display: flex;
     align-items: center;
-    padding: var(--space-md) var(--space-xs) var(--space-lg);
+    padding: var(--space-sm) var(--space-md) var(--space-md);
     flex-shrink: 0;
-    background: var(--bg-primary);
-    max-width: 720px;
-    width: 100%;
-    margin: 0 auto;
-    align-self: center;
 }
 
 /* Rounded outer container holding input + circular send button */
@@ -1414,7 +1426,7 @@ button.accent:hover, .btn-accent:hover {
 .gp-header {
     display: flex;
     align-items: center;
-    padding: 1rem 0;
+    padding: 0.7rem 0;
     flex-shrink: 0;
     gap: 0.8rem;
 }
@@ -1454,12 +1466,11 @@ button.accent:hover, .btn-accent:hover {
 }
 
 .gp-label {
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-size: var(--font-3xl);
-    font-weight: normal;
+    font-weight: 600;
     color: var(--text-accent);
     margin-bottom: 0;
-    letter-spacing: 0.05em;
 }
 
 .gp-setting {
@@ -1511,7 +1522,7 @@ button.accent:hover, .btn-accent:hover {
 .sv-header {
     display: flex;
     align-items: center;
-    padding: 1rem 0;
+    padding: 0.7rem 0;
     flex-shrink: 0;
     gap: 0.8rem;
 }
@@ -1811,12 +1822,13 @@ button.accent:hover, .btn-accent:hover {
 .game-view {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 4rem);   /* #app padding is 2rem top + 2rem bottom */
-    max-width: var(--content-width);
+    height: calc(100vh - 4rem);
+    max-width: var(--content-wide);
     margin: 0 auto;
+    padding: 0 var(--space-xl);
     background: var(--bg-primary);
     animation: fadeIn var(--trans-slow);
-    position: relative;           /* anchor for absolutely-positioned choices */
+    position: relative;
 }
 
 /* ── Top Bar ────────────────────────────────────────────────────── */
@@ -1824,10 +1836,10 @@ button.accent:hover, .btn-accent:hover {
 .game-topbar {
     display: flex;
     align-items: center;
-    padding: var(--space-md) var(--space-xs);
+    padding: 0.7rem 0;
     flex-shrink: 0;
     background: var(--bg-primary);
-    gap: 0.6rem;
+    gap: 0.8rem;
 }
 
 .game-exit-btn {
@@ -1849,15 +1861,15 @@ button.accent:hover, .btn-accent:hover {
 
 .game-exit-btn:hover {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--bg-tertiary);
     box-shadow: none;
 }
 
 .game-label {
-    font-family: var(--font-mono);
-    font-size: var(--font-md);
-    color: var(--text-accent);
-    font-weight: normal;
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    color: var(--text-primary);
+    font-weight: 600;
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1894,7 +1906,7 @@ button.accent:hover, .btn-accent:hover {
 
 .game-mode-btn:hover {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--bg-tertiary);
 }
 
 .game-mode-btn svg {

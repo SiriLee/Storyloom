@@ -51,27 +51,28 @@ const CoCreateView = (function () {
 
         _container.innerHTML = `
             <div class="co-create-view">
-                <!-- Header: ← back | [spacer] | theme | mode | Start -->
+                <!-- Header: ← back | title | [spacer] | theme | mode | Start -->
                 <div class="cc-header">
                     <button class="cc-back-btn" id="cc-back"
                             title="${esc(_("Back to Menu"))}" disabled>${Icons.arrowLeft()}</button>
+                    <span class="cc-title">${esc(_("Co-Create"))}</span>
                     <span class="cc-spacer"></span>
                     <button class="theme-toggle-btn" id="cc-theme-btn" title="${esc(_("Toggle Theme"))}"></button>
                     <button class="cc-mode-btn" id="cc-mode-btn" title="${esc(_("Switch Mode"))}">${esc(modeLabel)}</button>
                     <button class="cc-start-btn" id="cc-start" disabled>${esc(_("Start"))}</button>
                 </div>
 
-                <!-- Messages -->
-                <div class="cc-messages" id="cc-messages"></div>
-
-                <!-- Input bar: rounded container wrapping input + circular send button -->
-                <div class="cc-input-bar" id="cc-input-bar">
-                    <div class="cc-input-wrap">
-                        <textarea class="cc-input" id="cc-input"
-                                  placeholder="${esc(_("Type your story idea..."))}"
-                                  rows="1"></textarea>
-                        <button class="cc-send-btn" id="cc-send"
-                                title="${esc(_("Send"))}" disabled>${Icons.arrowUp()}</button>
+                <!-- Chat panel -->
+                <div class="cc-chat-panel">
+                    <div class="cc-messages" id="cc-messages"></div>
+                    <div class="cc-input-bar" id="cc-input-bar">
+                        <div class="cc-input-wrap">
+                            <textarea class="cc-input" id="cc-input"
+                                      placeholder="${esc(_("Type your story idea..."))}"
+                                      rows="1"></textarea>
+                            <button class="cc-send-btn" id="cc-send"
+                                    title="${esc(_("Send"))}" disabled>${Icons.arrowUp()}</button>
+                        </div>
                     </div>
                 </div>
             </div>
