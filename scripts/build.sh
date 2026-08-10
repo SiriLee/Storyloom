@@ -29,7 +29,7 @@ echo "=== Storyloom Web UI Build v${VERSION} ==="
 
 # 0. Clean previous build artifacts (dist + PyInstaller build cache only).
 echo "--- Cleaning previous builds ---"
-rm -rf build/ dist/*.whl dist/*.tar.gz dist/storyloom-web*
+rm -rf build/ dist/*.whl dist/*.tar.gz dist/storyloom-v* dist/storyloom-web*
 
 # 0b. Ensure background-removal model is available (u2netp.onnx, ~4.4 MB).
 #     Bundled via --add-data into the main exe.  Downloaded once and cached.
