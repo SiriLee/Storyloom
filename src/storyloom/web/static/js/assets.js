@@ -31,14 +31,6 @@ const AssetManagerView = (function () {
         + '<path d="M6 6 L18 18 M18 6 L6 18"/>'
         + '</svg>';
 
-    const DOWNLOAD_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" '
-        + 'fill="none" stroke="currentColor" stroke-width="2" '
-        + 'stroke-linecap="round" stroke-linejoin="round">'
-        + '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'
-        + '<polyline points="7 10 12 15 17 10"/>'
-        + '<line x1="12" y1="15" x2="12" y2="3"/>'
-        + '</svg>';
-
     const TRASH_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" '
         + 'fill="none" stroke="currentColor" stroke-width="2" '
         + 'stroke-linecap="round" stroke-linejoin="round">'
@@ -280,7 +272,7 @@ const AssetManagerView = (function () {
         overlay.innerHTML =
             '<div class="am-viewer-toolbar">'
                 + '<a class="am-viewer-btn" href="' + url + '" download'
-                    + ' title="' + esc(_("Download")) + '">' + DOWNLOAD_ICON + '</a>'
+                    + ' title="' + esc(_("Download")) + '">' + Icons.download() + '</a>'
                 + '<button class="am-viewer-btn" id="am-viewer-close"'
                     + ' title="' + esc(_("Close")) + '">' + X_ICON + '</button>'
             + '</div>'

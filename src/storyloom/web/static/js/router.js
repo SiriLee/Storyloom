@@ -37,16 +37,6 @@
         return d.innerHTML;
     }
 
-    /** Trash can icon (Feather-style SVG, 16×16). */
-    const TRASH_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" `
-        + `fill="none" stroke="currentColor" stroke-width="2" `
-        + `stroke-linecap="round" stroke-linejoin="round">`
-        + `<polyline points="3 6 5 6 21 6"/>`
-        + `<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>`
-        + `<line x1="10" y1="11" x2="10" y2="17"/>`
-        + `<line x1="14" y1="11" x2="14" y2="17"/>`
-        + `</svg>`;
-
     // ── Route table ────────────────────────────────────────────────
 
     const routes = {
@@ -1361,7 +1351,7 @@
                         </div>
                     </div>
                     ${g.last_played_at ? `<span class="sv-card-time">${formatDate(g.last_played_at)}</span>` : ""}
-                    <button class="sv-card-trash" title="${esc(_("Delete"))}">${TRASH_ICON}</button>
+                    <button class="sv-card-trash" title="${esc(_("Delete"))}">${Icons.trash()}</button>
                 </div>
             `).join("");
 
@@ -1484,7 +1474,7 @@
                             ${summary ? `<div class="sv-card-meta"><span>${esc(summary)}</span></div>` : ""}
                         </div>
                         ${s.saved_at ? `<span class="sv-card-time">${formatDate(s.saved_at)}</span>` : ""}
-                        <button class="sv-card-trash" title="${esc(_("Delete"))}">${TRASH_ICON}</button>
+                        <button class="sv-card-trash" title="${esc(_("Delete"))}">${Icons.trash()}</button>
                     </div>
                 `;
             }).join("");
