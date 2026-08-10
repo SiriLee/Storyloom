@@ -124,7 +124,9 @@ cp "dist/storyloom-${VERSION}-"*.whl "dist/storyloom-${VERSION}.tar.gz" "$OUTPUT
 # Uses the same zip produced by pack_system_media.sh (skips thumbnails).
 if [ -f "$SM_ZIP" ]; then
     echo "--- System media: extracting $SM_ZIP into release ---"
-    $PYTHON -c "import zipfile; zipfile.ZipFile('${SM_ZIP}').extractall('${OUTPUT_DIR}')"
+    $PYTHON -c "import zipfile, os; \
+os.makedirs('${OUTPUT_DIR}/system_media', exist_ok=True); \
+zipfile.ZipFile('${SM_ZIP}').extractall('${OUTPUT_DIR}/system_media')"
 else
     echo "WARNING: no system_media zip — release will lack built-in media"
 fi
