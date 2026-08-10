@@ -354,6 +354,7 @@ button.accent:hover, .btn-accent:hover {
     font-size: 1rem;
     color: var(--text-primary);
     font-weight: 600;
+    flex: 1;
 }
 
 /* ── Scrollable form area ─────────────────────────────────────── */
