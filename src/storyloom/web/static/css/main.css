@@ -24,10 +24,12 @@ body {
 }
 
 #app {
-    max-width: var(--content-width);
     margin: 0 auto;
     padding: var(--space-2xl) var(--space-xl);
     min-height: 100vh;
+    /* No max-width — each view sets its own constraint.
+       Text-mode views use --content-width; data-dense views
+       (settings, assets) use --content-wide.                  */
 }
 
 /* ── Typography ─────────────────────────────────────────────────── */
@@ -331,8 +333,9 @@ button.accent:hover, .btn-accent:hover {
     display: flex;
     flex-direction: column;
     height: calc(100vh - 4rem);
-    max-width: var(--content-width);
+    max-width: var(--content-wide);
     margin: 0 auto;
+    padding: 0 var(--space-lg);
     animation: fadeIn var(--trans-slow);
 }
 
@@ -516,8 +519,9 @@ button.accent:hover, .btn-accent:hover {
     display: flex;
     flex-direction: column;
     height: calc(100vh - 4rem);
-    max-width: var(--content-width);
+    max-width: var(--content-wide);
     margin: 0 auto;
+    padding: 0 var(--space-lg);
     animation: fadeIn var(--trans-slow);
 }
 
@@ -1894,10 +1898,13 @@ button.accent:hover, .btn-accent:hover {
 
 .game-segment {
     font-family: var(--font-sans);
-    font-size: var(--font-lg);      /* Default: medium */
-    line-height: 1.8;               /* Default: 1.0 spacing */
+    font-size: var(--font-lg);
+    line-height: 1.8;
     color: var(--text-primary);
     text-align: center;
+    max-width: var(--content-text);
+    margin-left: auto;
+    margin-right: auto;
     animation: fadeIn var(--trans-slow);
     white-space: pre-wrap;
     word-break: break-word;
@@ -2246,8 +2253,8 @@ button.accent:hover, .btn-accent:hover {
 .al-view {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 4rem);   /* #app padding: 2rem top + 2rem bottom */
-    max-width: 960px;
+    height: calc(100vh - 4rem);
+    max-width: var(--content-width);
     margin: 0 auto;
     animation: fadeIn 0.3s ease;
 }
@@ -2620,7 +2627,7 @@ button.accent:hover, .btn-accent:hover {
 .settings-nav {
     display: flex;
     flex-direction: column;
-    width: 200px;
+    width: 220px;
     flex-shrink: 0;
     border-right: 1px solid var(--border-color);
     padding: var(--space-sm) 0;

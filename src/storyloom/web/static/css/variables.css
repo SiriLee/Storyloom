@@ -37,7 +37,9 @@
     --space-3xl: 3rem;
 
     /* ── Layout ──────────────────────────────────────────────────── */
-    --content-width: 960px;
+    --content-width: 1100px;     /* general pages (menu, saves, game-preview) */
+    --content-wide: 100%;        /* data-dense pages (settings, assets) — fill viewport */
+    --content-text: 720px;       /* readable text column (narrative, adventure log) */
     --choices-width: 420px;
     --icon-btn-size: 2.2rem;
 
