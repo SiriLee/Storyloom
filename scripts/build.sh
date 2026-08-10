@@ -33,25 +33,26 @@ rm -rf build/ dist/*.whl dist/*.tar.gz dist/storyloom-web*
 
 # 0b. Ensure background-removal model is available (u2netp.onnx, ~4.4 MB).
 #     Bundled via --add-data into the main exe.  Downloaded once and cached.
+#     Build aborts if the model cannot be obtained — a release binary must
+#     include every feature it advertises.
 MODEL_DIR="src/storyloom/models"
 MODEL_FILE="$MODEL_DIR/u2netp.onnx"
 MODEL_URL="https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx"
 if [ ! -f "$MODEL_FILE" ]; then
     echo "--- Downloading u2netp.onnx (background removal model) ---"
     $PYTHON -c "
-import urllib.request, os, sys
+import urllib.request, os
 url = '${MODEL_URL}'
 dest = '${MODEL_FILE}'
 os.makedirs(os.path.dirname(dest), exist_ok=True)
-try:
-    urllib.request.urlretrieve(url, dest)
-    print(f'  Downloaded {os.path.getsize(dest)} bytes')
-except Exception as e:
-    print(f'  WARNING: Download failed: {e}', file=sys.stderr)
-    print('  Background removal will be unavailable.', file=sys.stderr)
-    print(f'  Manual download: {url}', file=sys.stderr)
-    print(f'  Place at: {dest}', file=sys.stderr)
-"
+urllib.request.urlretrieve(url, dest)
+print(f'  Downloaded {os.path.getsize(dest)} bytes')
+" || {
+        echo "ERROR: Failed to download u2netp.onnx." >&2
+        echo "  Manual download: ${MODEL_URL}" >&2
+        echo "  Place at: ${MODEL_FILE}" >&2
+        exit 1
+    }
 fi
 
 # 1. Install project + build tools (PyInstaller needs deps to discover imports)
