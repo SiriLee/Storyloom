@@ -116,7 +116,7 @@ _SYS_MEDIA_DIR = os.environ.get("STORYLOOM_SYSTEM_MEDIA_DIR",
                                  os.path.join(_APP_DIR, DEFAULT_SYSTEM_MEDIA_DIR))
 
 @app.get("/" + DEFAULT_MEDIA_DIR + "/{asset_type}/{asset_id}")
-async def serve_media(asset_type: str, asset_id: str):
+async def serve_media(asset_type: str, asset_id: str, thumb: str = "0"):
     """Serve an asset file by ID, checking user media then system media.
 
     Frontend uses a single URL pattern: ``/media/{type}/{id}`` — no
@@ -126,9 +126,12 @@ async def serve_media(asset_type: str, asset_id: str):
     Uses ``AssetType.default_extension`` as the primary lookup, then
     falls back to other common image extensions for robustness
     (manually imported files may not use the canonical format).
+
+    When ``?thumb=1``, returns a 280px-wide WebP thumbnail.  Generated
+    on first request and cached to disk as ``{id}_thumb.webp`` alongside
+    the original.
     """
     from fastapi.responses import FileResponse
-
     from storyloom.assets import AssetType
 
     # Security: reject path traversal
@@ -146,14 +149,46 @@ async def serve_media(asset_type: str, asset_id: str):
         if e != canonical_ext
     ]
 
+    want_thumb = thumb == "1"
+
     for base_dir in (_MEDIA_DIR, _SYS_MEDIA_DIR):
         for ext in extensions:
             path = os.path.join(base_dir, asset_type, f"{asset_id}{ext}")
             if os.path.isfile(path):
-                return FileResponse(
-                    path,
-                    headers={"Cache-Control": "public, max-age=86400"},
+                if not want_thumb:
+                    return FileResponse(
+                        path,
+                        headers={"Cache-Control": "public, max-age=86400"},
+                    )
+
+                # Thumbnail path — same dir, _thumb.webp suffix
+                thumb_path = os.path.join(
+                    base_dir, asset_type, f"{asset_id}_thumb.webp"
                 )
+                if os.path.isfile(thumb_path):
+                    return FileResponse(
+                        thumb_path,
+                        headers={"Cache-Control": "public, max-age=86400"},
+                    )
+
+                # Generate thumbnail on the fly
+                try:
+                    from PIL import Image
+
+                    im = Image.open(path)
+                    im = im.convert("RGB")
+                    im.thumbnail((280, 210), Image.LANCZOS)
+                    im.save(thumb_path, "WEBP", quality=80)
+                    return FileResponse(
+                        thumb_path,
+                        headers={"Cache-Control": "public, max-age=86400"},
+                    )
+                except Exception:
+                    # Fall back to full image if thumbnail fails
+                    return FileResponse(
+                        path,
+                        headers={"Cache-Control": "public, max-age=86400"},
+                    )
 
     raise HTTPException(404, f"Asset not found: {asset_type}/{asset_id}")
 
