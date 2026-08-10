@@ -475,10 +475,10 @@
                 { value: "zh-TW", label: "繁體中文" },
                 { value: "en", label: "English" },
             ])
-            + _settingSelect("game_mode", _("Game Mode"), [
+            + _settingSegmented("game_mode", _("Game Mode"), [
                 { value: "text", label: _("Text") },
                 { value: "graph", label: _("Graph") },
-            ])
+            ], getSetting("game_mode") || "text")
             + '</div>';
         _bindSettingsInputs(container);
     }
@@ -759,6 +759,8 @@
                     if (group.dataset.key === "theme") {
                         ThemeState.set(val);
                         _updateAllThemeButtons();
+                    } else if (group.dataset.key === "game_mode") {
+                        applySetting("game_mode", val);
                     }
                 });
             });

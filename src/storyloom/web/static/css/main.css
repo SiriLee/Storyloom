@@ -2695,9 +2695,16 @@ button.accent:hover, .btn-accent:hover {
 .settings-card {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    padding: 1.4rem;
-    margin-bottom: 1rem;
+    border-radius: var(--radius-xl);
+    padding: 1.2rem 1.4rem;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    transition: border-color var(--trans-normal), box-shadow var(--trans-normal);
+}
+
+.settings-card:hover {
+    border-color: var(--text-accent);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .settings-card-title {
@@ -2824,32 +2831,34 @@ button.accent:hover, .btn-accent:hover {
 /* ── Segmented Control ───────────────────────────────────────────── */
 
 .settings-seg-group {
-    display: flex;
+    display: inline-flex;
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    overflow: hidden;
+    border-radius: var(--radius-round);
+    padding: 3px;
+    gap: 2px;
 }
 
 .settings-seg-btn {
-    padding: 0.4rem 0.9rem;
+    padding: 0.35rem 1rem;
     border: none;
-    border-right: 1px solid var(--border-color);
+    border-radius: var(--radius-round);
     background: transparent;
     color: var(--text-secondary);
     font-family: var(--font-sans);
-    font-size: 0.84rem;
+    font-size: 0.85rem;
     cursor: pointer;
-    transition: background var(--trans-normal), color var(--trans-normal);
+    transition: all var(--trans-normal);
+    white-space: nowrap;
 }
-
-.settings-seg-btn:last-child { border-right: none; }
 
 .settings-seg-btn:hover { color: var(--text-primary); }
 
 .settings-seg-btn.active {
     background: var(--text-accent);
     color: var(--bg-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    font-weight: 500;
 }
 
 /* ── Theme Toggle Button (global, in all topbars) ────────────────── */
