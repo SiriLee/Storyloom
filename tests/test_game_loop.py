@@ -1326,9 +1326,15 @@ class TestGameLoopGraphPipeline:
         from storyloom.tasks import TaskPool
         assert isinstance(gl._task_pool, TaskPool)
 
-    def test_mount_sets_process_factory(self, tmp_path):
+    def test_mount_sets_process_factory(self, tmp_path, monkeypatch):
         """mount_graph_pipeline() stores callable match_processor (MatchProcessor
         for MATCH) and generate_processor (GenerateProcessor for GENERATE)."""
+        # Isolate from real media/_asset_lib.json — use tmp_path.
+        media_dir = tmp_path / "media"
+        media_dir.mkdir()
+        monkeypatch.setattr(
+            "storyloom.core.game_loop.DEFAULT_MEDIA_DIR", str(media_dir),
+        )
         gl = self._make_gl()
         gl.api_client.response = '{"selected": "hero"}'
         gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
@@ -1375,10 +1381,17 @@ class TestGameLoopGraphPipeline:
         gl.mount_graph_pipeline(game_id="test", saves_root=str(tmp_path))
         assert gl._roster.game_id == "test"
 
-    def test_mount_registers_system_assets(self, tmp_path):
+    def test_mount_registers_system_assets(self, tmp_path, monkeypatch):
         """§7.8: mount_graph_pipeline() imports system assets into the library."""
         import json
         from unittest import mock
+
+        # Isolate from real media/_asset_lib.json — use tmp_path.
+        media_dir = tmp_path / "media"
+        media_dir.mkdir()
+        monkeypatch.setattr(
+            "storyloom.core.game_loop.DEFAULT_MEDIA_DIR", str(media_dir),
+        )
 
         # Build a minimal system_media/ with a valid manifest so the test
         # is self-contained — system_media/ is a generated artifact (not in

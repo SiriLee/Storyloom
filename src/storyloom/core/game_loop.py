@@ -1308,7 +1308,7 @@ class GameLoop:
         from storyloom.tasks import TaskPool
 
         self._game_mode = "graph"
-        library = AssetLibrary(DEFAULT_MEDIA_DIR)
+        library = AssetLibrary.load(DEFAULT_MEDIA_DIR)
         if self._save_manager is not None:
             self._roster_path = self._save_manager.roster_path
         else:
