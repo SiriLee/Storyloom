@@ -1290,7 +1290,7 @@ def _show_desktop_window(url: str) -> None:
 
     print()
     print(f"Storyloom {__version__} — application server")
-    print("Opening desktop window.  Minimize this window to keep running.")
+    print("Opening desktop window.  You may minimize this window.")
 
     try:
         import webview
