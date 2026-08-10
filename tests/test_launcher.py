@@ -40,14 +40,15 @@ def test_apply_app_update_swaps(tmp_path, monkeypatch):
     monkeypatch.setattr("storyloom.launcher.APP_NEW", str(tmp_path / "app_new"))
     monkeypatch.setattr("storyloom.launcher.APP_OLD", str(tmp_path / "app_old"))
 
+    main_exe = _platform_exe("storyloom-web")
     (tmp_path / "app").mkdir()
-    (tmp_path / "app" / "storyloom-web").write_text("old")
+    (tmp_path / "app" / main_exe).write_text("old")
     (tmp_path / "app_new").mkdir()
-    (tmp_path / "app_new" / "storyloom-web").write_text("new")
+    (tmp_path / "app_new" / main_exe).write_text("new")
 
     _apply_app_update()
 
-    assert (tmp_path / "app" / "storyloom-web").read_text() == "new"
+    assert (tmp_path / "app" / main_exe).read_text() == "new"
     assert not (tmp_path / "app_old").exists()
     assert not (tmp_path / "app_new").exists()
 
@@ -59,12 +60,13 @@ def test_apply_app_update_no_old_app(tmp_path, monkeypatch):
     monkeypatch.setattr("storyloom.launcher.APP_NEW", str(tmp_path / "app_new"))
     monkeypatch.setattr("storyloom.launcher.APP_OLD", str(tmp_path / "app_old"))
 
+    main_exe = _platform_exe("storyloom-web")
     (tmp_path / "app_new").mkdir()
-    (tmp_path / "app_new" / "storyloom-web").write_text("new")
+    (tmp_path / "app_new" / main_exe).write_text("new")
 
     _apply_app_update()
 
-    assert (tmp_path / "app" / "storyloom-web").read_text() == "new"
+    assert (tmp_path / "app" / main_exe).read_text() == "new"
     assert not (tmp_path / "app_new").exists()
 
 

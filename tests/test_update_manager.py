@@ -431,13 +431,18 @@ def test_download_extract_cleans_stale_app_new(tmp_path):
 # ── regenerate_launcher tests ──────────────────────────────────────
 
 
-def test_regenerate_launcher_success(tmp_path, monkeypatch):
-    """Happy path: zip contains Storyloom at root, extracted to target dir."""
+def test_regenerate_launcher_success(tmp_path):
+    """Happy path: zip contains launcher at root, extracted to target dir."""
+    from storyloom.launcher import _platform_exe
+
+    launcher_name = _platform_exe("Storyloom")
+    app_exe = _platform_exe("storyloom-web")
+
     zip_dir = tmp_path / "zip"
     zip_dir.mkdir()
     _create_test_zip(str(zip_dir), {
-        "app/storyloom-web": b"fake-exe",
-        "Storyloom": b"fake-launcher",
+        f"app/{app_exe}": b"fake-exe",
+        launcher_name: b"fake-launcher",
     })
 
     def fake_check(app_version):
@@ -456,7 +461,7 @@ def test_regenerate_launcher_success(tmp_path, monkeypatch):
             ok = regenerate_launcher(str(tmp_path))
 
     assert ok is True
-    assert os.path.isfile(str(tmp_path / "Storyloom"))
+    assert os.path.isfile(str(tmp_path / launcher_name))
 
 
 def test_regenerate_launcher_no_asset_url(tmp_path):

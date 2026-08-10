@@ -774,7 +774,7 @@ class TestImageSave:
         lib = AssetLibrary(str(tmp_path / "media"))
         aid = _save_image(lib, AssetType.BACKGROUND, "Forest", "Dark forest",
                           _make_png(64, 36))
-        assert f"background_img/{aid}.png" in str(
+        assert os.path.join("background_img", f"{aid}.png") in str(
             tmp_path / "media" / "background_img" / f"{aid}.png"
         )
 

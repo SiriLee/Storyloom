@@ -550,7 +550,7 @@ class TestAssetPath:
         result = lib.asset_path(asset)
         assert result is not None
         assert "media" in result
-        assert result.endswith("char_portrait/hero_001.png")
+        assert result.endswith(os.path.join("char_portrait", "hero_001.png"))
 
     def test_asset_path_system_asset(self, tmp_path):
         """System asset (sys_ prefix) resolves under system_media_dir."""
@@ -569,7 +569,7 @@ class TestAssetPath:
         result = lib.asset_path(asset)
         assert result is not None
         assert "system_media" in result
-        assert result.endswith("char_portrait/sys_hero_001.png")
+        assert result.endswith(os.path.join("char_portrait", "sys_hero_001.png"))
 
     def test_asset_path_missing_file_returns_none(self, tmp_path):
         """File not on disk → returns None."""
