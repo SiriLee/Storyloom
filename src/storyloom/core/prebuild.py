@@ -138,8 +138,8 @@ Target Characters:
 
 1. Match by **appearance description first** — the target's visual features (clothing, build, hair style, facial features) are the primary matching signal. Names may differ across games.
 2. Be **conservative** — only return `"match"` when the library asset is a genuine visual fit. When in doubt, return `"generate"` — a new generated image is better than a mismatched one.
-3. Every target character MUST appear in the results array."""
-
+3. Every target character MUST appear in the results array.
+4. Prefer distinct assets — when multiple library entries are a reasonable fit, spread selections across different assets rather than reusing the same one."""
 _SELECTION_NORMAL_BG = """\
 You are the asset selector in a real-time visual novel game. Given a list of target scenes and a global asset library, decide for each scene whether a suitable background already exists in the library or whether a new image must be generated.
 
@@ -173,7 +173,8 @@ Target Scenes:
 
 1. Match by **description** — atmosphere, lighting, environment type, era, and key visual features. Names are not important.
 2. Be **conservative** — only return `"match"` when the library asset is a genuine visual fit. When in doubt, return `"generate"`.
-3. Every target scene MUST appear in the results array."""
+3. Every target scene MUST appear in the results array.
+4. Prefer distinct assets — when multiple library entries are a reasonable fit, spread selections across different assets rather than reusing the same one."""
 
 # ── Forced mode: match ONLY ──────────────────────────────────────────
 
@@ -209,7 +210,8 @@ Target Characters:
 
 1. Match by **appearance description first** — the target's visual features (clothing, build, hair style, facial features) are the primary matching signal.
 2. You MUST pick a library asset for every target character, even if it is not a perfect match. Pick the closest available.
-3. Every target character MUST appear in the results array. The same library asset may be used for multiple characters."""
+3. Every target character MUST appear in the results array.
+4. Prefer distinct assets — when multiple library entries are a reasonable fit, spread selections across different assets rather than reusing the same one."""
 
 _SELECTION_FORCED_BG = """\
 You are the asset selector in a real-time visual novel game. Given a list of target scenes and a global asset library, pick the best matching background from the library for each scene.
@@ -243,7 +245,8 @@ Target Scenes:
 
 1. Match by **description** — atmosphere, lighting, environment type, era, and key visual features.
 2. You MUST pick a library asset for every target scene, even if it is not a perfect match. Pick the closest available.
-3. Every target scene MUST appear in the results array. The same library asset may be used for multiple scenes."""
+3. Every target scene MUST appear in the results array.
+4. Prefer distinct assets — when multiple library entries are a reasonable fit, spread selections across different assets rather than reusing the same one."""
 
 # ── User message template (shared) ────────────────────────────────────
 
