@@ -61,6 +61,11 @@ const GameView = (function () {
        and exit immediately (analogous to co-create phase restrictions). */
     let _contentStarted = false;
 
+    /* Track whether an error modal has already been surfaced (SSE error
+       event or start failure) so the SSE connect-failure catch doesn't
+       show a second, duplicate dialog. */
+    let _fatalErrorShown = false;
+
     /* ── DOM helpers ─────────────────────────────────────────────── */
     function $(sel) { return _container ? _container.querySelector(sel) : null; }
 
@@ -80,6 +85,7 @@ const GameView = (function () {
         _ending = false;
         _endChoiceShown = false;
         _contentStarted = false;
+        _fatalErrorShown = false;
         _eventQueue = [];
         _optionsPending = null;
         /* Reset display mode to default manual on every entry.
@@ -162,7 +168,7 @@ const GameView = (function () {
                                 title="${_("Settings")}">
                             ${Icons.gear()}
                         </button>
-                        <button class="theme-toggle-btn" id="game-theme-btn" title="Toggle Theme"></button>
+                        <button class="theme-toggle-btn" id="game-theme-btn" title="${_("Toggle Theme")}"></button>
                     </div>
                 </div>
 
@@ -183,10 +189,10 @@ const GameView = (function () {
 
         var themeBtn = document.getElementById("game-theme-btn");
         if (themeBtn) {
-            _updateThemeButton(themeBtn);
+            window._updateThemeButton(themeBtn);
             themeBtn.addEventListener("click", function () {
                 ThemeState.cycle();
-                _updateAllThemeButtons();
+                window._updateAllThemeButtons();
             });
         }
 
@@ -286,6 +292,16 @@ const GameView = (function () {
             _wakeDisplay();
         }).catch(() => {
             _stopDisplayLoop();
+            /* Surface the connection failure — but only if no error
+               event was already received (SSE "error" → _handleError
+               shows a modal; avoid a double dialog). */
+            if (!_fatalErrorShown) {
+                Display.showErrorModal(
+                    _("Connection lost. Please try again."),
+                    function () { _connectSSE(); },
+                    function () { Router.navigate("menu"); }
+                );
+            }
         });
     }
 
@@ -543,6 +559,7 @@ const GameView = (function () {
        ═══════════════════════════════════════════════════════════════ */
 
     function _handleError(data) {
+        _fatalErrorShown = true;
         const message = data.message || _("Unknown error");
 
         Display.showErrorModal(
@@ -652,6 +669,7 @@ const GameView = (function () {
     }
 
     function _showFatalError(message) {
+        _fatalErrorShown = true;
         Display.showErrorModal(
             _("Game start failed: ") + message,
             /* Retry: re-render */

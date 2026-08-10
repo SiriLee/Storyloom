@@ -51,6 +51,10 @@ const AdventureLogView = (function () {
         _gameId = gameId;
         _title = title || null;
         _logText = null;
+        /* Reset poll counter on every entry — re-entering the view
+           must start a fresh 30 s poll window, not inherit the
+           previous session's count. */
+        _pollCount = 0;
 
         _buildDOM(title);
         _fetchLog();
@@ -68,7 +72,7 @@ const AdventureLogView = (function () {
                     <button class="cc-back-btn" id="al-back"
                             title="${_("Back to Menu")}">${Icons.arrowLeft()}</button>
                     <span class="al-label">${escHtml(title)}</span>
-                    <button class="theme-toggle-btn" id="al-theme-btn" title="Toggle Theme"></button>
+                    <button class="theme-toggle-btn" id="al-theme-btn" title="${_("Toggle Theme")}"></button>
                     <button class="al-export-btn" id="al-export" disabled>
                         ${_("Export")}
                     </button>
@@ -97,10 +101,10 @@ const AdventureLogView = (function () {
         /* ── Theme toggle ──────────────────────────────────────── */
         var themeBtn = document.getElementById("al-theme-btn");
         if (themeBtn) {
-            _updateThemeButton(themeBtn);
+            window._updateThemeButton(themeBtn);
             themeBtn.addEventListener("click", function () {
                 ThemeState.cycle();
-                _updateAllThemeButtons();
+                window._updateAllThemeButtons();
             });
         }
     }
@@ -207,5 +211,5 @@ const AdventureLogView = (function () {
     }
 
     /* ── Export ──────────────────────────────────────────────────── */
-    return { render };
+    return { render: render, cleanup: _cleanup };
 })();

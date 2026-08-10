@@ -126,105 +126,33 @@ const ThemeState = {
 };
 
 /* ── Settings ────────────────────────────────────────────────────── */
-/* Data-driven settings panel.  Add a new object to the SETTINGS array
-   to add a row to the settings overlay — no HTML changes needed.
-
-   Supported types: "select", "text", "password".
+/* Settings storage + persistence helpers.  The data-driven SETTINGS
+   array was removed in the 2026-08-10 redesign — the settings UI is
+   now rendered by router.js (_renderSettingsSection / factory
+   functions).  The config keys and localStorage schema below remain
+   authoritative and are unchanged.
 
    All setting values are persisted in localStorage under the key
    "storyloom-setting-<key>".  The "lang" setting is mirrored to
    GameState.lang for convenience.
 
    Authority: keys, defaults, and structure mirror
-              src/storyloom/user_config.py UserConfig._DEFAULTS.
-
-   ⚠️  SYNC: api_base_url and api_model placeholder values must
-   stay in sync with UserConfig._DEFAULTS.  When the backend
-   defaults change, update the placeholders here too.             */
+              src/storyloom/user_config.py UserConfig._DEFAULTS. */
 
 const SETTINGS_STORE = "storyloom-setting-";
 
-const SETTINGS = [
-    /* ── Language ── */
-    {
-        key: "lang",
-        type: "select",
-        label: "Language",
-        options: [
-            { value: "zh-CN", label: "中文" },
-            { value: "zh-TW", label: "繁體中文" },
-            { value: "en", label: "English" },
-        ],
-    },
-    /* ── Game Mode (§7.7) ── */
-    {
-        key: "game_mode",
-        type: "select",
-        label: "Game Mode",
-        options: [
-            { value: "text", label: "Text" },
-            { value: "graph", label: "Graph" },
-        ],
-    },
-    /* ── API Configuration (mirrors UserConfig properties) ── */
-    {
-        key: "api_base_url",
-        type: "text",
-        label: "API Base URL",
-        placeholder: "https://api.deepseek.com",
-    },
-    {
-        key: "api_key",
-        type: "password",
-        label: "API Key",
-        placeholder: "sk-...",
-    },
-    {
-        key: "api_model",
-        type: "text",
-        label: "Model",
-        placeholder: "deepseek-v4-pro",
-    },
-    /* ── Image Generation Toggle (7.8) ── */
-    {
-        key: "img_generation_enabled",
-        type: "toggle",
-        label: "Image Generation",
-    },
-    /* ── Image API Configuration (7.3) ── */
-    {
-        key: "img_api_base_url",
-        type: "text",
-        label: "Image API URL",
-        placeholder: "https://api.apiyi.com/v1",
-        group: "image",
-    },
-    {
-        key: "img_api_key",
-        type: "password",
-        label: "Image API Key",
-        placeholder: "sk-...",
-        group: "image",
-    },
-    {
-        key: "img_api_model",
-        type: "text",
-        label: "Image Model",
-        placeholder: "flux-2-pro",
-        group: "image",
-    },
-    {
-        key: "portrait_remove_bg",
-        type: "select",
-        label: "Sprite Cutout",
-        options: [
-            { value: "never", label: "Never" },
-            { value: "auto", label: "Auto" },
-            { value: "always", label: "Always" },
-        ],
-        group: "image",
-    },
-];
+/* ── Deprecated SETTINGS array (2026-08-10 redesign) ──────────────
+ * Kept as reference for config key definitions.
+ * Router now uses _renderSettingsSection / factory functions instead.
+ *
+ * Keys previously driven by this array:
+ *   lang, game_mode, api_base_url, api_key, api_model,
+ *   img_generation_enabled, img_api_base_url, img_api_key,
+ *   img_api_model, portrait_remove_bg
+ *
+ * Types: select / text / password / toggle.  Placeholders mirrored
+ * src/storyloom/user_config.py UserConfig._DEFAULTS.
+ * ──────────────────────────────────────────────────────────────── */
 
 /** Get the current value of a setting by key.
  *  Reads from localStorage first (instant); server is the
@@ -277,6 +205,7 @@ async function saveConfig() {
 
     try { await API.post("/api/config", body); } catch (err) {
         console.warn("saveConfig: server unreachable, values in localStorage only", err);
+        if (typeof showToast !== "undefined") showToast(_("Failed to save settings"), 4000);
     }
 }
 

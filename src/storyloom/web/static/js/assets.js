@@ -74,7 +74,7 @@ const AssetManagerView = (function () {
                     <button class="cc-back-btn" id="am-back"
                             title="${esc(_("Back to Menu"))}">${Icons.arrowLeft()}</button>
                     <span class="am-title">${esc(_("Asset Management"))}</span>
-                    <button class="theme-toggle-btn" id="am-theme-btn" title="Toggle Theme"></button>
+                    <button class="theme-toggle-btn" id="am-theme-btn" title="${esc(_("Toggle Theme"))}"></button>
                 </div>
                 <div class="am-body">
                     <div class="am-sidebar" id="am-sidebar">
@@ -96,10 +96,10 @@ const AssetManagerView = (function () {
 
         var themeBtn = document.getElementById("am-theme-btn");
         if (themeBtn) {
-            _updateThemeButton(themeBtn);
+            window._updateThemeButton(themeBtn);
             themeBtn.addEventListener("click", function () {
                 ThemeState.cycle();
-                _updateAllThemeButtons();
+                window._updateAllThemeButtons();
             });
         }
 

@@ -53,7 +53,7 @@ const CoCreateView = (function () {
                     <button class="cc-back-btn" id="cc-back"
                             title="${esc(_("Back to Menu"))}" disabled>${Icons.arrowLeft()}</button>
                     <span class="cc-title">${esc(_("Co-Create"))}</span>
-                    <button class="theme-toggle-btn" id="cc-theme-btn" title="Toggle Theme"></button>
+                    <button class="theme-toggle-btn" id="cc-theme-btn" title="${esc(_("Toggle Theme"))}"></button>
                     <button class="cc-start-btn" id="cc-start" disabled>${esc(_("Start"))}</button>
                 </div>
 
@@ -116,10 +116,10 @@ const CoCreateView = (function () {
 
         var themeBtn = document.getElementById("cc-theme-btn");
         if (themeBtn) {
-            _updateThemeButton(themeBtn);
+            window._updateThemeButton(themeBtn);
             themeBtn.addEventListener("click", function () {
                 ThemeState.cycle();
-                _updateAllThemeButtons();
+                window._updateAllThemeButtons();
             });
         }
     }
@@ -256,7 +256,7 @@ const CoCreateView = (function () {
                 var card = cards[e.name];
                 if (!card) return;
                 if (e.action === 'matched') {
-                    _setCardState(card, 'matched', e.asset_id || 'matched');
+                    _setCardState(card, 'matched', e.asset_id || _("matched"));
                 } else {
                     _setCardState(card, 'generating', _("generating..."));
                     toGenerate++;

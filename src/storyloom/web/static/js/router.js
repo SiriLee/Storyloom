@@ -24,6 +24,12 @@
 (function () {
     const app = document.getElementById("app");
 
+    /** Cleanup callback for the currently-active view.  Set by views
+     *  that hold timers/polls (adventure-log) and invoked on every
+     *  dispatch so navigating away (browser-back, hash change) releases
+     *  them — not just the per-view back button. */
+    let _currentViewCleanup = null;
+
     /** Tiny HTML escape — inline until display.js is implemented. */
     function esc(s) {
         const d = document.createElement("div");
@@ -64,6 +70,14 @@
     }
 
     function dispatch() {
+        /* Run the previous view's cleanup (e.g. adventure-log poll
+           timer) before rendering the new route — covers browser-back
+           and manual hash changes that bypass per-view buttons. */
+        if (_currentViewCleanup) {
+            _currentViewCleanup();
+            _currentViewCleanup = null;
+        }
+
         const hash = location.hash.replace("#", "") || "";
         const parts = hash.split("/");
         const view = parts[0];
@@ -96,6 +110,12 @@
     }
 
     window.Router = { navigate, dispatch };
+    /* Export theme helpers at module load time so all views can use
+       them on first render (previously these only ran when a theme
+       toggle was clicked — first load of #co-create / #game / #assets /
+       #adventure-log threw ReferenceError). */
+    window._updateThemeButton = _updateThemeButton;
+    window._updateAllThemeButtons = _updateAllThemeButtons;
 
     /* ═══════════════════════════════════════════════════════════════
        View: Main Menu (#menu / default)
@@ -561,13 +581,31 @@
             if (el) el.textContent = "?";
         });
 
-        /* Bind update check button — reuse existing _bindUpdateCheck flow */
+        /* Bind update check button — direct API call.  Do NOT go through
+           _bindUpdateCheck() (it would add ANOTHER click handler on every
+           click, accumulating listeners).  Replicates the same flow inline. */
         var btn = document.getElementById("btn-check-update");
         if (btn) {
             btn.addEventListener("click", function () {
-                _bindUpdateCheck();
-                var checkBtn = document.getElementById("btn-check-update");
-                if (checkBtn) checkBtn.click();
+                btn.disabled = true;
+                btn.textContent = "...";
+
+                API.get("/api/update/check?force=true").then(function (result) {
+                    btn.disabled = false;
+                    btn.textContent = _("Check for Updates");
+                    var el = document.getElementById("update-current-ver");
+                    if (el) el.textContent = result.app.current;
+
+                    if (!result.app.has_update && !result.system_media.has_update) {
+                        showToast(_("Up to date"));
+                        return;
+                    }
+                    _showUpdatePopup(result);
+                }).catch(function (err) {
+                    btn.disabled = false;
+                    btn.textContent = _("Check for Updates");
+                    showToast(_("Check failed") + ": " + err.message);
+                });
             });
         }
     }
@@ -818,8 +856,6 @@
                 b.classList.toggle("active", b.dataset.value === ThemeState.current);
             });
         }
-        window._updateThemeButton = _updateThemeButton;
-        window._updateAllThemeButtons = _updateAllThemeButtons;
     }
 
     /** Bind the update check/apply flow on the settings page. */
@@ -1066,7 +1102,7 @@
                 <div class="gp-header">
                     <button class="cc-back-btn" id="gp-back"
                             title="${esc(_("Back to Menu"))}">${Icons.arrowLeft()}</button>
-                    <button class="theme-toggle-btn" id="gp-theme-btn" title="Toggle Theme"></button>
+                    <button class="theme-toggle-btn" id="gp-theme-btn" title="${esc(_("Toggle Theme"))}"></button>
                 </div>
 
                 <div class="gp-content">
@@ -1141,7 +1177,7 @@
                     <button class="cc-back-btn" id="sv-back"
                             title="${esc(_("Back to Menu"))}">${Icons.arrowLeft()}</button>
                     <span class="sv-title">${esc(_("Load Save"))}</span>
-                    <button class="theme-toggle-btn" id="sv-theme-btn" title="Toggle Theme"></button>
+                    <button class="theme-toggle-btn" id="sv-theme-btn" title="${esc(_("Toggle Theme"))}"></button>
                 </div>
                 <div class="sv-list sv-list--expandable" id="sv-game-list">
                     <p class="sv-card-empty">${esc(_("Loading..."))}</p>
@@ -1228,7 +1264,7 @@
                     <button class="cc-back-btn" id="sv-back"
                             title="${esc(_("Back to Menu"))}">${Icons.arrowLeft()}</button>
                     <span class="sv-title" id="sv-cp-title">${esc(_("Loading..."))}</span>
-                    <button class="theme-toggle-btn" id="cp-theme-btn" title="Toggle Theme"></button>
+                    <button class="theme-toggle-btn" id="cp-theme-btn" title="${esc(_("Toggle Theme"))}"></button>
                     <button class="sv-restart-btn" id="sv-restart">${esc(_("Restart"))}</button>
                 </div>
                 <div class="sv-list sv-list--expandable" id="sv-cp-list">
@@ -1369,6 +1405,13 @@
             || gameId;
 
         app.innerHTML = "";
+        /* Register cleanup so navigating away cancels any pending poll
+           timer (not just the back button).  _cleanup is idempotent. */
+        _currentViewCleanup = function () {
+            if (typeof AdventureLogView !== "undefined" && AdventureLogView.cleanup) {
+                AdventureLogView.cleanup();
+            }
+        };
         AdventureLogView.render(app, gameId, title);
     }
 
