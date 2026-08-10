@@ -1299,6 +1299,9 @@ class GameLoop:
         the EventDispatcher.
 
         Idempotent — safe to call multiple times.
+
+        Media directories are derived from *saves_root* (parent dir)
+        so the asset pipeline works regardless of CWD.
         """
         if self._roster is not None:
             return  # already mounted
@@ -1307,8 +1310,14 @@ class GameLoop:
         from storyloom.config import DEFAULT_SYSTEM_MEDIA_DIR
         from storyloom.tasks import TaskPool
 
+        # Derive media paths from saves_root so the asset pipeline works
+        # regardless of CWD (e.g. double-click launch on Linux / macOS).
+        _app_root = os.path.normpath(os.path.join(saves_root, ".."))
+        _media_dir = os.path.join(_app_root, DEFAULT_MEDIA_DIR)
+        _sys_media_dir = os.path.join(_app_root, DEFAULT_SYSTEM_MEDIA_DIR)
+
         self._game_mode = "graph"
-        library = AssetLibrary.load(DEFAULT_MEDIA_DIR)
+        library = AssetLibrary.load(_media_dir)
         if self._save_manager is not None:
             self._roster_path = self._save_manager.roster_path
         else:
@@ -1317,9 +1326,9 @@ class GameLoop:
         self._task_pool = TaskPool()
 
         # ── System assets (§7.8 framework) ──────────────────────────
-        if os.path.isdir(DEFAULT_SYSTEM_MEDIA_DIR):
+        if os.path.isdir(_sys_media_dir):
             try:
-                library.import_system_assets(DEFAULT_SYSTEM_MEDIA_DIR)
+                library.import_system_assets(_sys_media_dir)
                 library.save()  # persist first-time import (was in stub block, lost in 456c114)
             except Exception:
                 # system_media/ exists but is broken — skip, don't block
