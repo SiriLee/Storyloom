@@ -11,7 +11,6 @@ import tempfile
 import time
 import zipfile
 from dataclasses import dataclass, field
-from pathlib import Path
 from urllib.request import Request, urlopen
 
 
@@ -49,7 +48,7 @@ class VersionInfo:
     has_update: bool = field(default=False, init=False)
 
     def __post_init__(self):
-        if self.latest:
+        if self.latest and self.asset_url:
             self.has_update = _version_gt(self.latest, self.current)
 
 
