@@ -109,12 +109,15 @@ $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
     src/storyloom/launcher.py
 
 # 4. Assemble release directory — ready-to-run structure for first install
+#    Shared resources (locale, config.example.json, system_media) live
+#    at the root so they survive app version swaps.  Only the binary
+#    and pip packages go inside app/.
 echo "--- Assembling release directory ---"
 mkdir -p "$OUTPUT_DIR/app"
 cp "dist/$BIN_NAME" "$OUTPUT_DIR/app/"
 cp "dist/$LAUNCHER_NAME" "$OUTPUT_DIR/$LAUNCHER_NAME"
-cp -r locale "$OUTPUT_DIR/app/"
-cp config.example.json "$OUTPUT_DIR/app/"
+cp -r locale "$OUTPUT_DIR/"
+cp config.example.json "$OUTPUT_DIR/"
 cp "dist/storyloom-${VERSION}-"*.whl "dist/storyloom-${VERSION}.tar.gz" "$OUTPUT_DIR/app/"
 
 # System media — bundled as standalone directory in the release zip.
