@@ -14,11 +14,13 @@ cd "$PROJECT_DIR"
 VERSION=$($PYTHON -c "from storyloom import __version__; print(__version__)")
 PYI_FLAGS=""
 BIN_NAME="storyloom-web"
-OUTPUT_DIR="dist/storyloom-web-v${VERSION}"
+LAUNCHER_NAME="Storyloom"
+OUTPUT_DIR="dist/storyloom-v${VERSION}"
 
 # Platform-specific binary extension
 case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*)  BIN_NAME="storyloom-web.exe" ;;
+    MINGW*|MSYS*|CYGWIN*)  BIN_NAME="storyloom-web.exe"
+                            LAUNCHER_NAME="Storyloom.exe" ;;
     Darwin)                ;;  # macOS: no extension
     Linux)                 ;;  # Linux: no extension
 esac
@@ -93,20 +95,27 @@ $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
     --add-data "src/storyloom/web/static${ADD_SEP}storyloom/web/static" \
     --add-data "src/storyloom/core/lang_meta${ADD_SEP}storyloom/core/lang_meta" \
     --add-data "src/storyloom/models${ADD_SEP}storyloom/models" \
-    --add-data "system_media${ADD_SEP}system_media" \
     --hidden-import uvicorn.loops.auto \
     --hidden-import uvicorn.protocols.http.auto \
     --hidden-import onnxruntime \
     --hidden-import numpy \
     src/storyloom/web/__main__.py
 
-# 4. Assemble release directory
+# 3b. Build Launcher — minimal PyInstaller exe (no --add-data)
+echo "--- Building Launcher ---"
+$PYTHON -m PyInstaller --onefile $PYI_FLAGS \
+    --name "$LAUNCHER_NAME" \
+    --clean \
+    src/storyloom/launcher.py
+
+# 4. Assemble release directory (launcher.new + app_new/ structure)
 echo "--- Assembling release directory ---"
-mkdir -p "$OUTPUT_DIR"
-cp "dist/$BIN_NAME" "$OUTPUT_DIR/"
-cp -r locale "$OUTPUT_DIR/"
-cp config.example.json "$OUTPUT_DIR/"
-cp "dist/storyloom-${VERSION}-"*.whl "dist/storyloom-${VERSION}.tar.gz" "$OUTPUT_DIR/"
+mkdir -p "$OUTPUT_DIR/app_new"
+cp "dist/$BIN_NAME" "$OUTPUT_DIR/app_new/"
+cp "dist/$LAUNCHER_NAME" "$OUTPUT_DIR/launcher.new"
+cp -r locale "$OUTPUT_DIR/app_new/"
+cp config.example.json "$OUTPUT_DIR/app_new/"
+cp "dist/storyloom-${VERSION}-"*.whl "dist/storyloom-${VERSION}.tar.gz" "$OUTPUT_DIR/app_new/"
 
 # 5. Create zip for GitHub Release upload
 echo "--- Creating release archive ---"
@@ -117,8 +126,9 @@ case "$(uname -s)" in
     Linux)                 PLATFORM="Linux" ;;
     *)                     PLATFORM="$(uname -s)" ;;
 esac
-ZIP_NAME="storyloom-web-v${VERSION}-${PLATFORM}"
-$PYTHON -c "import shutil; shutil.make_archive('dist/$ZIP_NAME', 'zip', 'dist', 'storyloom-web-v${VERSION}')"
+ZIP_NAME="storyloom-v${VERSION}-${PLATFORM}"
+ZIP_DIR="storyloom-v${VERSION}"
+$PYTHON -c "import shutil; shutil.make_archive('dist/$ZIP_NAME', 'zip', 'dist', '$ZIP_DIR')"
 
 echo ""
 echo "=== Done ==="

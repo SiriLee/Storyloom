@@ -8,6 +8,13 @@ from storyloom.core.session import GameSession
 from storyloom.core.state_manager import StateManager
 from storyloom.core.event_dispatcher import EventDispatcher
 from storyloom.core.prebuild import Prebuilder, EntitySpec, SelectionResult, PrebuildResult
+from storyloom.core.update_manager import (
+    VersionInfo,
+    UpdateCheckResult,
+    UpdateProgress,
+    check_for_updates,
+    download_and_extract,
+)
 
 __all__ = [
     "CoCreateFlow",
@@ -26,4 +33,9 @@ __all__ = [
     "RoundResult",
     "SelectionResult",
     "StateManager",
+    "UpdateCheckResult",
+    "UpdateProgress",
+    "VersionInfo",
+    "check_for_updates",
+    "download_and_extract",
 ]
