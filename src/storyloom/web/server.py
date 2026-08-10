@@ -150,7 +150,10 @@ async def serve_media(asset_type: str, asset_id: str):
         for ext in extensions:
             path = os.path.join(base_dir, asset_type, f"{asset_id}{ext}")
             if os.path.isfile(path):
-                return FileResponse(path)
+                return FileResponse(
+                    path,
+                    headers={"Cache-Control": "public, max-age=86400"},
+                )
 
     raise HTTPException(404, f"Asset not found: {asset_type}/{asset_id}")
 

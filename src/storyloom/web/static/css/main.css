@@ -555,28 +555,36 @@ button.accent:hover, .btn-accent:hover {
 .am-sidebar {
     display: flex;
     flex-direction: column;
-    width: 150px;
+    width: 170px;
     flex-shrink: 0;
     border-right: 1px solid var(--border-color);
-    padding: var(--space-sm) 0;
+    padding: var(--space-md) var(--space-sm);
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
+
+.am-sidebar::-webkit-scrollbar { display: none; }
 
 .am-nav {
     display: flex;
     flex-direction: column;
     flex: 1;
-    gap: 0.2rem;
-    padding: 0 var(--space-xs);
+    gap: 0.15rem;
 }
 
 .am-nav-item {
-    padding: 0.65rem 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-lg);
     background: transparent;
     color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: var(--font-md);
+    font-family: var(--font-sans);
+    font-size: 0.92rem;
+    font-weight: 500;
     text-align: left;
     cursor: pointer;
     transition: background var(--trans-normal), color var(--trans-normal);
@@ -584,12 +592,13 @@ button.accent:hover, .btn-accent:hover {
 
 .am-nav-item:hover {
     color: var(--text-primary);
-    background: rgba(78, 204, 163, 0.05);
+    background: var(--bg-tertiary);
 }
 
 .am-nav-item.active {
-    color: var(--text-accent);
-    background: rgba(78, 204, 163, 0.1);
+    background: var(--text-accent);
+    color: #fff;
+    font-weight: 600;
 }
 
 /* ── Right content area ─────────────────────────────────────────── */
@@ -606,26 +615,28 @@ button.accent:hover, .btn-accent:hover {
 .am-toolbar {
     display: flex;
     align-items: center;
-    padding: var(--space-sm) var(--space-md);
+    padding: 0 var(--space-sm) var(--space-sm);
     flex-shrink: 0;
     gap: 0.6rem;
 }
 
 .am-toolbar-label {
-    font-family: var(--font-mono);
-    font-size: var(--font-sm);
-    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
     flex: 1;
 }
 
 .am-clean-btn {
-    padding: 0.35rem 0.9rem;
+    padding: 0.4rem 1rem;
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     background: transparent;
     color: var(--text-secondary);
     font-family: var(--font-sans);
     font-size: var(--font-sm);
+    font-weight: 500;
     cursor: pointer;
     transition: background var(--trans-normal), color var(--trans-normal),
                 border-color var(--trans-normal);
@@ -635,7 +646,7 @@ button.accent:hover, .btn-accent:hover {
 .am-clean-btn:hover {
     color: var(--text-accent);
     border-color: var(--text-accent);
-    background: rgba(78, 204, 163, 0.08);
+    background: var(--accent-light);
 }
 
 /* ── Loading / Empty ────────────────────────────────────────────── */
@@ -643,9 +654,10 @@ button.accent:hover, .btn-accent:hover {
 .am-loading,
 .am-empty {
     color: var(--text-secondary);
-    font-style: italic;
     text-align: center;
     padding: var(--space-3xl) 0;
+    font-size: 0.95rem;
+    opacity: 0.6;
 }
 
 /* ── Card list (right side) — gallery grid ─────────────────────── */
