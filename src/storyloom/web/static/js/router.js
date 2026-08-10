@@ -449,19 +449,13 @@
                     <div class="settings-form">
                         ${rows}
                     </div>
-                    <!-- Updates -->
+                    <!-- Updates — inline row matching other settings -->
                     <div class="settings-form" style="margin-top:2rem; padding-top:1.5rem; border-top:1px solid var(--border-color)">
-                        <h3 style="font-family:var(--font-mono); color:var(--text-accent); margin-bottom:1rem; text-align:center">
-                            ${esc(_("Updates"))}
-                        </h3>
-                        <div id="update-section">
-                            <div class="setting-row">
-                                <span class="setting-label">${esc(_("Current Version"))}</span>
-                                <span class="setting-val" id="update-current-ver">...</span>
-                            </div>
-                            <button class="menu-btn" id="btn-check-update" style="margin-top:0.5rem; width:100%">
-                                ${esc(_("Check for Updates"))}
-                            </button>
+                        <div class="setting-row" id="update-row">
+                            <span class="setting-label">${esc(_("Current Version"))}</span>
+                            <span class="setting-val" id="update-current-ver">...</span>
+                            <button class="setting-edit-btn" id="btn-check-update"
+                                    style="margin-left:auto">${esc(_("Check for Updates"))}</button>
                         </div>
                     </div>
                     <!-- Credits (moved from main menu) -->
@@ -593,9 +587,8 @@
 
     /** Bind the update check/apply flow on the settings page. */
     function _bindUpdateCheck() {
-        const currentVer = document.getElementById("update-current-ver");
-        const updateSection = document.getElementById("update-section");
-        if (!currentVer || !updateSection) return;
+        var currentVer = document.getElementById("update-current-ver");
+        if (!currentVer) return;
 
         // Lazy-load current version
         API.get("/api/update/check?force=false").then(function (result) {
@@ -608,136 +601,149 @@
         if (!btnCheck) return;
 
         btnCheck.addEventListener("click", function () {
-            updateSection.innerHTML =
-                '<p class="text-muted" style="text-align:center">'
-                + esc(_("Checking...")) + '</p>';
+            btnCheck.disabled = true;
+            btnCheck.textContent = "...";
 
             API.get("/api/update/check?force=true").then(function (result) {
+                btnCheck.disabled = false;
+                btnCheck.textContent = _("Check for Updates");
+                // Update version display
+                if (currentVer) currentVer.textContent = result.app.current;
+
                 if (!result.app.has_update && !result.system_media.has_update) {
-                    updateSection.innerHTML =
-                        '<div class="setting-row">'
-                        + '<span class="setting-label">' + esc(_("Current Version")) + '</span>'
-                        + '<span class="setting-val">' + esc(result.app.current) + '</span>'
-                        + '</div>'
-                        + '<p style="text-align:center;color:var(--color-success);margin-top:0.5rem">'
-                        + '&#x2705; ' + esc(_("Up to date")) + '</p>'
-                        + '<button class="menu-btn" id="btn-check-update-again"'
-                        + ' style="margin-top:0.5rem;width:100%">'
-                        + esc(_("Check for Updates")) + '</button>';
-                    document.getElementById("btn-check-update-again")
-                        .addEventListener("click", function () {
-                            renderSettings();
-                        });
+                    showToast(_("Up to date"));
                     return;
                 }
-
-                var rows = "";
-                if (result.app.has_update) {
-                    rows += '<div class="setting-row" style="flex-direction:column;'
-                        + 'align-items:flex-start;gap:0.5rem">'
-                        + '<span class="setting-label">App Core &nbsp; '
-                        + esc(result.app.current) + ' &#x2192; <strong>'
-                        + esc(result.app.latest) + '</strong></span>';
-                    if (result.app.release_notes) {
-                        rows += '<div style="max-height:150px;overflow-y:auto;'
-                            + 'font-size:0.85rem;color:var(--text-muted);'
-                            + 'padding-left:0.5rem;border-left:2px solid var(--border-color)">'
-                            + esc(result.app.release_notes).replace(/\n/g, "<br>")
-                            + '</div>';
-                    }
-                    rows += '</div>';
-                }
-                if (result.system_media.has_update) {
-                    rows += '<div class="setting-row">'
-                        + '<span class="setting-label">System Media &nbsp; '
-                        + esc(result.system_media.current) + ' &#x2192; <strong>'
-                        + esc(result.system_media.latest) + '</strong></span>'
-                        + '</div>';
-                }
-                rows += '<button class="menu-btn accent" id="btn-apply-update"'
-                    + ' style="margin-top:0.75rem;width:100%">'
-                    + esc(_("Update")) + '</button>';
-
-                updateSection.innerHTML = rows;
-
-                document.getElementById("btn-apply-update")
-                    .addEventListener("click", function () {
-                        var layers = [];
-                        if (result.app.has_update) layers.push("app");
-                        if (result.system_media.has_update) layers.push("system_media");
-
-                        updateSection.innerHTML =
-                            '<div id="update-progress">'
-                            + '<p class="text-muted" style="text-align:center">'
-                            + esc(_("Downloading...")) + '</p>'
-                            + '<div id="update-progress-bars"></div></div>';
-
-                        API.post("/api/update/apply", { layers: layers })
-                            .then(function (applyResult) {
-                                SSEClient.open(applyResult.stream_url, {
-                                    progress: function (data) {
-                                        var bars = document.getElementById(
-                                            "update-progress-bars");
-                                        if (!bars) return;
-                                        var pct = data.total
-                                            ? Math.round(data.received * 100 / data.total) + "%"
-                                            : "?%";
-                                        var html = "";
-                                        for (var i = 0; i < layers.length; i++) {
-                                            var l = layers[i];
-                                            if (l === data.layer && data.stage === "downloading") {
-                                                html += '<p>' + esc(l) + ': ' + pct + '</p>';
-                                            } else if (l === data.layer && data.stage === "extracting") {
-                                                html += '<p>' + esc(l) + ': '
-                                                    + esc(_("extracting...")) + '</p>';
-                                            } else {
-                                                html += '<p>' + esc(l) + ': '
-                                                    + esc(_("waiting...")) + '</p>';
-                                            }
-                                        }
-                                        bars.innerHTML = html;
-                                    },
-                                    done: function () {
-                                        updateSection.innerHTML =
-                                            '<p style="text-align:center;color:var(--color-success)">'
-                                            + '&#x2705; ' + esc(_("Update ready")) + '</p>'
-                                            + '<p class="text-muted" style="text-align:center;'
-                                            + 'margin-top:0.5rem">'
-                                            + esc(_("Please close the application and restart via Storyloom."))
-                                            + '</p>';
-                                    },
-                                    error: function (data) {
-                                        updateSection.innerHTML =
-                                            '<p style="text-align:center;color:var(--color-error)">'
-                                            + esc(_("Update failed")) + ': '
-                                            + esc(data.error || "") + '</p>'
-                                            + '<button class="menu-btn" id="btn-retry-update"'
-                                            + ' style="margin-top:0.5rem;width:100%">'
-                                            + esc(_("Retry")) + '</button>';
-                                        document.getElementById("btn-retry-update")
-                                            .addEventListener("click", function () {
-                                                renderSettings();
-                                            });
-                                    }
-                                });
-                            }).catch(function (err) {
-                                updateSection.innerHTML =
-                                    '<p style="text-align:center;color:var(--color-error)">'
-                                    + esc(err.message) + '</p>';
-                            });
-                    });
+                _showUpdatePopup(result);
             }).catch(function (err) {
-                updateSection.innerHTML =
-                    '<p style="text-align:center;color:var(--color-error)">'
-                    + esc(_("Check failed")) + ': ' + esc(err.message) + '</p>'
-                    + '<button class="menu-btn" id="btn-retry-check"'
-                    + ' style="margin-top:0.5rem;width:100%">'
-                    + esc(_("Retry")) + '</button>';
-                document.getElementById("btn-retry-check")
-                    .addEventListener("click", function () {
-                        renderSettings();
-                    });
+                btnCheck.disabled = false;
+                btnCheck.textContent = _("Check for Updates");
+                showToast(_("Check failed") + ": " + err.message);
             });
+        });
+    }
+
+    /** Show a centered modal for update download. */
+    function _showUpdatePopup(result) {
+        // Remove any existing popup
+        var old = document.getElementById("update-popup-overlay");
+        if (old) old.remove();
+
+        var layers = [];
+        var rows = "";
+        if (result.app.has_update) {
+            layers.push("app");
+            rows += '<div class="update-popup-layer">'
+                + '<strong>' + esc(_("App Core")) + '</strong> &nbsp; '
+                + esc(result.app.current) + ' → ' + esc(result.app.latest)
+                + '</div>';
+        }
+        if (result.system_media.has_update) {
+            layers.push("system_media");
+            rows += '<div class="update-popup-layer">'
+                + '<strong>' + esc(_("System Media")) + '</strong> &nbsp; '
+                + esc(result.system_media.current) + ' → '
+                + esc(result.system_media.latest)
+                + '</div>';
+        }
+
+        var overlay = document.createElement("div");
+        overlay.id = "update-popup-overlay";
+        overlay.innerHTML =
+            '<div class="update-popup">'
+            + '<h3 class="update-popup-title">' + esc(_("Update Available"))
+            + '</h3>'
+            + rows
+            + '<div class="update-popup-actions">'
+            + '<button class="menu-btn accent" id="btn-update-start">'
+            + esc(_("Update")) + '</button>'
+            + '<button class="menu-btn" id="btn-update-close">'
+            + esc(_("Cancel")) + '</button>'
+            + '</div>'
+            + '<div id="update-popup-progress" class="hidden"></div>'
+            + '</div>';
+        document.body.appendChild(overlay);
+
+        var remove = function () { overlay.remove(); };
+
+        overlay.addEventListener("click", function (e) {
+            if (e.target === overlay) remove();
+        });
+        document.getElementById("btn-update-close")
+            .addEventListener("click", remove);
+
+        document.getElementById("btn-update-start")
+            .addEventListener("click", function () {
+                var actions = overlay.querySelector(".update-popup-actions");
+                if (actions) actions.classList.add("hidden");
+                var prog = document.getElementById("update-popup-progress");
+                if (prog) prog.classList.remove("hidden");
+
+                _runUpdateDownload(layers, prog, remove);
+            });
+    }
+
+    /** Stream the download progress into the popup. */
+    function _runUpdateDownload(layers, container, onDone) {
+        container.innerHTML =
+            '<p class="text-muted">' + esc(_("Downloading...")) + '</p>'
+            + '<div id="update-popup-bars"></div>';
+
+        API.post("/api/update/apply", { layers: layers }).then(function (r) {
+            SSEClient.open(r.stream_url, {
+                progress: function (data) {
+                    var bars = document.getElementById("update-popup-bars");
+                    if (!bars) return;
+                    var pct = data.total
+                        ? Math.round(data.received * 100 / data.total) + "%"
+                        : "?";
+                    var html = "";
+                    for (var i = 0; i < layers.length; i++) {
+                        var l = layers[i];
+                        if (l === data.layer && data.stage === "downloading") {
+                            html += '<p>' + esc(l) + ': ' + pct + '</p>';
+                        } else if (l === data.layer && data.stage === "extracting") {
+                            html += '<p>' + esc(l) + ': '
+                                + esc(_("Extracting...")) + '</p>';
+                        } else {
+                            html += '<p>' + esc(l) + ': ...</p>';
+                        }
+                    }
+                    bars.innerHTML = html;
+                },
+                done: function () {
+                    container.innerHTML =
+                        '<p style="color:var(--color-success);text-align:center">'
+                        + esc(_("Update ready")) + '</p>'
+                        + '<p class="text-muted" style="text-align:center;'
+                        + 'margin-top:0.5rem">'
+                        + esc(_("Please restart via Storyloom.")) + '</p>'
+                        + '<button class="menu-btn" id="btn-update-done-close"'
+                        + ' style="margin-top:0.75rem;width:100%">'
+                        + esc(_("Close")) + '</button>';
+                    document.getElementById("btn-update-done-close")
+                        .addEventListener("click", function () {
+                            if (onDone) onDone();
+                        });
+                },
+                error: function (data) {
+                    container.innerHTML =
+                        '<p style="color:var(--color-error);text-align:center">'
+                        + esc(_("Update failed")) + ': '
+                        + esc(data.error || "") + '</p>'
+                        + '<button class="menu-btn" id="btn-update-retry"'
+                        + ' style="margin-top:0.5rem;width:100%">'
+                        + esc(_("Retry")) + '</button>';
+                    document.getElementById("btn-update-retry")
+                        .addEventListener("click", function () {
+                            _runUpdateDownload(layers, container, onDone);
+                        });
+                }
+            });
+        }).catch(function (err) {
+            container.innerHTML =
+                '<p style="color:var(--color-error);text-align:center">'
+                + esc(err.message) + '</p>';
         });
     }
 

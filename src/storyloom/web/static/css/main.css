@@ -2641,3 +2641,53 @@ button.accent:hover, .btn-accent:hover {
     max-height: 0;
     opacity: 0;
 }
+
+/* ── Update Popup (centered modal for auto-update) ─────────────── */
+
+#update-popup-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    background: var(--overlay-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn var(--trans-fast);
+}
+
+.update-popup {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    min-width: 320px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: var(--shadow-modal);
+}
+
+.update-popup-title {
+    font-family: var(--font-mono);
+    color: var(--text-accent);
+    text-align: center;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+.update-popup-layer {
+    padding: 0.4rem 0;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.update-popup-actions {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 1rem;
+    justify-content: center;
+}
+
+.update-popup-actions .menu-btn {
+    width: auto;
+    min-width: 80px;
+}

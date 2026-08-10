@@ -375,3 +375,44 @@ msgstr "开发者"
 
 msgid "Contributors"
 msgstr "贡献者"
+
+# ── Auto-update ──
+
+msgid "App Core"
+msgstr "程序核心"
+
+msgid "Check failed"
+msgstr "检查失败"
+
+msgid "Check for Updates"
+msgstr "检查更新"
+
+msgid "Current Version"
+msgstr "当前版本"
+
+msgid "Downloading..."
+msgstr "下载中..."
+
+msgid "Extracting..."
+msgstr "提取中..."
+
+msgid "Please restart via Storyloom."
+msgstr "请通过 Storyloom 重新启动。"
+
+msgid "System Media"
+msgstr "系统素材"
+
+msgid "Up to date"
+msgstr "已是最新"
+
+msgid "Update"
+msgstr "更新"
+
+msgid "Update Available"
+msgstr "有可用更新"
+
+msgid "Update failed"
+msgstr "更新失败"
+
+msgid "Update ready"
+msgstr "更新就绪"
