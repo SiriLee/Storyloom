@@ -1273,6 +1273,7 @@
             _updateThemeButton(themeBtn);
             themeBtn.addEventListener("click", function () {
                 ThemeState.toggle();
+                saveConfig();
                 _updateAllThemeButtons();
             });
         }
@@ -1336,6 +1337,7 @@
             _updateThemeButton(themeBtn);
             themeBtn.addEventListener("click", function () {
                 ThemeState.toggle();
+                saveConfig();
                 _updateAllThemeButtons();
             });
         }
@@ -1441,6 +1443,7 @@
             _updateThemeButton(themeBtn);
             themeBtn.addEventListener("click", function () {
                 ThemeState.toggle();
+                saveConfig();
                 _updateAllThemeButtons();
             });
         }
