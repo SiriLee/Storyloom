@@ -824,7 +824,7 @@
         if (!btn) return;
         _updateThemeButton(btn);
         btn.addEventListener("click", function () {
-            ThemeState.cycle();
+            ThemeState.toggle();
             _updateAllThemeButtons();
         });
     }
@@ -1130,7 +1130,7 @@
         if (themeBtn) {
             _updateThemeButton(themeBtn);
             themeBtn.addEventListener("click", function () {
-                ThemeState.cycle();
+                ThemeState.toggle();
                 _updateAllThemeButtons();
             });
         }
@@ -1193,7 +1193,7 @@
         if (themeBtn) {
             _updateThemeButton(themeBtn);
             themeBtn.addEventListener("click", function () {
-                ThemeState.cycle();
+                ThemeState.toggle();
                 _updateAllThemeButtons();
             });
         }
@@ -1298,7 +1298,7 @@
         if (themeBtn) {
             _updateThemeButton(themeBtn);
             themeBtn.addEventListener("click", function () {
-                ThemeState.cycle();
+                ThemeState.toggle();
                 _updateAllThemeButtons();
             });
         }

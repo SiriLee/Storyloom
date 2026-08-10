@@ -98,7 +98,7 @@ const AssetManagerView = (function () {
         if (themeBtn) {
             window._updateThemeButton(themeBtn);
             themeBtn.addEventListener("click", function () {
-                ThemeState.cycle();
+                ThemeState.toggle();
                 window._updateAllThemeButtons();
             });
         }

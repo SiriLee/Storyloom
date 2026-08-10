@@ -115,11 +115,10 @@ const ThemeState = {
         localStorage.setItem(this._key, value);
     },
 
-    /** Cycle: system → dark → light → system.  Returns new value. */
-    cycle() {
-        const order = ["system", "dark", "light"];
-        const idx = order.indexOf(this.current);
-        const next = order[(idx + 1) % order.length];
+    /** Toggle: dark ↔ light.  System is only selectable via Appearance settings.
+     *  If current is "system", resolves to the effective theme first. */
+    toggle() {
+        const next = this.effective === "dark" ? "light" : "dark";
         this.set(next);
         return next;
     },
