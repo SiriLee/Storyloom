@@ -342,18 +342,18 @@
     }
 
     /* ═══════════════════════════════════════════════════════════════
-       View: Settings (#settings) — full-page, same pattern as co-create
-       ──────────────────────────────────────────────────────────────
-       Layout:
-         header:  ← Back button (top-left) + "Settings" title
-         content: scrollable form area with all settings rows
+       View: Settings (#settings) — sidebar layout
 
-       Data-driven: reads SETTINGS array from state.js — same data
-       source as the old overlay panel.
+       Layout:
+         header:  ← Back button (left) + "Settings" title + theme toggle (right)
+         body:    left sidebar (200px nav) + right content (cards)
+
+       Sidebar sections: General, API, Image, Appearance,
+                         — divider —
+                         API Guide, Credits, Updates
 
        Authority:
-         CLAUDE.local.md §3.2 (event flow consumption)
-         Co-create view pattern (full-height routed view)
+         2026-08-10-frontend-redesign.md §3
        ═══════════════════════════════════════════════════════════════ */
 
     function renderSettings() {
@@ -362,227 +362,435 @@
             SSEClient.close();
         }
 
-        const X_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" '
-            + 'fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 '
-            + '6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 '
-            + '17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
+        var sections = [
+            { id: "general",    icon: "globe",   label: _("General") },
+            { id: "api",        icon: "key",     label: _("API") },
+            { id: "image",      icon: "image",   label: _("Image") },
+            { id: "appearance", icon: "palette", label: _("Appearance") },
+            { id: null,         icon: null,      label: null },
+            { id: "guide",      icon: "book",    label: _("API Guide") },
+            { id: "credits",    icon: "heart",   label: _("Credits") },
+            { id: "updates",    icon: "refresh", label: _("Updates") },
+        ];
 
-        const rows = SETTINGS.reduce((acc, def, i) => {
-            const prevGroup = i > 0 ? SETTINGS[i - 1].group : undefined;
-            const thisGroup = def.group;
-            const current = getSetting(def.key);
-            const label = esc(_(def.label));
+        var currentSection = "general";
 
-            /* ── Group boundary: close previous group ── */
-            if (prevGroup && prevGroup !== thisGroup) {
-                acc.push("</div>");
-            }
+        /* ── Render shell ─────────────────────────────────────────── */
+        app.innerHTML =
+            '<div class="settings-view">'
+            + '<div class="settings-header">'
+            + '<button class="cc-back-btn" id="settings-back" '
+            + 'title="' + esc(_("Back to Menu")) + '">' + Icons.arrowLeft() + '</button>'
+            + '<span class="settings-title">' + esc(_("Settings")) + '</span>'
+            + '<button class="theme-toggle-btn" id="settings-theme-btn" '
+            + 'title="' + esc(_("Toggle Theme")) + '"></button>'
+            + '</div>'
+            + '<div class="settings-body">'
+            + '<nav class="settings-nav" id="settings-nav"></nav>'
+            + '<div class="settings-content" id="settings-content"></div>'
+            + '</div>'
+            + '</div>';
 
-            /* ── Group boundary: open new group ── */
-            if (thisGroup && thisGroup !== prevGroup) {
-                const enabled = getSetting("img_generation_enabled") !== "false";
-                const collapsed = enabled ? "" : " collapsed";
-                acc.push(`<div class="setting-group${collapsed}" data-group="${thisGroup}">`);
-            }
+        /* ── Render sidebar ──────────────────────────────────────── */
+        var nav = document.getElementById("settings-nav");
+        nav.innerHTML = sections.map(function (s) {
+            if (s.id === null) return '<div class="settings-nav-divider"></div>';
+            var cls = (s.id === currentSection)
+                ? "settings-nav-item active" : "settings-nav-item";
+            return '<button class="' + cls + '" data-section="' + s.id + '">'
+                + Icons[s.icon]() + '<span>' + esc(s.label) + '</span></button>';
+        }).join("");
 
-            /* ── Toggle (checkbox slider) ── */
-            if (def.type === "toggle") {
-                const checked = current !== "false" ? " checked" : "";
-                acc.push(`
-                    <div class="setting-row">
-                        <span class="setting-label">${label}</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="setting-${def.key}"${checked}>
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>`);
-                return acc;
-            }
+        /* ── Render initial section ───────────────────────────────── */
+        _renderSettingsSection(currentSection);
 
-            /* ── Select dropdown ── */
-            if (def.type === "select") {
-                acc.push(`
-                    <div class="setting-row">
-                        <span class="setting-label">${label}</span>
-                        <select id="setting-${def.key}">${def.options.map(opt =>
-                            `<option value="${esc(opt.value)}" ${current === opt.value ? "selected" : ""}>${esc(_(opt.label))}</option>`
-                        ).join("")}</select>
-                    </div>`);
-                return acc;
-            }
+        /* ── Sidebar navigation ──────────────────────────────────── */
+        nav.querySelectorAll(".settings-nav-item").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var sid = this.dataset.section;
+                if (sid === currentSection) return;
+                currentSection = sid;
+                nav.querySelectorAll(".settings-nav-item").forEach(function (b) {
+                    b.classList.toggle("active", b.dataset.section === sid);
+                });
+                _renderSettingsSection(sid);
+            });
+        });
 
-            /* ── text / password: display + edit button (✎ → ✓ / ✕) ── */
-            const isKeyField = def.key === "api_key" || def.key === "img_api_key";
-            const displayVal = isKeyField
-                ? maskKey(current)
-                : (current || esc(def.placeholder || ""));
-            const displayCls = (!current && def.key !== "api_key") ? "setting-val muted" : "setting-val";
-            acc.push(`
-                <div class="setting-row" id="row-${def.key}">
-                    <span class="setting-label">${label}</span>
-                    <span class="${displayCls}" id="display-${def.key}">${esc(displayVal)}</span>
-                    <input type="${def.type === "password" ? "password" : "text"}"
-                           id="input-${def.key}" value="${esc(current || "")}"
-                           placeholder="${esc(def.placeholder || "")}"
-                           class="setting-input hidden">
-                    <button class="setting-edit-btn" id="edit-${def.key}"
-                            title="${esc(_("Edit"))}">${Icons.pencil()}</button>
-                </div>`);
-
-            /* ── Close trailing group ── */
-            if (i === SETTINGS.length - 1 && thisGroup) {
-                acc.push("</div>");
-            }
-
-            return acc;
-        }, []).join("");
-
-        app.innerHTML = `
-            <div class="settings-view">
-                <div class="settings-header">
-                    <button class="cc-back-btn" id="settings-back"
-                            title="${esc(_("Back to Menu"))}">${Icons.arrowLeft()}</button>
-                    <span class="settings-title">${esc(_("Settings"))}</span>
-                </div>
-
-                <div class="settings-content">
-                    <div class="settings-form">
-                        ${rows}
-                    </div>
-                    <!-- Updates — inline row matching other settings -->
-                    <div class="settings-form" style="margin-top:2rem; padding-top:1.5rem; border-top:1px solid var(--border-color)">
-                        <div class="setting-row" id="update-row">
-                            <span class="setting-label">${esc(_("Current Version"))}</span>
-                            <span class="setting-val" id="update-current-ver">...</span>
-                            <button class="setting-edit-btn" id="btn-check-update"
-                                    style="margin-left:auto">${esc(_("Check for Updates"))}</button>
-                        </div>
-                    </div>
-                    <!-- Credits (moved from main menu) -->
-                    <div class="settings-form" style="margin-top:2rem; padding-top:1.5rem; border-top:1px solid var(--border-color)">
-                        <h3 style="font-family:var(--font-mono); color:var(--text-accent); margin-bottom:1rem; text-align:center">
-                            ${esc(_("Credits"))}
-                        </h3>
-                        <div class="credits-section" style="text-align:center">
-                            <h3>${esc(_("Developers"))}</h3>
-                            <p class="credits-name">${CREDITS.developers.map(function(p) { return '<a class="credits-link" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.name) + '</a>'; }).join(" ")}</p>
-                        </div>
-                        <div class="credits-section" style="text-align:center">
-                            <h3>${esc(_("Contributors"))}</h3>
-                            <p class="credits-name">${CREDITS.contributors.map(function(p) { return '<a class="credits-link" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.name) + '</a>'; }).join(" ")}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        /* ── Bind events ────────────────────────────────────────── */
-
-        document.getElementById("settings-back").addEventListener("click", () => {
+        /* ── Back button ──────────────────────────────────────────── */
+        document.getElementById("settings-back").addEventListener("click", function () {
             navigate("menu");
         });
 
-        SETTINGS.forEach(def => {
-            /* ── Toggle: collapse / expand group ── */
-            if (def.type === "toggle") {
-                const el = document.getElementById(`setting-${def.key}`);
-                if (!el) return;
-                el.addEventListener("change", () => {
-                    const value = el.checked ? "true" : "false";
-                    /* Toggle group visibility */
-                    const group = document.querySelector(
-                        `.setting-group[data-group="${def.group || "image"}"]`
-                    );
-                    if (group) {
-                        if (el.checked) {
-                            group.classList.remove("collapsed");
-                        } else {
-                            group.classList.add("collapsed");
+        /* ── Theme toggle ─────────────────────────────────────────── */
+        _bindThemeToggle(document.getElementById("settings-theme-btn"));
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Settings Section Renderers
+       ═══════════════════════════════════════════════════════════════ */
+
+    /** Dispatch to the correct section renderer. */
+    function _renderSettingsSection(id) {
+        var container = document.getElementById("settings-content");
+        if (!container) return;
+
+        switch (id) {
+            case "general":    _renderGeneralSection(container);    break;
+            case "api":        _renderApiSection(container);        break;
+            case "image":      _renderImageSection(container);      break;
+            case "appearance": _renderAppearanceSection(container); break;
+            case "guide":      _renderApiGuideSection(container);   break;
+            case "credits":    _renderCreditsSection(container);    break;
+            case "updates":    _renderUpdatesSection(container);    break;
+        }
+    }
+
+    function _renderGeneralSection(container) {
+        container.innerHTML =
+            '<div class="settings-card">'
+            + '<div class="settings-card-title">' + esc(_("General")) + '</div>'
+            + _settingSelect("lang", _("Language"), [
+                { value: "zh-CN", label: "中文" },
+                { value: "zh-TW", label: "繁體中文" },
+                { value: "en", label: "English" },
+            ])
+            + _settingSelect("game_mode", _("Game Mode"), [
+                { value: "text", label: _("Text") },
+                { value: "graph", label: _("Graph") },
+            ])
+            + '</div>';
+        _bindSettingsInputs(container);
+    }
+
+    function _renderApiSection(container) {
+        container.innerHTML =
+            '<div class="settings-card">'
+            + '<div class="settings-card-title">' + esc(_("API Configuration")) + '</div>'
+            + _settingText("api_base_url", _("API Base URL"), "https://api.deepseek.com")
+            + _settingPassword("api_key", _("API Key"), "sk-...")
+            + _settingText("api_model", _("Model"), "deepseek-v4-pro")
+            + '</div>';
+        _bindSettingsInputs(container);
+    }
+
+    function _renderImageSection(container) {
+        var enabled = getSetting("img_generation_enabled") !== "false";
+        var cardHtml =
+            '<div class="settings-card">'
+            + '<div class="settings-card-title">' + esc(_("Image Generation")) + '</div>'
+            + _settingToggle("img_generation_enabled", _("Image Generation"))
+            + '</div>';
+
+        if (enabled) {
+            cardHtml +=
+                '<div class="settings-card" id="image-settings-group">'
+                + _settingText("img_api_base_url", _("Image API URL"), "https://api.apiyi.com/v1")
+                + _settingPassword("img_api_key", _("Image API Key"), "sk-...")
+                + _settingText("img_api_model", _("Image Model"), "flux-2-pro")
+                + _settingSelect("portrait_remove_bg", _("Sprite Cutout"), [
+                    { value: "never", label: _("Never") },
+                    { value: "auto", label: _("Auto") },
+                    { value: "always", label: _("Always") },
+                ])
+                + '</div>';
+        }
+
+        container.innerHTML = cardHtml;
+        _bindSettingsInputs(container);
+    }
+
+    function _renderAppearanceSection(container) {
+        container.innerHTML =
+            '<div class="settings-card">'
+            + '<div class="settings-card-title">' + esc(_("Appearance")) + '</div>'
+            + _settingSegmented("theme", _("Theme"), [
+                { value: "system", label: _("System") },
+                { value: "dark", label: _("Dark") },
+                { value: "light", label: _("Light") },
+            ], ThemeState.current)
+            + '</div>';
+        _bindSettingsInputs(container);
+    }
+
+    function _renderCreditsSection(container) {
+        container.innerHTML =
+            '<div class="settings-card">'
+            + '<div class="settings-card-title">' + esc(_("Credits")) + '</div>'
+            + '<div class="settings-credits-group">'
+            + '<h3>' + esc(_("Developers")) + '</h3>'
+            + '<p class="settings-credits-name">'
+            + CREDITS.developers.map(function (p) {
+                return '<a class="settings-credits-link" href="' + esc(p.url)
+                    + '" target="_blank" rel="noopener">' + esc(p.name) + '</a>';
+            }).join(" ")
+            + '</p>'
+            + '</div>'
+            + '<div class="settings-credits-group">'
+            + '<h3>' + esc(_("Contributors")) + '</h3>'
+            + '<p class="settings-credits-name">'
+            + CREDITS.contributors.map(function (p) {
+                return '<a class="settings-credits-link" href="' + esc(p.url)
+                    + '" target="_blank" rel="noopener">' + esc(p.name) + '</a>';
+            }).join(" ")
+            + '</p>'
+            + '</div>'
+            + '</div>';
+    }
+
+    function _renderUpdatesSection(container) {
+        container.innerHTML =
+            '<div class="settings-card">'
+            + '<div class="settings-card-title">' + esc(_("Updates")) + '</div>'
+            + '<div class="settings-row">'
+            + '<span class="settings-row-label">' + esc(_("Current Version")) + '</span>'
+            + '<span class="settings-row-value" id="update-current-ver">...</span>'
+            + '<button class="settings-row-edit" id="btn-check-update" '
+            + 'style="width:auto;padding:0.35rem 0.9rem;border:1px solid var(--border-color);'
+            + 'border-radius:var(--radius-sm);font-family:var(--font-sans);font-size:0.85rem">'
+            + esc(_("Check for Updates")) + '</button>'
+            + '</div>'
+            + '</div>';
+
+        /* Lazy-load current version */
+        API.get("/api/update/check?force=false").then(function (result) {
+            var el = document.getElementById("update-current-ver");
+            if (el) el.textContent = result.app.current;
+        }).catch(function () {
+            var el = document.getElementById("update-current-ver");
+            if (el) el.textContent = "?";
+        });
+
+        /* Bind update check button — reuse existing _bindUpdateCheck flow */
+        var btn = document.getElementById("btn-check-update");
+        if (btn) {
+            btn.addEventListener("click", function () {
+                _bindUpdateCheck();
+                var checkBtn = document.getElementById("btn-check-update");
+                if (checkBtn) checkBtn.click();
+            });
+        }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Settings Row Factories
+       ═══════════════════════════════════════════════════════════════ */
+
+    /** Render a select dropdown row. */
+    function _settingSelect(key, label, options) {
+        var current = getSetting(key);
+        var opts = options.map(function (o) {
+            var sel = o.value === current ? " selected" : "";
+            return '<option value="' + esc(o.value) + '"' + sel + '>' + esc(o.label) + '</option>';
+        }).join("");
+        return '<div class="settings-row">'
+            + '<span class="settings-row-label">' + esc(label) + '</span>'
+            + '<select class="settings-row-select" data-key="' + esc(key) + '">' + opts + '</select>'
+            + '</div>';
+    }
+
+    /** Render a text input row with read-only display + edit button. */
+    function _settingText(key, label, placeholder) {
+        var current = getSetting(key);
+        var display = current || placeholder || "";
+        var cls = current ? "settings-row-value" : "settings-row-value muted";
+        return '<div class="settings-row" data-key="' + esc(key) + '">'
+            + '<span class="settings-row-label">' + esc(label) + '</span>'
+            + '<span class="' + cls + '">' + esc(display) + '</span>'
+            + '<button class="settings-row-edit" title="' + esc(_("Edit")) + '">'
+            + Icons.pencil() + '</button>'
+            + '<input type="text" class="settings-row-input hidden" '
+            + 'value="' + esc(current) + '" placeholder="' + esc(placeholder || "") + '">'
+            + '</div>';
+    }
+
+    /** Render a password row (display masked, input type=password). */
+    function _settingPassword(key, label, placeholder) {
+        var current = getSetting(key);
+        var display = current ? maskKey(current) : (placeholder || "");
+        var cls = current ? "settings-row-value" : "settings-row-value muted";
+        return '<div class="settings-row" data-key="' + esc(key) + '">'
+            + '<span class="settings-row-label">' + esc(label) + '</span>'
+            + '<span class="' + cls + '">' + esc(display) + '</span>'
+            + '<button class="settings-row-edit" title="' + esc(_("Edit")) + '">'
+            + Icons.pencil() + '</button>'
+            + '<input type="password" class="settings-row-input hidden" '
+            + 'value="' + esc(current) + '" placeholder="' + esc(placeholder || "") + '">'
+            + '</div>';
+    }
+
+    /** Render a toggle switch row. */
+    function _settingToggle(key, label) {
+        var checked = getSetting(key) !== "false" ? " checked" : "";
+        return '<div class="settings-row">'
+            + '<span class="settings-row-label">' + esc(label) + '</span>'
+            + '<label class="toggle-switch">'
+            + '<input type="checkbox" data-key="' + esc(key) + '"' + checked + '>'
+            + '<span class="toggle-slider"></span>'
+            + '</label>'
+            + '</div>';
+    }
+
+    /** Render a segmented control row (e.g. Theme: System | Dark | Light). */
+    function _settingSegmented(key, label, options, currentVal) {
+        var segs = options.map(function (o) {
+            var cls = o.value === currentVal ? "settings-seg-btn active" : "settings-seg-btn";
+            return '<button class="' + cls + '" data-value="' + esc(o.value) + '">'
+                + esc(o.label) + '</button>';
+        }).join("");
+        return '<div class="settings-row">'
+            + '<span class="settings-row-label">' + esc(label) + '</span>'
+            + '<div class="settings-seg-group" data-key="' + esc(key) + '">' + segs + '</div>'
+            + '</div>';
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Settings Event Binding
+       ═══════════════════════════════════════════════════════════════ */
+
+    /** Bind event listeners for all settings inputs in a container. */
+    function _bindSettingsInputs(container) {
+        if (!container) return;
+
+        /* Select dropdowns */
+        container.querySelectorAll(".settings-row-select").forEach(function (el) {
+            el.addEventListener("change", function () {
+                applySetting(this.dataset.key, this.value);
+                if (this.dataset.key === "img_generation_enabled") {
+                    _renderSettingsSection("image");
+                }
+                if (this.dataset.key === "lang") {
+                    renderSettings();
+                }
+                if (this.dataset.key === "portrait_remove_bg" && this.value !== "never") {
+                    API.get("/api/config/bg-removal-status").then(function (status) {
+                        if (!status.available) {
+                            showToast(_("Background removal model not available"), 4000);
                         }
-                    }
-                    applySetting(def.key, value);
-                });
-                return;
-            }
-
-            if (def.type === "select") {
-                const el = document.getElementById(`setting-${def.key}`);
-                if (!el) return;
-                el.addEventListener("change", async () => {
-                    /* ── Background Removal: verify model is available ── */
-                    if (def.key === "portrait_remove_bg" && el.value !== "never") {
-                        try {
-                            const status = await API.get("/api/config/bg-removal-status");
-                            if (!status.available) {
-                                /* Model not found — revert. */
-                                el.value = getSetting("portrait_remove_bg") || "never";
-                                return;
-                            }
-                        } catch (_) {
-                            /* API unreachable — apply anyway (best-effort). */
-                        }
-                    }
-                    const needsRerender = applySetting(def.key, el.value);
-                    if (needsRerender) {
-                        renderSettings();
-                    }
-                });
-                return;
-            }
-
-            /* text / password: ✎ → ✓+✕ (lazy, same pattern as ✓) */
-            const displayEl = document.getElementById(`display-${def.key}`);
-            const inputEl   = document.getElementById(`input-${def.key}`);
-            const editBtn   = document.getElementById(`edit-${def.key}`);
-            if (!editBtn) return;
-
-            let _preEditVal = "";
-            let _xBtn = null;
-
-            function _exitEdit() {
-                inputEl.classList.add("hidden");
-                displayEl.classList.remove("hidden");
-                if (_xBtn) { _xBtn.remove(); _xBtn = null; }
-                editBtn.innerHTML = Icons.pencil();
-            }
-
-            editBtn.addEventListener("click", () => {
-                if (!inputEl.classList.contains("hidden")) {
-                    /* Save */
-                    applySetting(def.key, inputEl.value);
-                    const newVal = getSetting(def.key);
-                    if (def.key === "api_key" || def.key === "img_api_key") {
-                        displayEl.textContent = maskKey(newVal);
-                    } else {
-                        displayEl.textContent = newVal || def.placeholder || "";
-                        displayEl.classList.toggle("muted", !newVal);
-                    }
-                    _exitEdit();
-                } else {
-                    /* Enter edit — insert ✕ before ✓, same lazy pattern as ✓ */
-                    _preEditVal = getSetting(def.key);
-                    inputEl.value = _preEditVal;
-                    inputEl.classList.remove("hidden");
-                    displayEl.classList.add("hidden");
-                    _xBtn = document.createElement("button");
-                    _xBtn.className = "setting-edit-btn";
-                    _xBtn.style.marginRight = "-0.8rem";
-                    _xBtn.innerHTML = X_SVG;
-                    _xBtn.title = _("Cancel");
-                    _xBtn.addEventListener("click", () => {
-                        inputEl.value = _preEditVal;
-                        _exitEdit();
-                    });
-                    editBtn.parentNode.insertBefore(_xBtn, editBtn);
-                    editBtn.innerHTML = Icons.checkmark();
-                    inputEl.focus();
+                    }).catch(function () { /* best-effort */ });
                 }
             });
         });
 
-        /* ── Update check button ─────────────────────────────────── */
+        /* Toggle switches */
+        container.querySelectorAll(".toggle-switch input[type=checkbox]").forEach(function (el) {
+            el.addEventListener("change", function () {
+                var val = this.checked ? "true" : "false";
+                applySetting(this.dataset.key, val);
+                if (this.dataset.key === "img_generation_enabled") {
+                    _renderSettingsSection("image");
+                }
+            });
+        });
 
-        _bindUpdateCheck();
+        /* Segmented controls */
+        container.querySelectorAll(".settings-seg-group").forEach(function (group) {
+            group.querySelectorAll(".settings-seg-btn").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    var val = this.dataset.value;
+                    group.querySelectorAll(".settings-seg-btn").forEach(function (b) {
+                        b.classList.toggle("active", b.dataset.value === val);
+                    });
+                    if (group.dataset.key === "theme") {
+                        ThemeState.set(val);
+                        _updateAllThemeButtons();
+                    }
+                });
+            });
+        });
+
+        /* Text / password edit buttons */
+        container.querySelectorAll(".settings-row-edit").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var row = this.closest(".settings-row");
+                if (!row) return;
+                var key = row.dataset.key;
+                var displayEl = row.querySelector(".settings-row-value");
+                var inputEl = row.querySelector(".settings-row-input");
+                if (!displayEl || !inputEl) return;
+
+                if (!inputEl.classList.contains("hidden")) {
+                    /* Save */
+                    applySetting(key, inputEl.value);
+                    var newVal = getSetting(key);
+                    if (key === "api_key" || key === "img_api_key") {
+                        displayEl.textContent = maskKey(newVal);
+                    } else {
+                        displayEl.textContent = newVal || "";
+                        displayEl.classList.toggle("muted", !newVal);
+                    }
+                    inputEl.classList.add("hidden");
+                    displayEl.classList.remove("hidden");
+                    this.innerHTML = Icons.pencil();
+                    /* Remove cancel button if present */
+                    var cancelBtn = row.querySelector(".settings-row-cancel");
+                    if (cancelBtn) cancelBtn.remove();
+                } else {
+                    /* Enter edit mode */
+                    inputEl.value = getSetting(key);
+                    inputEl.classList.remove("hidden");
+                    displayEl.classList.add("hidden");
+                    this.innerHTML = Icons.checkmark();
+
+                    /* Add cancel button */
+                    var cancelBtn = document.createElement("button");
+                    cancelBtn.className = "settings-row-cancel";
+                    cancelBtn.innerHTML = Icons.x();
+                    cancelBtn.title = _("Cancel");
+                    cancelBtn.addEventListener("click", function () {
+                        inputEl.classList.add("hidden");
+                        displayEl.classList.remove("hidden");
+                        btn.innerHTML = Icons.pencil();
+                        cancelBtn.remove();
+                    });
+                    this.parentNode.insertBefore(cancelBtn, this);
+                    inputEl.focus();
+                }
+            });
+        });
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Theme Toggle Button Helpers
+       ═══════════════════════════════════════════════════════════════ */
+
+    /** Bind a theme quick-toggle button. */
+    function _bindThemeToggle(btn) {
+        if (!btn) return;
+        _updateThemeButton(btn);
+        btn.addEventListener("click", function () {
+            ThemeState.cycle();
+            _updateAllThemeButtons();
+        });
+    }
+
+    /** Update a single theme button icon to match current theme. */
+    function _updateThemeButton(btn) {
+        var cur = ThemeState.current;
+        if (cur === "system") {
+            btn.innerHTML = Icons.halfMoon();
+            btn.title = _("Theme: System");
+        } else if (ThemeState.effective === "dark") {
+            btn.innerHTML = Icons.moon();
+            btn.title = _("Theme: Dark");
+        } else {
+            btn.innerHTML = Icons.sun();
+            btn.title = _("Theme: Light");
+        }
+    }
+
+    /** Update ALL theme buttons on the page. */
+    function _updateAllThemeButtons() {
+        document.querySelectorAll(".theme-toggle-btn").forEach(function (btn) {
+            _updateThemeButton(btn);
+        });
+        /* Update appearance segmented control if visible */
+        var seg = document.querySelector('.settings-seg-group[data-key="theme"]');
+        if (seg) {
+            seg.querySelectorAll(".settings-seg-btn").forEach(function (b) {
+                b.classList.toggle("active", b.dataset.value === ThemeState.current);
+            });
+        }
     }
 
     /** Bind the update check/apply flow on the settings page. */
