@@ -172,111 +172,68 @@ def get_thinking_params(model: str, mode: str = "disabled") -> dict:
 # Image API thinking presets (separate from chat — different wire format)
 # ═══════════════════════════════════════════════════════════════════════
 #
-# Image generation models use POST /images/generations, not /chat/completions.
-# Thinking/reasoning parameters are NOT part of the OpenAI image API spec —
-# they only apply to models whose native API supports reasoning control.
+# Image generation uses POST /images/generations.  Only add entries when
+# the provider's OWN official documentation confirms the parameter exists.
 #
-# Wire-format assumption: the project uses an OpenAI-compatible unified proxy.
-# Parameters are passed as top-level JSON fields merged into the request body.
-# The proxy is expected to forward unknown fields (standard API gateway behaviour)
-# — models that don't support thinking will silently ignore them.
+# Wire-format assumption: the project uses an OpenAI-compatible unified
+# proxy.  Parameters are passed as top-level JSON fields merged into the
+# request body — the proxy translates them to the native format.
 #
-# Each entry MUST cite a URL showing the native API supports the parameter.
+# Models NOT listed below (Seedream, FLUX, GPT Image, DeepSeek, Gemini
+# 2.5/pro image) have no officially documented thinking control on the
+# /images/generations endpoint → get_image_thinking_params returns {}.
 
 _IMAGE_THINKING_PRESETS: list[tuple[str, dict, dict, dict]] = [
-    # ── Gemini 3.x Image (nano-banana-pro, nano-banana-2) ─────────────
-    # Native API: generationConfig.thinkingConfig.thinkingLevel
-    #   = "minimal" (default) | "high".
-    # OpenAI-compatible proxy: thinking_config.thinking_level (consistent
-    #   with the text API's thinking_config.thinking_budget wrapper).
-    # "minimal" is the lightest setting; there is no true "off" for image
-    #   models — some base reasoning always runs.
-    # Ref: https://discuss.ai.google.dev/t/145830
-    #   "For image generation models …, the relevant parameter is
-    #    thinkingLevel, nested inside generationConfig.thinkingConfig"
-    # Ref: https://help.apiyi.com/en/gemini-3-1-flash-lite-image-thinking-mode-guide-en.html
-    #   "thinking_level — values: minimal (default) and high"
+    # ── Gemini 3.1 Flash / Flash Lite Image ────────────────────────────
+    # Official Google AI docs (ai.google.dev, Aug 2026):
+    #   generationConfig.thinkingConfig.thinkingLevel
+    #     = "minimal" (default) | "high"
+    #   Only supported on gemini-3.1-flash-image and
+    #   gemini-3.1-flash-lite-image.
+    #   gemini-3-pro-image does NOT support thinkingLevel control.
+    #   Thinking is "enabled by default and cannot be disabled."
+    #
+    # OpenAI-compatible proxy format: thinking_config.thinking_level
+    # (consistent with the text API's thinking_config wrapper).
+    #
+    # Source (official):
+    #   https://ai.google.dev/gemini-api/docs/generate-content/image-generation
+    #   → "thinkingConfig: {thinkingLevel: 'minimal' | 'high'}"
+    #   → "Only supported on gemini-3.1-flash-image and
+    #       gemini-3.1-flash-lite-image."
+    #
+    # nano-banana-2 is the same model family as gemini-3.1-flash-image.
     (
-        "nano-banana-pro",
+        "nano-banana-2",
         {"thinking_config": {"thinking_level": "minimal"}},
         {"thinking_config": {"thinking_level": "minimal"}},
         {},                                              # enabled = API default (high)
     ),
     (
-        "nano-banana-2",
+        "gemini-3.1",
         {"thinking_config": {"thinking_level": "minimal"}},
         {"thinking_config": {"thinking_level": "minimal"}},
         {},
     ),
-    (
-        "gemini-3",
-        {"thinking_config": {"thinking_level": "minimal"}},
-        {"thinking_config": {"thinking_level": "minimal"}},
-        {},
-    ),
-    # ── Gemini 2.5 Image (nano-banana) ────────────────────────────────
-    # Native API: generationConfig.thinkingConfig.thinkingBudget
-    #   = integer 0–24576 (0 = minimal, Flash only; Pro min is 128).
-    # OpenAI-compatible proxy: thinking_config.thinking_budget
-    #   (same wrapper as the text API entry above).
-    # Ref: https://discuss.ai.google.dev/t/145830
-    #   "2.5 Flash: thinking_budget range 0–24576 (0 = disabled)"
-    (
-        "nano-banana",
-        {"thinking_config": {"thinking_budget": 0}},
-        {"thinking_config": {"thinking_budget": 0}},
-        {},
-    ),
-    (
-        "gemini-2.5",
-        {"thinking_config": {"thinking_budget": 0}},
-        {"thinking_config": {"thinking_budget": 0}},
-        {},
-    ),
-    # ── Gemini generic fallback ───────────────────────────────────────
-    # Unknown Gemini variant — assume 3.x format (newer API generation).
-    (
-        "gemini",
-        {"thinking_config": {"thinking_level": "minimal"}},
-        {"thinking_config": {"thinking_level": "minimal"}},
-        {},
-    ),
-    # ── GPT Image 2 ───────────────────────────────────────────────────
-    # Third-party developer guides document a top-level "thinking"
-    # parameter on /v1/images/generations: off | low | medium | high.
-    # CAUTION: the official OpenAI API reference (developers.openai.com,
-    # Aug 2026) does NOT document this parameter.  It may be:
-    #   (a) an undocumented API feature,
-    #   (b) a proxy-specific extension, or
-    #   (c) planned but not yet in the public reference.
-    # Included here on a best-effort basis — if unsupported, the field
-    # is silently ignored by the API.
-    # Ref: https://apidog.com/blog/gpt-image-2-api/
-    #   "thinking — off | low | medium | high"
-    # Ref: https://lushbinary.com/blog/chatgpt-images-2-developer-guide-gpt-image-2-api-pricing/
-    #   "thinking mode adds reasoning tokens … budget 1.2–2× baseline"
-    (
-        "gpt-image-2",
-        {"thinking": "off"},
-        {"thinking": "low"},
-        {},                                              # enabled = API default (medium)
-    ),
-    # NOTE: gpt-image-1 and earlier do NOT support the thinking
-    # parameter (it was introduced with gpt-image-2, April 2026).
-    # "gpt-image-2" does NOT match "gpt-image-1" (substring check).
-    #
-    # NOTE: Seedream, FLUX, and other diffusion-based image models
-    # have no thinking/reasoning mechanism.  They don't match any
-    # prefix above → get_image_thinking_params returns {}.
+    # NOTE: The following models are intentionally absent — their
+    # official docs do NOT confirm thinking control on the image endpoint:
+    #   • gpt-image-* — OpenAI /v1/images/generations ref has no
+    #     "thinking" parameter (verified Aug 2026).
+    #   • gemini-3-pro-image / nano-banana-pro — official docs list
+    #     only flash-image and flash-lite-image as supported.
+    #   • gemini-2.5-flash-image / nano-banana (v1) — official image
+    #     gen docs use thinkingLevel, not the text-model thinkingBudget.
+    #   • seedream-*, flux-*, doubao-* — diffusion models, no reasoning.
 ]
 
 
 def get_image_thinking_params(model: str, mode: str = "light") -> dict:
     """Return ``extra_body`` dict for controlling thinking on image *model*.
 
-    Only applies to models whose native API supports reasoning control
-    (Gemini image, GPT Image 2).  For dedicated diffusion models
-    (Seedream, FLUX) the function returns ``{}`` — a no-op.
+    Only applies to models whose official API docs confirm thinking
+    control on the images endpoint.  Currently only Gemini 3.1 Flash /
+    Flash Lite Image (including nano-banana-2) — all other models
+    return ``{}``.
 
     Args:
         model: Image model identifier (e.g. ``"gemini-3.1-flash-image"``).
