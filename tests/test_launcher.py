@@ -93,3 +93,35 @@ def test_apply_launcher_update_unix(tmp_path, monkeypatch):
     assert not (tmp_path / "launcher.new").exists()
     assert (tmp_path / "Storyloom").read_text() == "new-launcher"
     mock_execv.assert_called_once()
+
+
+def test_apply_launcher_update_windows_bat_paths(tmp_path, monkeypatch):
+    """The .bat script must use absolute paths for both source and dest."""
+    monkeypatch.setattr("storyloom.launcher.DIR", str(tmp_path))
+    monkeypatch.setattr(
+        "storyloom.launcher.LAUNCHER_NEW",
+        str(tmp_path / "launcher.new"),
+    )
+    monkeypatch.setattr("storyloom.launcher.LAUNCHER_NAME", "Storyloom.exe")
+    monkeypatch.setattr(sys, "platform", "win32")
+
+    (tmp_path / "launcher.new").write_text("new-launcher")
+
+    mock_popen = Mock()
+    monkeypatch.setattr("storyloom.launcher.subprocess.Popen", mock_popen)
+
+    # sys.exit is called after spawning the .bat — prevent test exit.
+    with pytest.raises(SystemExit):
+        _apply_launcher_update()
+
+    # Verify .bat was written with absolute paths.
+    bat_path = tmp_path / "_launcher_swap.bat"
+    assert bat_path.exists()
+    content = bat_path.read_text()
+    launcher_dest = str(tmp_path / "Storyloom.exe")
+    # Both source and dest in move /Y must be absolute paths.
+    assert f'move /Y' in content
+    assert launcher_dest in content, f"Expected absolute dest in: {content}"
+    # start command must also use absolute path.
+    assert f'start ""' in content
+    mock_popen.assert_called_once()

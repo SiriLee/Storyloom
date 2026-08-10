@@ -68,12 +68,13 @@ def _apply_launcher_update():
 
     if sys.platform == "win32":
         bat = os.path.join(DIR, "_launcher_swap.bat")
+        launcher_dest = os.path.join(DIR, LAUNCHER_NAME)
         with open(bat, "w") as f:
             f.write(
                 "@echo off\n"
                 "timeout /t 1 /nobreak >nul\n"
-                f'move /Y "{LAUNCHER_NEW}" "{LAUNCHER_NAME}"\n'
-                f'start "" "{os.path.join(DIR, LAUNCHER_NAME)}"\n'
+                f'move /Y "{LAUNCHER_NEW}" "{launcher_dest}"\n'
+                f'start "" "{launcher_dest}"\n'
             )
         subprocess.Popen(
             bat,
