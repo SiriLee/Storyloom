@@ -6,6 +6,171 @@
 
 ---
 
+## 2026-08-10（周日）— v2.0.0 发布日
+
+> **概述**：Storyloom v2.0.0 正式发布。今日完成了横跨前端、后端、打包、发布管线的巨量工作——前端全面翻新（CSS 主题系统 + 设置页重设计 + 图标系统）、自动更新系统（UpdateManager + 启动器自更新）、原生桌面窗口模式（pywebview）、素材管理器重设计（画廊网格 + 缩略图）、启动器打包与发布管线、以及大量 UI 细节打磨和 bug 修复。共 **103 commits**，**66 files**，**+13,490/-1,586 lines**，测试从 1,030 增至 **1,081**（+51）。
+
+### v2.0.0 发布 — 版本号、打包、发布管线
+
+**背景**：Phase 2 全部功能（素材系统、图模式、pre-build、自动更新、桌面模式）就绪后，需要正式发布 v2.0.0——包括版本号升级、PyInstaller 打包、发布 zip 结构、README 文档、以及启动器自更新验证。
+
+**决策**（commits `1f46b57` → `0ba15ed` → `f6a5334` → `03363d3` → `5c77673` 等，~15 commits）：
+
+1. **版本号升至 2.0.0**（`1f46b57`）：`pyproject.toml` 版本号从 `1.0.0` → `2.0.0`，副标题从 "AI Text Adventure" 更新为 "AI Real-Time Visual Novel"（`f6a5334`）。启动器添加 swap 验证——对比旧版本与新版本的 `pyproject.toml` 版本号确保原子替换成功。
+2. **发布 zip 结构**（`5c77673`、`f1e39ba`、`c48c1e2`、`2797ffe`）：zip 内直接使用就绪名称（`Storyloom/`、`storyloom.exe`），不再使用 `.new` 后缀——启动器的原子 swap 在解压后执行。`locale/` 和 `config.example.json` 放入 `app/` 子目录（版本化管理，非用户数据）。`system_media/` 打包进 zip 实现开箱即用（`ff6a971`）。
+3. **README 重构**（`6f9109a`）：按用户类型（pip 用户 vs 独立可执行文件用户）分层安装说明，明确图像 API 为可选、系统素材库为内置。
+4. **system_media 打包**（`93687a9`、`03363d3`）：排除运行时生成的缩略图，使用 `pack_system_media.sh` 输出而非原始目录拷贝。系统素材独立更新检查使用专用 release tag（`63888c8`）。
+
+**依据**：`pyproject.toml`；`scripts/build.sh`；`src/storyloom/launcher.py`；`README.md`。
+
+### 前端全面翻新 — CSS 主题系统 + 设置页重设计（T1-T10）
+
+**背景**：Phase 2 的 UI 在快速迭代中累积了大量 hardcoded 颜色值、零散的 CSS 规则和拥挤的设置页。随着功能增多（自动更新、主题切换、API 文档），需要一个可扩展的设计系统。按照 10 步实现计划（`2dbd0d4`）执行。
+
+**决策**（commits `b914d5a` → `9934d81` → `b632efe` → `0ac821b` → `f875517` → `9ef6a34` → `485393b` 等，~30 commits）：
+
+**Phase 1 — 基础设施（T1-T4）：**
+
+1. **CSS 主题变量系统**（`35d9e02`、`623665d`）：定义 `--color-bg`、`--color-surface`、`--color-text` 等语义变量，dark/light 两层通过 `[data-theme]` 选择器切换。所有组件颜色值迁移到变量引用——零 hardcoded 颜色。
+2. **ThemeState JS 模块**（`5dda11a`）：`ThemeState` 类管理三种状态（system/dark/light），`system` 模式通过 `matchMedia('(prefers-color-scheme: dark)')` 自动跟踪 OS 主题。`applyAccentColor()` 在页面加载时从 `UserConfig` 读取并应用。
+3. **Feather 风格图标系统**（`76aa7bc`）：`icons.js` 中 `Icons` 对象——`Icons.theme()`、`Icons.settings()`、`Icons.download()`、`Icons.trash()` 等返回 inline SVG。统一了之前分散在各 HTML 中的重复图标定义（`a543e52`）。
+
+**Phase 2 — 设置页重设计（T5-T9）：**
+
+4. **侧边栏布局**（`e4be07e`、`f3fdcda`）：设置页从单列堆叠 → 左侧导航侧边栏 + 右侧内容区。四个导航项（外观、语言、游戏、关于）带 SVG 图标，大屏固定侧边栏，小屏收起。
+5. **MXU 风格卡片系统**（`f875517`、`9ef6a34`）：每个设置分区使用独立卡片——带图标标题（`Icons.palette()` / `Icons.globe()` / `Icons.gamepad()` / `Icons.sparkle()`），卡片内嵌分段控件（segmented control）和编辑字段。**Accent 颜色系统**：6 种主题色（blue/purple/green/orange/red/mono），`--color-accent` CSS 变量驱动全局强调色。
+6. **主题切换 UX**（`0ac821b`、`b632efe`）：全局主题切换按钮（所有视图顶栏右侧）直接切换 dark↔light，System 选项仅在设置页 Appearance 分区内可用。修复了 P0 主题导出 bug——`saveConfig()` 未在部分按钮上调用导致配置丢失。
+7. **API 文档集成**（`2ecc091`、`177cadb`）：Markdown 渲染模块将 `docs/api/` 下的文档渲染到设置页的 "API Guide" 侧边栏项中。删除了独立的 `/help` 路由和 `help.html`——API 文档现在是 SPA 的一部分。
+
+**Phase 3 — 细节打磨（T10 + fixes）：**
+
+8. **i18n 完善**（`0084588`、`2537b40`）：补充 zh_CN/zh_TW 翻译——6 种 accent 颜色名 + Image API 配置项。修复 accent color i18n msgstr 为空的问题。
+9. **滚动联动**（`485393b`）：设置页侧边栏高亮仅在滚动设置分区时更新——查看 API Guide 或 Credits 时不触发，防止侧边栏意外跳动。
+10. **全局 max-width 解除**（`1f17e98`）：设置页和素材管理页使用全视口宽度，仅叙事视图保留可读文本宽度——结束了之前 `#app { max-width: 1200px }` 的笼统限制。
+
+**依据**：`web/static/css/main.css`（CSS 变量系统）；`web/static/js/state.js`（ThemeState）；`web/static/js/icons.js`；`web/static/js/settings.js`；`web/static/js/router.js`；[[2026-08-10-frontend-redesign-state]]。
+
+### 自动更新系统 — UpdateManager + 启动器 + UI
+
+**背景**：v2.0.0 独立可执行文件用户需要自动更新能力——检测新版本、下载、原子替换。设计要点：(1) PyInstaller 单文件启动器架构——`storyloom.exe`（启动器）+ `app/`（实际 Python 包），更新时替换 `app/` 目录；(2) 启动器自身也能自更新（通过 Windows `.bat` 脚本原子替换 exe）。
+
+**决策**（commits `67e4022` → `c57ca18` → `860c611` → `c28c4da` → `9188d8f` → `5dfc5ca` → `87bd5db` → `e71e82a` → `df3817a`，~12 commits）：
+
+1. **UpdateManager**（`c28c4da`）：`core/update_manager.py`（427 行）——`check_for_update()` 从 GitHub release 获取最新版本号与下载 URL（基于当前平台选择 asset），`download_update()` 流式下载 + 进度回调 + SHA256 校验，`extract_update()` 解压到临时目录。`perform_update()` 协调完整流程。
+2. **自动更新 API 端点**（`9188d8f`）：`GET /api/update/check` — 检查更新，`POST /api/update/apply` — 执行更新（Pydantic v2 兼容的 `ApplyUpdateRequest` validator）。服务器端检测 `_APP_DIR` 环境变量以适配启动器布局。
+3. **启动器自更新**（`87bd5db`、`209130b`）：`launcher.py`（106 行新增）——`regenerate_launcher()` 使用 PyInstaller 重新打包自身 exe；Windows 端 `_perform_self_update()` 创建 `.bat` 脚本在进程退出后执行 `move /Y` 原子替换。
+4. **更新 UI**（`5dfc5ca`、`df3817a`、`9886e7b`、`85efd8a`）：设置页 "Updates" 分区——当前版本号显示 + "Check for Updates" 按钮（`Icons.download()` SVG）。点击弹出模态框展示新版本信息 + "Download & Install" 操作。进度条实时显示下载进度。简化为单行内联布局 + 模态弹窗（`df3817a`），避免过度复杂的设置页内嵌 UI。
+5. **代码审查修复**（`e71e82a`）：12 项审查发现全部修复——包括缺少 `has_update` 对 `asset_url` 的空值检查、dead `Path` import。
+
+**测试**：`tests/test_update_manager.py`（535 行，新增）——版本检查、下载、解压、完整流程。`tests/test_launcher.py`（129 行新增）——swap 验证、regenerate_launcher。`tests/test_web_server.py`（212 行新增）——更新 API 端点集成测试。
+
+**依据**：`core/update_manager.py`；`launcher.py`；`web/server.py`；`web/static/js/settings.js`；`tests/test_update_manager.py`。
+
+### 原生桌面窗口模式 — pywebview
+
+**背景**：用户可能不喜欢浏览器标签页中运行应用。pywebview 提供原生桌面窗口（Windows/Linux/macOS），内嵌系统 WebView——无需捆绑 Chromium。
+
+**决策**（commits `5aa90e1` + `95aea18` → `352cf03`，~7 commits）：
+
+1. **`--window` CLI 标志**（`5aa90e1`）：`python -m storyloom --window` 启动 pywebview 桌面窗口。窗口标题 "Storyloom"，默认 1280×800，最小 900×600。FastAPI 服务器在后台线程运行，pywebview 加载 `http://127.0.0.1:{port}`。
+2. **stderr 噪声抑制**（`95aea18`、`b7a11d7`、`352cf03`）：GTK/QT 库导入时产生大量 stderr 警告（`Gtk-Message: Failed to load module "canberra-gtk-module"` 等）。方案演进：全局 `os.dup2` → 仅在 `_webview_available()` 导入时 `sys.stderr` 重定向到 `/dev/null`——最小影响范围，不影响应用自身日志。
+3. **启动横幅**（`50fcb41`、`0eca69c`）：应用启动时打印版本号 + 模式说明——web 模式显示 `http://127.0.0.1:{port}`，桌面模式显示 "Opening desktop window..."。
+
+**依据**：`__main__.py`；`launcher.py`；[[2026-08-10-frontend-redesign-state]]。
+
+### 素材管理器重设计 — 画廊网格 + 缩略图
+
+**背景**：素材管理页之前使用简单的列表布局，无法预览图片内容。用户需要视觉化浏览素材库。
+
+**决策**（commits `65c4153` → `84243b2` → `b810c61` → `aec96b6` 等，~8 commits）：
+
+1. **画廊网格布局**（`65c4153`、`ba5bec2`）：`flex-wrap` + 固定 280×210 卡片——全图覆盖 + 底部渐变文字叠加层显示素材名和类型。
+2. **即时缩略图生成**（`84243b2`）：`GET /api/assets/thumbnail/{asset_id}?w=280&h=210`——服务端 PIL 即时缩放 + 缓存。首次请求生成缩略图，后续命中直接返回。
+3. **性能优化**（`b810c61`、`aec96b6`）：缩略图分辨率 280→560（2x retina），JPEG quality 80→85。`Cache-Control: public, max-age=31536000, immutable`——缩略图内容由尺寸参数编码，URL 不同 = 内容不同，可永久缓存。缩略图 URL 包含尺寸维度（`?w=560&h=420`）确保缓存键唯一。
+4. **交互打磨**（`0d3d91a`、`88ac9be`、`c5da7ad`）：卡片 hover 不再使用 `scale` 变换（防止与相邻卡片重叠），改为内部图片 zoom 在卡片边界内。文字使用绝对定位渐变遮罩，不随 hover 移动。
+
+**依据**：`web/server.py:348-357`（缩略图端点）；`web/static/js/assets.js`；`web/static/css/main.css`。
+
+### Thinking 模式最终化 — Image API + Co-Create
+
+**背景**：§7.8a/§7.8b 的 thinking 决策需要扩展到 Image API（图像生成提示词）和 Co-Create（共创聊天）。需要基于实际 API 文档证据而非猜测。
+
+**决策**（commits `bb1e817` → `c4ec7b0`，2 commits）：
+
+| 调用场景 | 模式 | 理由 |
+|----------|------|------|
+| Image API（提示词生成 + ref 裁剪） | **light** | 官方文档明确支持，图像质量关键路径 |
+| Co-Create Q&A（chat 模式） | **disabled** | 聊天不需要推理链，速度优先 |
+| Image thinking presets 范围 | **仅限有官方证据的模型** | 移除推测性配置 |
+
+**关键**：`c4ec7b0` 将 image thinking presets 限制为仅 `gpt-5` 系列（有官方文档明确支持 light thinking）——移除对其他模型的猜测性配置。
+
+**依据**：`io/thinking.py`；`io/img_api_client.py`；`core/co_create.py`；[[2026-08-10-image-co-create-thinking]]。
+
+### MXU 风格 UI 统一 — 游戏视图、保存浏览器、Co-Create 头部
+
+**背景**：前端翻新后，各视图的顶栏、卡片、间距风格不统一——需要将 MXU 设计语言（侧边栏风格）扩展到全局。
+
+**决策**（commits `e5d668a` → `2570929` 等，~8 commits）：
+
+1. **Co-Create 头部 MXU 化**（`e5d668a`、`b722d3a`、`517d4e4`）：移除标题文字，添加模式切换按钮（chat/story），720px 居中内容区。聊天消息气泡——用户消息使用 `--color-accent` 背景。
+2. **游戏视图 MXU 对齐**（`517d4e4`）：文本模式和视觉小说模式顶栏统一高度和间距。图模式将 hardcoded 颜色迁移到 CSS 变量（`bd00a83`）。
+3. **保存浏览器卡片化**（`2570929`）：存档列表从简单行布局 → MXU 风格卡片——缩略图 + 标题 + 时间戳 + 模式徽章。主题切换联动保存。修复了 `_asset_roster.json` 干扰 `newest-file` 启发式排序的问题（`415d107`）。
+4. **模式徽章**（`5ef6aae`、`2a84920`、`da7a156`、`3db3ee6`）：存档列表和游戏预览界面显示游戏模式徽章（"Graph" / "Text"）。徽章尺寸缩小，位置调整——存档列表中附在标题右侧，预览中在 premise 下方。
+
+**依据**：`web/static/css/main.css`；`web/static/js/co-create.js`；`web/static/js/game.js`；`web/static/js/router.js`。
+
+### 图/VN 模式打磨 — CSS 变量 + 文本颜色
+
+**背景**：图模式在主题系统引入后出现颜色不一致——VN 文本颜色跟随主题变化，但 VN 是影院级场景，文本应为白色。
+
+**决策**（commits `bd00a83` → `5b3c518`，~5 commits）：
+
+1. **图模式颜色变量化**（`bd00a83`）：将所有 hardcoded 颜色（背景渐变、文本阴影、覆盖层）迁移到 CSS 变量——图模式现在响应主题切换（背景亮度），但保持影院感。
+2. **VN 文本固定白色**（`54bfd80`）：VN name tag 和对话文本强制 `color: #fff`——影院场景不应受主题驱动。
+3. **VN name tag 分割修复**（`a6e5f0e`）：`"Name: text"` 格式的 inline name tag 正确分割 name/char 部分——之前将整个字符串当角色名导致 sprite 匹配失败。
+4. **VN 顶栏主题切换移除**（`5b3c518`）：从 VN 顶栏移除主题切换按钮——影院场景不需要。全局主题切换仍可通过其他视图访问。
+
+**依据**：`web/static/css/main.css`；`web/static/css/graph.css`；`web/static/js/graph-renderer.js`。
+
+### 构建与打包修复
+
+**背景**：v2.0.0 发布需要健全的构建管线——ONNX 模型（背景移除）下载、system_media 打包、pywebview 依赖、Windows 路径处理。
+
+**决策**（commits `2f5d5d8` → `6211980`，~6 commits）：
+
+1. **ONNX 模型处理**（`38a6dc6`、`2f5d5d8`）：`build.sh clean` 不再删除 ONNX 模型（避免重新下载 170MB），新增 `--auto-download` 在模型缺失时自动下载。构建时 ONNX 下载失败 → hard fail（不静默跳过）。
+2. **system_media zip 解压路径**（`21e3d68`）：解压到 `system_media/` 子目录而非当前目录——防止文件散落。
+3. **pywebview 构建依赖**（`6211980`）：将 `pywebview` 加入 PyInstaller `hidden-imports`——pywebview 使用动态导入，PyInstaller 无法自动检测。
+4. **dist 清理**（`b8dd52c`）：`build.sh clean` 清理 `dist/storyloom-v*`（匹配新版本号命名）。
+
+**依据**：`scripts/build.sh`；`.github/workflows/test.yml`。
+
+### Bug 修复与稳定性
+
+**背景**：密集的功能开发伴随大量 bug——P0 级别的主题配置丢失、素材 API 端点不同步、平台特定测试失败。
+
+**决策**（commits `9934d81` → `7911d0b`，~10 commits）：
+
+1. **P0 主题导出 bug**（`9934d81`）：多处 `saveConfig()` 调用缺失导致主题切换后配置未持久化。同时修复了 i18n 违反（硬编码英文字符串）、事件监听器泄漏、错误处理缺口。
+2. **素材库同步**（`7911d0b`、`b0a9ed5`、`5bd5f87`）：素材 API 端点通过 `_get_asset_library()` 统一获取 `AssetLibrary`——确保系统素材在首次访问时被导入。idempotent 导入路径中 `_system_media_dir` 未设置的问题已修复。系统素材导入失败改为 log warning 而非静默吞掉。
+3. **Graph pipeline 路径修复**（`d16ecf0`）：`mount_graph_pipeline` 中的 media 路径从 `saves_root` 派生而非硬编码——修复了自定义存储路径下素材无法加载的问题。
+4. **平台测试修复**（`594ffce`）：Windows 平台路径分隔符和行结束符差异导致的测试断言失败——使用 `os.path` 和 `os.linesep` 替代硬编码。
+5. **`_skipTypewriter` 完整性**（`97bf03d`）：跳过打字机效果时必须显示完整文本，而非保留部分文本。
+
+**依据**：`web/server.py`；`core/game_loop.py`；`core/session.py`；`tests/`。
+
+### 工程日志与文档
+
+**决策**（commits `048acd4`、`5be0cb7`）：
+
+1. **2026-08-09 日志**（`048acd4`）：记录前一日 51 commits 的完整工程日志——§7.8c pre-build、thinking 决策、CI 集成。
+2. **日志勘误**（`5be0cb7`）：补充 CI 测试修复条目（`c29c7b7` —— GraphPipeline 测试自包含化，移除对 `system_media/` 的依赖）。
+
+**依据**：`docs/engineering-journal.md`；`tests/test_game_loop.py`。
+
+---
+
 ## 2026-08-09（周六）
 
 > **概述**：§7.8c Pre-build 全栈实现 + §7.8b 收尾审查 + 稳定性修复 + 游戏模式徽章 UI。核心工作是将素材预构建管道从 spec 推进到完整可用的全栈实现——批量选择提示词设计、Prebuilder 管道（parse → 2× batch selection → concurrent generation → force-select fallback）、GameSession 集成（删除 `_init_stub_roster`）、SSE 流式端点、前端卡片网格 UI。共 **51 commits**，**36 files**，**+4,186/-427 lines**，测试从 993 增至 **1,030**（+37）。

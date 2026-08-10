@@ -32,6 +32,9 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | `docs/spec/data-model.md` | Data model & constants — **authoritative** |
 | `docs/graph-mode-spec/design.md` | Phase 2 graph mode design — **authoritative** |
 | `docs/graph-mode-spec/design-draft.md` | Phase 2 graph mode early draft (reference) |
+| `docs/graph-mode-spec/prompt-design.md` | Graph mode narrative prompt templates |
+| `docs/graph-mode-spec/prompt-design-llm-match.md` | §7.8a LLM match prompts |
+| `docs/graph-mode-spec/prompt-design-llm-generate.md` | §7.8b LLM generate prompts |
 | `docs/engineering-journal.md` | Design decision log |
 | `docs/api/co-create.md` | Co-creation API reference |
 | `docs/api/session.md` | GameSession integration API |
@@ -50,20 +53,27 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | `src/storyloom/io/api_client.py` | OpenAI-compatible API client |
 | `src/storyloom/io/_types.py` | Shared image I/O data types — enums, dataclasses |
 | `src/storyloom/io/img_api_client.py` | Image generation API client (§7.3) |
+| `src/storyloom/io/img_prompts.py` | Image generation prompt templates (§7.8b) |
 | `src/storyloom/io/img_utils.py` | Image utilities — format detection, background removal |
+| `src/storyloom/io/thinking.py` | Thinking mode presets for chat + image APIs (§7.8a) |
 | `src/storyloom/assets/_types.py` | AssetType, Asset, AssetItem data types (§2) |
 | `src/storyloom/assets/_library.py` | AssetLibrary — global registry (§2.2) |
 | `src/storyloom/assets/_roster.py` | GameAssetRoster — per-game mapping (§2.3) |
+| `src/storyloom/assets/_manifest.py` | SystemManifest loader — system_media manifest reconciliation |
 | `src/storyloom/tasks/_types.py` | Task, TaskType, TaskTimeoutError data types (§4.2) |
 | `src/storyloom/tasks/_generator.py` | TaskGenerator — Event→Task dispatch, O(1) program match (§3.2) |
 | `src/storyloom/tasks/_pool.py` | TaskPool — ThreadPoolExecutor wrapper (§3.3) |
+| `src/storyloom/tasks/_llm_match.py` | MatchProcessor — LLM asset matching (§7.8a) |
+| `src/storyloom/tasks/_llm_generate.py` | GenerateProcessor — LLM selection + AI image generation (§7.8b) |
 | `src/storyloom/web/` | Web UI (FastAPI + SSE + SPA) |
+| `src/storyloom/web/sessions.py` | In-memory session store for co-create + game loops |
 | `src/storyloom/dev_cli/` | Dev CLI — `DevObserver`, deque-buffered display (**v2.0.0: path detection not adapted to new layout, stale/deprecated**) |
 | `src/storyloom/core/update_manager.py` | UpdateManager — version check, download, extraction (§4) |
 | `src/storyloom/launcher.py` | Launcher — atomic app_new→app swap, self-update (§3) |
 | `src/storyloom/config.py` | Configurable constants |
 | `src/storyloom/user_config.py` | UserConfig — centralized config management |
 | `src/storyloom/i18n.py` | gettext i18n (zh-CN, zh-TW, en) |
+| `src/storyloom/i18n_compile.py` | .po→.mo compiler + frontend JS dict generator (build hook) |
 | `scripts/build.sh` | PyInstaller + wheel packaging |
 | `pyproject.toml` | Project metadata, dependencies, entry points |
 | `tests/test_stream_parser.py` | StreamParser unit tests — tag → Event, position tracking, edge cases |
@@ -74,6 +84,11 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | `tests/test_img_api_client.py` | Image generation API client tests (§7.3) |
 | `tests/test_img_utils.py` | Image utilities — format detection, bg removal tests |
 | `tests/test_task_framework.py` | Task framework tests — lifecycle, program match, §4.3 algorithm, E2E |
+| `tests/test_llm_match.py` | MatchProcessor tests — thinking presets, messages, parse, integration (§7.8a) |
+| `tests/test_llm_generate.py` | GenerateProcessor tests — selection, forced, generation, integration (§7.8b) |
+| `tests/test_pipeline_integration.py` | Event→Task pipeline E2E tests (§7.6) |
+| `tests/test_graph_mode_pipeline.py` | Graph mode pipeline tests |
+| `tests/test_manifest.py` | SystemManifest loader tests |
 | `tests/test_prebuild.py` | §7.8c pre-build pipeline tests — parsing, prompt, selection, orchestration, integration |
 | `tests/test_co_create.py` | Co-creation flow unit tests |
 | `tests/test_save_manager.py` | Save manager — atomic JSON save/load/delete/list tests |
@@ -91,7 +106,7 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | Command | Purpose |
 |---------|---------|
 | `pytest` | Run all unit tests |
-| `python -m storyloom` | Run the application |
+| `python -m storyloom.web` | Run the application |
 | `bash scripts/build.sh` | Build standalone binary + pip wheel |
 
 ## Conventions

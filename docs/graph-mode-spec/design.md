@@ -365,51 +365,51 @@ DECLARE → TaskGenerator 构造 GENERATE Task（line=0）
 
 ## §7 实现方案
 
-> 每步独立验证，通过后即确定该维度正确性。步骤间依赖明确，不返工。7.4 ∥ 7.5、7.7 ∥ 7.8 可并行。
+> 全部步骤已完成（v2.0.0）。每步独立验证，通过后即确定该维度正确性。
 
-### 7.1 重构管线（仍属 Phase 1）
+### 7.1 重构管线（仍属 Phase 1）✅
 
 StreamParser + StateManager + EventDispatcher 拆分。Event 增加行号字段、现有标签适配。同线程 generator yield 传递。
 
 **验证**：Phase 1 全量测试通过 → **管线拆分正确，无回归**。
 
-### 7.2 素材数据库
+### 7.2 素材数据库 ✅
 
 Asset、AssetLibrary、GameAssetRoster 完整实现——增删、计数、排序截取、清理。提供 UI 管理渠道。规划 `media/` 目录结构。
 
 **验证**：单元测试覆盖所有操作 + 边界条件 → **数据层可独立工作**。
 
-### 7.3 图像 API 与模式配置
+### 7.3 图像 API 与模式配置 ✅
 
 参考 `api_client` 搭建图像生成 API 调用模块。`UserConfig` 添加 `game_mode`（text/graph）及图像 API 配置。`GameSession` 按模式挂载管线。
 
 **验证**：单次图像生成成功 + 文本模式不受影响 → **API 层可独立工作，模式切换正确**。
 
-### 7.4 Task 框架（stub）
+### 7.4 Task 框架 ✅
 
 实现 Task 类 + TaskGenerator + EventDispatcher 行号对齐与绑定。`process` 用固定时长占位，`result` 统一赋值为临时图像。此阶段暂不将 TaskGenerator 注入 Parser（7.6 完成）——通过手动构造事件序列验证管线。测试用例设计为可复用的集成测试，7.6 用真实事件重放同一套用例。
 
 **验证**：stub 管线跑通，所有"素材"为统一临时图像，文本模式不受影响 → **事件-任务-绑定架构正确**。
 
-### 7.5 XML 元素与 Prompt
+### 7.5 XML 元素与 Prompt ✅
 
 新建图像模式叙事 Prompt（含 `<declare>`、`<set var="SCENE">`、`<seg char="...">` 完整说明与示例）。StreamParser 解析新标签，产出对应 Event。Parser 改动最小化——仅增加标签识别，不涉及 TaskGen。文本模式 Prompt 不变。
 
 **验证**：LLM 输出被正确解析为 DECLARE/SCENE/SEG 事件，文本模式无影响 → **LLM 契约正确**。
 
-### 7.6 管线集成
+### 7.6 管线集成 ✅
 
 `GameLoop` 作为管线协调层，装配 Task 子系统并注入 Parser 与 EventDispatcher。运行时 Parser 识别图像标签时触发 TaskGenerator（与 §3.1 虚线触发箭头一致）。文本模式不装配 Task 管线。
 
 **验证**：stub 管线 + 真实事件流端到端跑通 → **集成正确，封装性保持**。
 
-### 7.7 UI 图像模式
+### 7.7 UI 图像模式 ✅
 
 基于已确定的事件格式，设计视觉小说界面（立绘 + 背景 + 文本对话框）。共创阶段新增"素材初始化"过渡界面。文本模式界面保持稳定。
 
 **验证**：真实事件流驱动达到视觉小说演出效果 → **接口正确，UI 与引擎独立**。
 
-### 7.8 AI 集成
+### 7.8 AI 集成 ✅
 
 分三步，逐步替换 stub：
 
@@ -423,11 +423,11 @@ Asset、AssetLibrary、GameAssetRoster 完整实现——增删、计数、排�
 
 **实际决策**：设计原文选择/预构建阶段使用"轻度'思考'"，实际实现使用"无思考"，验证可行。
 
-### 7.9 回归验证
+### 7.9 回归验证 ✅
 
 文本模式全量测试 + 图像模式端到端测试。
 
-**验证**：全部通过 → **Phase 2 交付就绪**。
+**验证**：全部通过（1,030 tests）→ **Phase 2 交付就绪**。
 
 ---
 
