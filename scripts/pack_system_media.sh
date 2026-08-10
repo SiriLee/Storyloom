@@ -121,6 +121,12 @@ archive = sys.argv[2]
 with ZipFile(archive, "w", ZIP_DEFLATED) as zf:
     for root, dirs, files in os.walk(media):
         for fn in files:
+            # Skip runtime-generated thumbnails — the app generates
+            # these on first request and caches them to disk.
+            # See server.py serve_media() line 130-132.
+            base, ext = os.path.splitext(fn)
+            if base.endswith("_thumb") or base.endswith("_thumb_560"):
+                continue
             full = os.path.join(root, fn)
             arcname = os.path.relpath(full, media)
             zf.write(full, arcname)
