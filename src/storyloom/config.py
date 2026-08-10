@@ -83,3 +83,7 @@ TASK_POOL_MAX_WORKERS = 4    # Thread 4 default pool size
 # ── Asset generation (Phase 2 §7.8b) ────────────────────────────
 GENERATE_LIBRARY_TOP_N = 30      # library entries in LLM selection prompt
 GENERATE_REF_IMAGE_COUNT = 3     # max reference images for style guidance
+
+# ── Auto-update ────────────────────────────────────────────────────
+GITHUB_REPO_OWNER = "SiriLee"
+GITHUB_REPO_NAME = "Storyloom"

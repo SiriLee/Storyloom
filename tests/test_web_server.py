@@ -728,3 +728,167 @@ class TestAssets:
         """DELETE with invalid type → 404."""
         res = client.delete("/api/assets/invalid_type/some_id")
         assert res.status_code == 404
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Auto-Update API Tests
+# ═══════════════════════════════════════════════════════════════════
+
+
+def _make_no_update():
+    from storyloom.core.update_manager import UpdateCheckResult, VersionInfo
+    return UpdateCheckResult(
+        app=VersionInfo(current="1.3.0", latest="1.3.0"),
+        system_media=VersionInfo(current="1.1.0", latest="1.1.0"),
+    )
+
+
+def _make_has_update():
+    from storyloom.core.update_manager import UpdateCheckResult, VersionInfo
+    return UpdateCheckResult(
+        app=VersionInfo(current="1.3.0", latest="1.4.0",
+                        release_notes="## v1.4.0"),
+        system_media=VersionInfo(current="1.1.0", latest="1.2.0"),
+    )
+
+
+class TestUpdateAPI:
+    """Tests for /api/update/* endpoints — self-contained, all mocked."""
+
+    @patch("storyloom.web.server.check_for_updates")
+    def test_check_no_update(self, mock_check, client):
+        mock_check.return_value = _make_no_update()
+        resp = client.get("/api/update/check")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["app"]["has_update"] is False
+        assert data["system_media"]["has_update"] is False
+
+    @patch("storyloom.web.server.check_for_updates")
+    def test_check_has_update(self, mock_check, client):
+        mock_check.return_value = _make_has_update()
+        resp = client.get("/api/update/check")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["app"]["has_update"] is True
+        assert data["app"]["latest"] == "1.4.0"
+        assert data["app"]["release_notes"] == "## v1.4.0"
+
+    @patch("storyloom.web.server.check_for_updates")
+    def test_check_force_param(self, mock_check, client):
+        """force=true is passed through to check_for_updates."""
+        mock_check.return_value = _make_no_update()
+        client.get("/api/update/check?force=true")
+        _, kwargs = mock_check.call_args
+        assert kwargs.get("force") is True
+
+    @patch("storyloom.web.server.check_for_updates")
+    def test_check_force_default_false(self, mock_check, client):
+        mock_check.return_value = _make_no_update()
+        client.get("/api/update/check")
+        _, kwargs = mock_check.call_args
+        assert kwargs.get("force") is False
+
+    def test_apply_rejects_empty_layers(self, client):
+        resp = client.post("/api/update/apply", json={})
+        assert resp.status_code == 422
+
+    def test_apply_rejects_invalid_layers(self, client):
+        resp = client.post("/api/update/apply", json={"layers": "not_a_list"})
+        assert resp.status_code == 422
+
+    def test_apply_returns_stream_url(self, client):
+        resp = client.post("/api/update/apply",
+                           json={"layers": ["app", "system_media"]})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "stream_url" in data
+        assert data["stream_url"].startswith("/api/update/stream/")
+
+    def test_stream_invalid_id(self, client):
+        resp = client.get("/api/update/stream/nonexistent")
+        assert resp.status_code == 404
+
+    @patch("storyloom.web.server.download_and_extract")
+    @patch("storyloom.web.server.check_for_updates")
+    def test_stream_app_update_success(
+        self, mock_check, mock_dl, client, app_dir
+    ):
+        """Full SSE stream: apply → stream → done."""
+        mock_check.return_value = _make_has_update()
+
+        # Create system_media/VERSION so _get_system_media_version works
+        sm_dir = app_dir / "system_media"
+        sm_dir.mkdir()
+        (sm_dir / "VERSION").write_text("1.1.0")
+
+        # 1. Apply
+        resp = client.post("/api/update/apply",
+                           json={"layers": ["app"]})
+        assert resp.status_code == 200
+        stream_url = resp.json()["stream_url"]
+        assert stream_url.startswith("/api/update/stream/")
+
+    @patch("storyloom.web.server.download_and_extract")
+    @patch("storyloom.web.server.check_for_updates")
+    def test_stream_unknown_layer_skipped(
+        self, mock_check, mock_dl, client, app_dir
+    ):
+        """Layer with no update → skipped, no download call."""
+        # system_media has no update in this result
+        result = _make_no_update()
+        result.system_media._latest = ""
+        mock_check.return_value = result
+
+        sm_dir = app_dir / "system_media"
+        sm_dir.mkdir()
+        (sm_dir / "VERSION").write_text("1.1.0")
+
+        resp = client.post("/api/update/apply",
+                           json={"layers": ["system_media"]})
+        stream_url = resp.json()["stream_url"]
+
+        with client.stream("GET", stream_url) as s:
+            lines = [l for l in s.iter_lines() if l]
+
+        # Should complete without download
+        mock_dl.assert_not_called()
+
+    @patch("storyloom.web.server.download_and_extract")
+    @patch("storyloom.web.server.check_for_updates")
+    def test_stream_download_error(
+        self, mock_check, mock_dl, client, app_dir
+    ):
+        """Download failure → error event."""
+        mock_check.return_value = _make_has_update()
+
+        # Make download_and_extract raise to simulate download failure
+        # The run_update catches Exception and sends error event
+        # But since url fetching happens inside run_update via
+        # _http_get_json (inline import), we need to also patch that
+        # to avoid real network calls.  We'll patch at the update_manager
+        # module level since that's where the inline imports resolve.
+        with patch(
+            "storyloom.core.update_manager._http_get_json"
+        ) as mock_http:
+            mock_http.return_value = {
+                "tag_name": "v1.4.0",
+                "assets": [
+                    {"name": "storyloom-v1.4.0-Linux.zip",
+                     "browser_download_url": "https://example.com/a.zip"},
+                ],
+            }
+            mock_dl.side_effect = RuntimeError("connection reset")
+
+            sm_dir = app_dir / "system_media"
+            sm_dir.mkdir()
+            (sm_dir / "VERSION").write_text("1.1.0")
+
+            resp = client.post("/api/update/apply",
+                               json={"layers": ["app"]})
+            stream_url = resp.json()["stream_url"]
+
+            with client.stream("GET", stream_url) as s:
+                lines = [l for l in s.iter_lines() if l]
+                events = [l for l in lines if l.startswith("event:")]
+                assert "event: error" in events

@@ -10,7 +10,7 @@ import sys
 import tempfile
 import time
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -46,12 +46,11 @@ class VersionInfo:
     current: str  # "1.3.0"
     latest: str   # "1.4.0" (empty if no update or offline)
     release_notes: str = ""
+    has_update: bool = field(default=False, init=False)
 
-    @property
-    def has_update(self) -> bool:
-        if not self.latest:
-            return False
-        return _version_gt(self.latest, self.current)
+    def __post_init__(self):
+        if self.latest:
+            self.has_update = _version_gt(self.latest, self.current)
 
 
 @dataclass

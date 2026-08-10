@@ -50,24 +50,36 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from storyloom.config import DEFAULT_IMG_BASE_URL, DEFAULT_MEDIA_DIR, SUPPORTED_LANGUAGES, CLEANUP_KEEP_COUNT
+from storyloom.config import DEFAULT_IMG_BASE_URL, DEFAULT_MEDIA_DIR, SUPPORTED_LANGUAGES, CLEANUP_KEEP_COUNT, GITHUB_REPO_OWNER, GITHUB_REPO_NAME
 from storyloom.core.co_create import CoCreateError
 from storyloom.core.save_manager import SaveManager
 from storyloom.core.session import GameSession
+from storyloom.core.update_manager import (
+    check_for_updates,
+    download_and_extract,
+    UpdateCheckResult,
+    UpdateProgress,
+)
 from storyloom.i18n import init_i18n, switch_language
 from storyloom.io.api_client import ApiClient
 from storyloom.user_config import UserConfig
 from storyloom.web import sessions
+from storyloom import __version__
 
 # ── App setup ──────────────────────────────────────────────────────
 
 _STATIC = Path(__file__).resolve().parent / "static"
 
-# App directory — where config.json / locale / saves live.
+# App directory — where config.json / locale / saves / media / system_media live.
 # Dev: repo root (server.py → web → storyloom → src → repo root).
-# PyInstaller: next to the executable (sys.executable).
+# PyInstaller (new launcher layout): exe at <root>/app/storyloom-web → root = ../..
+# PyInstaller (old flat layout): exe at <root>/storyloom-web → root = .
 if getattr(sys, 'frozen', False):
-    _PROJECT_ROOT = Path(sys.executable).parent
+    exe_dir = Path(sys.executable).parent
+    if exe_dir.name == "app":
+        _PROJECT_ROOT = exe_dir.parent
+    else:
+        _PROJECT_ROOT = exe_dir
 else:
     _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _APP_DIR = os.environ.get("STORYLOOM_APP_DIR", str(_PROJECT_ROOT))
@@ -196,6 +208,10 @@ class ConfigUpdate(BaseModel):
     img_api_model: str | None = None
     portrait_remove_bg: str | None = None
     img_generation_enabled: bool | None = None
+
+
+class ApplyUpdateRequest(BaseModel):
+    layers: list[str]  # e.g. ["app", "system_media"]
 
 
 @app.post("/api/config")
@@ -985,6 +1001,161 @@ async def saves_delete(game_id: str, filename: str):
     except FileNotFoundError:
         raise HTTPException(404, f"Game not found: {game_id}")
     return {"status": "deleted" if deleted else "not_found"}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Auto-Update
+# Spec: docs/superpowers/specs/2026-08-10-auto-update-design.md §5
+# ═══════════════════════════════════════════════════════════════════
+
+
+def _get_system_media_version() -> str:
+    """Read system_media version from VERSION file, or '' if missing."""
+    version_file = os.path.join(_APP_DIR, "system_media", "VERSION")
+    try:
+        with open(version_file, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except (OSError, FileNotFoundError):
+        return ""
+
+
+@app.get("/api/update/check")
+async def update_check(force: bool = False):
+    """Check GitHub Releases for available updates."""
+    sm_ver = _get_system_media_version()
+    result = check_for_updates(
+        app_version=__version__,
+        system_media_version=sm_ver,
+        force=force,
+    )
+    return result
+
+
+@app.post("/api/update/apply")
+async def update_apply(req: ApplyUpdateRequest):
+    """Start downloading and extracting update layers.
+
+    Returns a stream URL for SSE progress tracking.
+    """
+    stream_id = os.urandom(8).hex()
+    sessions.update_store[stream_id] = {
+        "layers": req.layers,
+        "status": "pending",
+    }
+    return {"stream_url": f"/api/update/stream/{stream_id}"}
+
+
+@app.get("/api/update/stream/{stream_id}")
+async def update_stream(stream_id: str):
+    """SSE endpoint for update download progress."""
+    import asyncio
+    import threading
+
+    params = sessions.update_store.pop(stream_id, None)
+    if not params:
+        raise HTTPException(404, "Unknown or expired stream ID")
+
+    q: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
+    def run_update():
+        try:
+            layers = params["layers"]
+            results = {}
+            sm_ver = _get_system_media_version()
+            check = check_for_updates(__version__, sm_ver, force=False)
+
+            for layer in layers:
+                if layer == "app" and check.app.latest:
+                    from storyloom.core.update_manager import (
+                        _http_get_json,
+                        _find_asset_url,
+                        GITHUB_API_RELEASES,
+                    )
+                    release = _http_get_json(GITHUB_API_RELEASES)
+                    assets = release.get("assets", [])
+                    url, _ = _find_asset_url(
+                        assets, "storyloom-v", platform_specific=True
+                    )
+                elif layer == "system_media" and check.system_media.latest:
+                    from storyloom.core.update_manager import (
+                        _http_get_json,
+                        _find_asset_url,
+                        GITHUB_API_RELEASES,
+                    )
+                    release = _http_get_json(GITHUB_API_RELEASES)
+                    assets = release.get("assets", [])
+                    url, _ = _find_asset_url(
+                        assets, "system_media-v", platform_specific=False
+                    )
+                else:
+                    continue
+
+                if not url:
+                    continue
+
+                def progress_cb(p: UpdateProgress):
+                    loop.call_soon_threadsafe(
+                        q.put_nowait,
+                        {
+                            "type": "progress",
+                            "layer": p.layer,
+                            "stage": p.stage,
+                            "received": p.received,
+                            "total": p.total,
+                            "error": p.error,
+                        },
+                    )
+
+                download_and_extract(
+                    layer=layer,
+                    url=url,
+                    target_root=_APP_DIR,
+                    progress_callback=progress_cb,
+                )
+
+                results[layer] = (
+                    check.app.latest
+                    if layer == "app"
+                    else check.system_media.latest
+                )
+
+            loop.call_soon_threadsafe(
+                q.put_nowait, {"type": "done", "layers": results}
+            )
+        except Exception as exc:
+            loop.call_soon_threadsafe(
+                q.put_nowait, {"type": "error", "error": str(exc)}
+            )
+        finally:
+            try:
+                loop.call_soon_threadsafe(q.put_nowait, None)
+            except RuntimeError:
+                pass
+
+    thread = threading.Thread(target=run_update, daemon=True)
+    thread.start()
+
+    async def event_generator():
+        while True:
+            event = await q.get()
+            if event is None:
+                break
+            etype = event.get("type", "")
+            data = json.dumps(event, ensure_ascii=False)
+            yield f"event: {etype}\ndata: {data}\n\n"
+            if etype in ("done", "error"):
+                break
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════

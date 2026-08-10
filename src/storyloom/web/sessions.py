@@ -226,3 +226,8 @@ def wait_for_choice(game_id: str, timeout: float = 300.0) -> str:
     if not signaled:
         return "1"
     return _game_choices.pop(game_id, "1")
+
+
+# ── Auto-update store ──────────────────────────────────────────────
+
+update_store: dict = {}  # stream_id → {layers: list[str], status: str}
