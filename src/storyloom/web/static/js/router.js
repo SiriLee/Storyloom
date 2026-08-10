@@ -388,7 +388,7 @@
             { id: "api",        icon: "key",     label: _("API") },
             { id: "image",      icon: "image",   label: _("Image") },
             { id: "appearance", icon: "palette", label: _("Appearance") },
-            { id: "updates",    icon: "refresh", label: _("Updates") },
+            { id: "updates",    icon: "download", label: _("Updates") },
         ];
         var secondarySections = [
             { id: "guide",      icon: "book",    label: _("API Guide") },
@@ -657,17 +657,15 @@
 
     function _renderUpdatesSection(container) {
         container.innerHTML =
-            _sectionHeading(Icons.refresh, _("Updates"), "updates")
+            _sectionHeading(Icons.download, _("Updates"), "updates")
             + '<div class="settings-card">'
-            + '<div class="settings-card-title">' + Icons.refresh() + esc(_("Updates")) + '</div>'
+            + '<div class="settings-card-title">' + Icons.download() + esc(_("Updates")) + '</div>'
             + '<div class="settings-row">'
             + '<span class="settings-row-label">' + esc(_("Current Version")) + '</span>'
             + '<span class="settings-row-value" id="update-current-ver">...</span>'
-            + '<button class="settings-row-edit" id="btn-check-update" '
-            + 'style="width:auto;padding:0.35rem 0.9rem;border:1px solid var(--border-color);'
-            + 'border-radius:var(--radius-sm);font-family:var(--font-sans);font-size:0.85rem">'
-            + esc(_("Check for Updates")) + '</button>'
             + '</div>'
+            + '<button class="settings-update-btn" id="btn-check-update">'
+            + Icons.download() + esc(_("Check for Updates")) + '</button>'
             + '</div>';
 
         /* Lazy-load current version */
@@ -679,18 +677,17 @@
             if (el) el.textContent = "?";
         });
 
-        /* Bind update check button — direct API call.  Do NOT go through
-           _bindUpdateCheck() (it would add ANOTHER click handler on every
-           click, accumulating listeners).  Replicates the same flow inline. */
+        /* Bind update check button */
         var btn = document.getElementById("btn-check-update");
         if (btn) {
             btn.addEventListener("click", function () {
+                var origHTML = btn.innerHTML;
                 btn.disabled = true;
-                btn.textContent = "...";
+                btn.innerHTML = Icons.download() + " ...";
 
                 API.get("/api/update/check?force=true").then(function (result) {
                     btn.disabled = false;
-                    btn.textContent = _("Check for Updates");
+                    btn.innerHTML = Icons.download() + esc(_("Check for Updates"));
                     var el = document.getElementById("update-current-ver");
                     if (el) el.textContent = result.app.current;
 
@@ -701,7 +698,7 @@
                     _showUpdatePopup(result);
                 }).catch(function (err) {
                     btn.disabled = false;
-                    btn.textContent = _("Check for Updates");
+                    btn.innerHTML = Icons.download() + esc(_("Check for Updates"));
                     showToast(_("Check failed") + ": " + err.message);
                 });
             });

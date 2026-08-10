@@ -3205,6 +3205,39 @@ button.accent:hover, .btn-accent:hover {
     color: var(--text-secondary);
 }
 
+/* ── Update Button (accent, full-width, standalone) ──────────────── */
+
+.settings-update-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border: none;
+    border-radius: var(--radius-lg);
+    background: var(--text-accent);
+    color: #fff;
+    font-family: var(--font-sans);
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter var(--trans-normal), box-shadow var(--trans-normal);
+    margin-top: 0.5rem;
+}
+
+.settings-update-btn:hover {
+    filter: brightness(1.1);
+    box-shadow: var(--shadow-glow);
+}
+
+.settings-update-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: none;
+    box-shadow: none;
+}
+
 /* ── Toast: error variant ────────────────────────────────────────── */
 
 .toast--error {
