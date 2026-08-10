@@ -61,20 +61,34 @@ for atype_key, src_fname in [
     m_ids = set(manifest["assets"][atype_key])
     s_ids = set(src)
     subdir = os.path.join(media, atype_key)
-    f_ids = {f[:-4] for f in os.listdir(subdir)} if os.path.isdir(subdir) else set()
+    # Disk has thumbnails (_thumb, _thumb_560) alongside base PNGs —
+    # strip suffixes so only base IDs are compared against the manifest.
+    # Use os.path.splitext to handle both .png and .webp extensions.
+    _all = {os.path.splitext(f)[0] for f in os.listdir(subdir)} if os.path.isdir(subdir) else set()
+    _base = {r.replace("_thumb_560", "").replace("_thumb", "") for r in _all}
+    _unknown = {e for e in (_all - m_ids)
+                if not e.endswith("_thumb")
+                and not e.endswith("_thumb_560")}
 
-    print(f"  {atype_key}: manifest={len(m_ids)}  source={len(s_ids)}  files={len(f_ids)}")
+    print(f"  {atype_key}: manifest={len(m_ids)}"
+          f"  source={len(s_ids)}  files={len(_all)}")
 
     if m_ids != s_ids:
         print(f"  ERROR: manifest != source", file=sys.stderr)
+        if m_ids - s_ids:
+            print(f"    In manifest but not source: {sorted(m_ids - s_ids)}",
+                  file=sys.stderr)
+        if s_ids - m_ids:
+            print(f"    In source but not manifest: {sorted(s_ids - m_ids)}",
+                  file=sys.stderr)
         ok = False
-    if m_ids != f_ids:
-        print(f"  ERROR: manifest != disk files", file=sys.stderr)
-        missing = m_ids - f_ids
-        extra = f_ids - m_ids
-        if missing: print(f"    Missing on disk: {missing}", file=sys.stderr)
-        if extra:  print(f"    Extra on disk:   {extra}", file=sys.stderr)
+    missing = m_ids - _base
+    if missing:
+        print(f"  ERROR: missing on disk — {sorted(missing)}", file=sys.stderr)
         ok = False
+    if _unknown:
+        print(f"  WARNING: unexpected files on disk — {sorted(_unknown)}",
+              file=sys.stderr)
     for aid in m_ids & s_ids:
         if manifest["assets"][atype_key][aid]["name"] != src[aid]["name"]:
             print(f"  ERROR: {aid} name mismatch", file=sys.stderr)

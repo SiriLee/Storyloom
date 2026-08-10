@@ -16,9 +16,9 @@ from urllib.request import Request, urlopen
 
 # ── Config ────────────────────────────────────────────────────────
 
-GITHUB_API_RELEASES = (
-    "https://api.github.com/repos/SiriLee/Storyloom/releases/latest"
-)
+_GITHUB_API_BASE = "https://api.github.com/repos/SiriLee/Storyloom/releases"
+_GITHUB_API_LATEST = f"{_GITHUB_API_BASE}/latest"
+_GITHUB_API_SYSTEM_MEDIA = f"{_GITHUB_API_BASE}/tags/system-media"
 CACHE_SECONDS = 900  # 15 minutes
 
 # Per spec §4.3
@@ -165,6 +165,57 @@ def _download_file(url: str, dest: str, progress_callback=None) -> None:
 # ── Public API ────────────────────────────────────────────────────
 
 
+def _check_app_update(app_version: str) -> VersionInfo:
+    """Query ``releases/latest`` for the app layer.
+
+    Returns a ``VersionInfo`` with ``latest=""`` on any error (offline,
+    rate-limited, etc.) so one layer's failure never blocks the other.
+    """
+    try:
+        release = _http_get_json(_GITHUB_API_LATEST)
+    except Exception:
+        return VersionInfo(current=app_version, latest="")
+
+    assets = release.get("assets", [])
+    release_notes = release.get("body", "")
+    remote_tag = release.get("tag_name", "")
+    remote_app_ver = _parse_version_from_tag(remote_tag)
+    app_url, _ = _find_asset_url(assets, "storyloom-v", platform_specific=True)
+
+    return VersionInfo(
+        current=app_version,
+        latest=remote_app_ver,
+        release_notes=release_notes,
+        asset_url=app_url or "",
+    )
+
+
+def _check_system_media_update(system_media_version: str) -> VersionInfo:
+    """Query the ``system-media`` release tag for the system_media layer.
+
+    The ``system-media`` release is versioned independently from the app
+    (its assets carry the version in the filename, e.g.
+    ``system_media-v1.1.0.zip``).
+
+    Returns a ``VersionInfo`` with ``latest=""`` on any error.
+    """
+    try:
+        release = _http_get_json(_GITHUB_API_SYSTEM_MEDIA)
+    except Exception:
+        return VersionInfo(current=system_media_version, latest="")
+
+    assets = release.get("assets", [])
+    sm_url, remote_sm_ver = _find_asset_url(
+        assets, "system_media-v", platform_specific=False
+    )
+
+    return VersionInfo(
+        current=system_media_version,
+        latest=remote_sm_ver or "",
+        asset_url=sm_url or "",
+    )
+
+
 def check_for_updates(
     app_version: str,
     system_media_version: str,
@@ -173,6 +224,13 @@ def check_for_updates(
 ) -> UpdateCheckResult:
     """Check GitHub Releases for available updates.
 
+    Queries two independent releases:
+      - ``releases/latest`` for the app layer.
+      - ``releases/tags/system-media`` for the system_media layer.
+
+    Each layer fails independently — a network error on one never
+    prevents the other from reporting results.
+
     Args:
         app_version: Current app version (``storyloom.__version__``).
         system_media_version: Current system_media version (from ``VERSION`` file).
@@ -180,7 +238,6 @@ def check_for_updates(
 
     Returns:
         ``UpdateCheckResult`` with version info for each layer.
-        On network errors, both layers return empty ``latest`` strings.
     """
     global _cache
 
@@ -188,41 +245,9 @@ def check_for_updates(
     if not force and _cache["data"] is not None and (now - _cache["ts"]) < CACHE_SECONDS:
         return _cache["data"]
 
-    try:
-        release = _http_get_json(GITHUB_API_RELEASES)
-    except Exception:
-        result = UpdateCheckResult(
-            app=VersionInfo(current=app_version, latest=""),
-            system_media=VersionInfo(current=system_media_version, latest=""),
-        )
-        _cache = {"ts": now, "data": result}
-        return result
-
-    assets = release.get("assets", [])
-    release_notes = release.get("body", "")
-
-    remote_tag = release.get("tag_name", "")
-    remote_app_ver = _parse_version_from_tag(remote_tag)
-
-    app_url, _ = _find_asset_url(
-        assets, "storyloom-v", platform_specific=True
-    )
-    sm_url, remote_sm_ver = _find_asset_url(
-        assets, "system_media-v", platform_specific=False
-    )
-
     result = UpdateCheckResult(
-        app=VersionInfo(
-            current=app_version,
-            latest=remote_app_ver,
-            release_notes=release_notes,
-            asset_url=app_url or "",
-        ),
-        system_media=VersionInfo(
-            current=system_media_version,
-            latest=remote_sm_ver or "",
-            asset_url=sm_url or "",
-        ),
+        app=_check_app_update(app_version),
+        system_media=_check_system_media_update(system_media_version),
     )
 
     _cache = {"ts": now, "data": result}

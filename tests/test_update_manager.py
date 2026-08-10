@@ -129,31 +129,66 @@ def test_find_asset_url_not_found():
 # ── Version check tests ───────────────────────────────────────────
 
 
-def _make_release_json(tag="v1.4.0", assets=None, body="## Release notes"):
+def _make_app_release(tag="v1.4.0", assets=None, body="## Release notes"):
+    """Build a mock response for the app release (``releases/latest``)."""
+    import sys
+    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
+    if assets is None:
+        assets = [
+            {"name": f"storyloom-{tag}-{plat}.zip",
+             "browser_download_url": "https://example.com/app.zip"},
+        ]
     return {
         "tag_name": tag,
         "body": body,
-        "assets": assets or [
-            {"name": "storyloom-v1.4.0-Linux.zip",
-             "browser_download_url": "https://example.com/app.zip"},
+        "assets": assets,
+    }
+
+
+def _make_sm_release(assets=None):
+    """Build a mock response for the system-media release tag."""
+    if assets is None:
+        assets = [
             {"name": "system_media-v1.2.0.zip",
              "browser_download_url": "https://example.com/sm.zip"},
-        ],
+        ]
+    return {
+        "tag_name": "system-media",
+        "body": "",
+        "assets": assets,
     }
+
+
+def _patch_updates(mock_get, *, app_release, sm_release):
+    """Set up the dual-release mock.
+
+    ``_http_get_json`` is called twice per ``check_for_updates()`` —
+    once for ``releases/latest`` (app) and once for
+    ``releases/tags/system-media``.  Route by URL substring.
+    """
+    def _dispatch(url):
+        if "/tags/system-media" in url:
+            return sm_release
+        return app_release
+
+    mock_get.side_effect = _dispatch
 
 
 @patch("storyloom.core.update_manager._http_get_json")
 def test_check_no_update(mock_get):
     import sys
-    plat = {"win32": "Windows", "darwin": "macOS"}.get(
-        sys.platform, "Linux"
+    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
+    _patch_updates(
+        mock_get,
+        app_release=_make_app_release(tag="v1.3.0", assets=[
+            {"name": f"storyloom-v1.3.0-{plat}.zip",
+             "browser_download_url": "https://example.com/app.zip"},
+        ]),
+        sm_release=_make_sm_release(assets=[
+            {"name": "system_media-v1.1.0.zip",
+             "browser_download_url": "https://example.com/sm.zip"},
+        ]),
     )
-    mock_get.return_value = _make_release_json(tag="v1.3.0", assets=[
-        {"name": f"storyloom-v1.3.0-{plat}.zip",
-         "browser_download_url": "https://example.com/app.zip"},
-        {"name": "system_media-v1.1.0.zip",
-         "browser_download_url": "https://example.com/sm.zip"},
-    ])
     result = check_for_updates("1.3.0", "1.1.0", force=True)
     assert result.app.has_update is False
     assert result.system_media.has_update is False
@@ -162,15 +197,18 @@ def test_check_no_update(mock_get):
 @patch("storyloom.core.update_manager._http_get_json")
 def test_check_app_update(mock_get):
     import sys
-    plat = {"win32": "Windows", "darwin": "macOS"}.get(
-        sys.platform, "Linux"
+    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
+    _patch_updates(
+        mock_get,
+        app_release=_make_app_release(tag="v1.4.0", assets=[
+            {"name": f"storyloom-v1.4.0-{plat}.zip",
+             "browser_download_url": "https://example.com/app.zip"},
+        ]),
+        sm_release=_make_sm_release(assets=[
+            {"name": "system_media-v1.2.0.zip",
+             "browser_download_url": "https://example.com/sm.zip"},
+        ]),
     )
-    mock_get.return_value = _make_release_json(tag="v1.4.0", assets=[
-        {"name": f"storyloom-v1.4.0-{plat}.zip",
-         "browser_download_url": "https://example.com/app.zip"},
-        {"name": "system_media-v1.2.0.zip",
-         "browser_download_url": "https://example.com/sm.zip"},
-    ])
     result = check_for_updates("1.3.0", "1.1.0", force=True)
     assert result.app.has_update is True
     assert result.app.latest == "1.4.0"
@@ -180,17 +218,17 @@ def test_check_app_update(mock_get):
 @patch("storyloom.core.update_manager._http_get_json")
 def test_check_system_media_update(mock_get):
     import sys
-    plat = {"win32": "Windows", "darwin": "macOS"}.get(
-        sys.platform, "Linux"
-    )
-    mock_get.return_value = _make_release_json(
-        tag="v1.3.0",
-        assets=[
+    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
+    _patch_updates(
+        mock_get,
+        app_release=_make_app_release(tag="v1.3.0", assets=[
             {"name": f"storyloom-v1.3.0-{plat}.zip",
              "browser_download_url": "https://example.com/app.zip"},
+        ]),
+        sm_release=_make_sm_release(assets=[
             {"name": "system_media-v1.2.0.zip",
              "browser_download_url": "https://example.com/sm.zip"},
-        ],
+        ]),
     )
     result = check_for_updates("1.3.0", "1.1.0", force=True)
     assert result.system_media.has_update is True
@@ -200,15 +238,14 @@ def test_check_system_media_update(mock_get):
 @patch("storyloom.core.update_manager._http_get_json")
 def test_check_no_system_media_asset(mock_get):
     import sys
-    plat = {"win32": "Windows", "darwin": "macOS"}.get(
-        sys.platform, "Linux"
-    )
-    mock_get.return_value = _make_release_json(
-        tag="v1.3.0",
-        assets=[
+    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
+    _patch_updates(
+        mock_get,
+        app_release=_make_app_release(tag="v1.3.0", assets=[
             {"name": f"storyloom-v1.3.0-{plat}.zip",
              "browser_download_url": "https://example.com/app.zip"},
-        ],
+        ]),
+        sm_release=_make_sm_release(assets=[]),  # no system_media asset
     )
     result = check_for_updates("1.3.0", "1.1.0", force=True)
     assert result.system_media.has_update is False
@@ -217,46 +254,42 @@ def test_check_no_system_media_asset(mock_get):
 
 @patch("storyloom.core.update_manager._http_get_json")
 def test_check_api_error_returns_empty(mock_get):
+    """Every layer fails independently — app error doesn't block sm, and
+    vice versa.  When both API calls throw, both layers are empty."""
     mock_get.side_effect = RuntimeError("rate limited")
     result = check_for_updates("1.3.0", "1.1.0", force=True)
     assert result.app.has_update is False
     assert result.app.latest == ""
     assert result.system_media.has_update is False
-
-
-def _mock_release_with_platform(tag, include_app=True):
-    import sys
-    plat = {"win32": "Windows", "darwin": "macOS"}.get(
-        sys.platform, "Linux"
-    )
-    assets = []
-    if include_app:
-        assets.append({
-            "name": f"storyloom-{tag}-{plat}.zip",
-            "browser_download_url": "https://example.com/app.zip",
-        })
-    assets.append({
-        "name": f"system_media-v1.2.0.zip",
-        "browser_download_url": "https://example.com/sm.zip",
-    })
-    return {"tag_name": tag, "body": "## Release notes", "assets": assets}
+    assert result.system_media.latest == ""
 
 
 @patch("storyloom.core.update_manager._http_get_json")
 def test_check_cache(mock_get):
-    mock_get.return_value = _mock_release_with_platform("v1.4.0")
+    _patch_updates(
+        mock_get,
+        app_release=_make_app_release(tag="v1.4.0"),
+        sm_release=_make_sm_release(),
+    )
+    # force=True → 2 HTTP calls (one per layer)
     r1 = check_for_updates("1.3.0", "1.1.0", force=True)
-    assert mock_get.call_count == 1
+    assert mock_get.call_count == 2
+    # force=False → cached, 0 additional calls
     r2 = check_for_updates("1.3.0", "1.1.0", force=False)
-    assert mock_get.call_count == 1  # cached
+    assert mock_get.call_count == 2
     assert r2.app.latest == r1.app.latest
+    # force=True → bypass cache, 2 more calls
     r3 = check_for_updates("1.3.0", "1.1.0", force=True)
-    assert mock_get.call_count == 2  # force bypass
+    assert mock_get.call_count == 4
 
 
 @patch("storyloom.core.update_manager._http_get_json")
 def test_check_prerelease_no_downgrade(mock_get):
-    mock_get.return_value = _mock_release_with_platform("v1.4.0")
+    _patch_updates(
+        mock_get,
+        app_release=_make_app_release(tag="v1.4.0"),
+        sm_release=_make_sm_release(),
+    )
     result = check_for_updates("1.5.0-dev", "1.1.0", force=True)
     assert result.app.has_update is False
 

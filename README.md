@@ -32,7 +32,14 @@ Both are optional — `pip install -e .` gives you a working app either way.
 Graph mode needs a one-time asset download into your working directory:
 
 ```bash
-python3 -c "import urllib.request as u,zipfile as z;u.urlretrieve('https://github.com/SiriLee/Storyloom/releases/download/v2.0.0/system_media-v1.0.0.zip','_sm.zip');z.ZipFile('_sm.zip').extractall('system_media');print('OK')" && rm _sm.zip
+# 1. Download system media assets (~267 MB)
+curl -L -o _sm.zip https://github.com/SiriLee/Storyloom/releases/download/system-media/system_media-v1.1.0.zip
+
+# 2. Extract to system_media/
+python3 -c "import zipfile; zipfile.ZipFile('_sm.zip').extractall('system_media')"
+
+# 3. Clean up
+rm _sm.zip
 ```
 
 ---

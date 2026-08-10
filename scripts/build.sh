@@ -43,9 +43,9 @@ echo "--- Building pip packages ---"
 $PYTHON -m build --no-isolation
 
 # System media: use local copy or download from GitHub Release.
-SM_VERSION="1.0.0"
+SM_VERSION="1.1.0"
 SM_ZIP="system_media-v${SM_VERSION}.zip"
-SM_URL="https://github.com/SiriLee/Storyloom/releases/download/v${VERSION}/${SM_ZIP}"
+SM_URL="https://github.com/SiriLee/Storyloom/releases/download/system-media/${SM_ZIP}"
 
 # Portable check: manifest exists AND both directories contain at least one PNG.
 _has_media() {
