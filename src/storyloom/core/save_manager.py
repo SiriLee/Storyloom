@@ -375,7 +375,12 @@ class SaveManager:
                 continue
             meta = data.get("metadata", {})
             sc = data.get("story_config", {})
-            save_files = list(game_dir.glob("*.json"))
+            # Exclude _asset_roster.json — it's an asset registry, not a
+            # save file, and lacks metadata.updated_at.  Including it in
+            # the newest-file heuristic would produce an empty
+            # last_played_at for image/graph-mode games.
+            save_files = [p for p in game_dir.glob("*.json")
+                          if p.name != "_asset_roster.json"]
             save_count = len(save_files)
             game_data = {
                 "game_id": game_dir.name,
