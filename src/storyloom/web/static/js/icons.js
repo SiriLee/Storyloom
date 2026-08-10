@@ -158,6 +158,44 @@
             + '<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
     };
 
+    /* ── Card-specific (not reused from section headings) ───────── */
+
+    I.language = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="2" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M5 8l6 6m-6 0l6-6m2-3h7m-3.5 0L18 15l-1.5-4H12m-2 7h.01"/></svg>';
+    };
+
+    I.gamepad = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="2" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<line x1="6" y1="11" x2="10" y2="11"/>'
+            + '<line x1="8" y1="9" x2="8" y2="13"/>'
+            + '<line x1="15" y1="12" x2="15.01" y2="12"/>'
+            + '<line x1="18" y1="10" x2="18.01" y2="10"/>'
+            + '<path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></svg>';
+    };
+
+    I.sparkle = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="2" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5z"/>'
+            + '<path d="M18 14l.7 2.8L21 17l-2.3.7L18 20l-.7-2.3L15 17l2.3-.7z"/></svg>';
+    };
+
+    I.scissors = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="2" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<circle cx="6" cy="6" r="3"/>'
+            + '<circle cx="6" cy="18" r="3"/>'
+            + '<line x1="20" y1="4" x2="8.12" y2="15.88"/>'
+            + '<line x1="8.12" y1="8.12" x2="20" y2="20"/></svg>';
+    };
+
     /* ── Media Controls ──────────────────────────────────────────── */
 
     I.play = function () {

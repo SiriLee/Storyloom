@@ -2775,9 +2775,11 @@ button.accent:hover, .btn-accent:hover {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    /* Reserve space so switching to input doesn't shift layout */
+    /* Same box height as .settings-row-input */
+    padding: 0.4rem 0.6rem;
     min-height: 2rem;
-    line-height: 2rem;
+    line-height: 1.4;
+    box-sizing: border-box;
 }
 
 .settings-row-value.muted {
@@ -2795,8 +2797,8 @@ button.accent:hover, .btn-accent:hover {
     font-family: var(--font-mono);
     font-size: 0.87rem;
     outline: none;
-    /* Match the width of the value display to prevent jump */
     box-sizing: border-box;
+    text-align: right;
 }
 
 .settings-row-select {
@@ -2865,14 +2867,15 @@ button.accent:hover, .btn-accent:hover {
 /* ── Segmented Control (MXU-style: individual rounded buttons) ──── */
 
 .settings-seg-group {
-    display: flex;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
     width: 100%;
     gap: 0.5rem;
 }
 
 .settings-seg-btn {
-    flex: 1;
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 0.6rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     background: var(--bg-primary);
@@ -2882,7 +2885,6 @@ button.accent:hover, .btn-accent:hover {
     font-weight: 500;
     cursor: pointer;
     transition: all var(--trans-normal);
-    white-space: nowrap;
     text-align: center;
 }
 
@@ -2938,6 +2940,7 @@ button.accent:hover, .btn-accent:hover {
 
 .settings-credits-name {
     font-size: 0.95rem;
+    font-weight: 600;
     color: var(--text-primary);
     display: flex;
     flex-wrap: wrap;

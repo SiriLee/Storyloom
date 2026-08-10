@@ -519,7 +519,7 @@
         container.innerHTML =
             _sectionHeading(Icons.globe, _("General"), "general")
             + '<div class="settings-card">'
-            + '<div class="settings-card-title">' + Icons.globe() + esc(_("Language")) + '</div>'
+            + '<div class="settings-card-title">' + Icons.language() + esc(_("Language")) + '</div>'
             + '<div class="lang-grid">'
             + _langBtn("system", _("System"), lang, false)
             + _langBtn("zh-CN", "中文", lang, false)
@@ -530,7 +530,7 @@
             + '</div>'
             + '</div>'
             + '<div class="settings-card">'
-            + '<div class="settings-card-title">' + Icons.key() + esc(_("Game Mode")) + '</div>'
+            + '<div class="settings-card-title">' + Icons.gamepad() + esc(_("Game Mode")) + '</div>'
             + _settingSegmented("game_mode", "", [
                 { value: "text", label: _("Text") },
                 { value: "graph", label: _("Graph") },
@@ -567,7 +567,7 @@
         container.innerHTML =
             _sectionHeading(Icons.image, _("Image"), "image")
             + '<div class="settings-card">'
-            + '<div class="settings-card-title">' + Icons.image() + esc(_("Image Generation")) + '</div>'
+            + '<div class="settings-card-title">' + Icons.sparkle() + esc(_("Image Generation")) + '</div>'
             + _settingToggle("img_generation_enabled", _("Image Generation"))
             + '</div>';
 
@@ -580,7 +580,7 @@
                 + _settingText("img_api_model", _("Image Model"), "flux-2-pro")
                 + '</div>'
                 + '<div class="settings-card">'
-                + '<div class="settings-card-title">' + Icons.image() + esc(_("Sprite Cutout")) + '</div>'
+                + '<div class="settings-card-title">' + Icons.scissors() + esc(_("Sprite Cutout")) + '</div>'
                 + _settingSegmented("portrait_remove_bg", "", [
                     { value: "never", label: _("Never") },
                     { value: "auto", label: _("Auto") },
