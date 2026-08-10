@@ -150,6 +150,12 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/help")
+async def help_page():
+    """Serve the API setup guide."""
+    return FileResponse(str(_STATIC / "help.html"))
+
+
 # ═══════════════════════════════════════════════════════════════════
 # Config — thin pass-through to UserConfig
 # ═══════════════════════════════════════════════════════════════════
