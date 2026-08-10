@@ -699,6 +699,11 @@ button.accent:hover, .btn-accent:hover {
     height: 100%;
     object-fit: cover;
     display: block;
+    transition: transform var(--trans-slow);
+}
+
+.am-card:hover .am-card-img img {
+    transform: scale(1.06);
 }
 
 /* ── Text overlay — gradient at bottom ─────────────────────────── */
@@ -739,7 +744,6 @@ button.accent:hover, .btn-accent:hover {
 
 .am-card:hover .am-card-desc {
     white-space: normal;
-    overflow: visible;
 }
 
 .am-card-usage {
