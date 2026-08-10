@@ -2872,10 +2872,21 @@ button.accent:hover, .btn-accent:hover {
 
 /* ── Segmented Control (MXU-style: individual rounded buttons) ──── */
 
-.settings-seg-group {
+/* ── Segmented controls / language grid share the same base ────── */
+
+.settings-seg-group,
+.lang-grid {
     display: grid;
-    flex: 1;
     gap: 0.5rem;
+}
+
+.settings-seg-group {
+    flex: 1;
+    /* grid-template-columns set inline by JS: repeat(N, 1fr) */
+}
+
+.lang-grid {
+    grid-template-columns: repeat(3, 1fr);
 }
 
 .settings-seg-btn {
