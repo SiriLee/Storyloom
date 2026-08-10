@@ -128,7 +128,8 @@ case "$(uname -s)" in
 esac
 ZIP_NAME="storyloom-v${VERSION}-${PLATFORM}"
 ZIP_DIR="storyloom-v${VERSION}"
-$PYTHON -c "import shutil; shutil.make_archive('dist/$ZIP_NAME', 'zip', 'dist', '$ZIP_DIR')"
+# root_dir=dist/$ZIP_DIR — no base_dir, so zip has app_new/ at root
+$PYTHON -c "import shutil; shutil.make_archive('dist/$ZIP_NAME', 'zip', 'dist/$ZIP_DIR')"
 
 echo ""
 echo "=== Done ==="

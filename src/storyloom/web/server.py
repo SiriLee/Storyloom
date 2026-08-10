@@ -87,14 +87,17 @@ _APP_DIR = os.environ.get("STORYLOOM_APP_DIR", str(_PROJECT_ROOT))
 app = FastAPI(title="Storyloom", docs_url=None, redoc_url=None)
 cfg = UserConfig(_APP_DIR)
 
+# ── First-run bootstrap ────────────────────────────────────────────
+# Ensure user data directories exist.  system_media/ is created empty
+# if missing — the user downloads it later via the update UI.
+for _dir in ("saves", "media", "system_media"):
+    os.makedirs(os.path.join(_APP_DIR, _dir), exist_ok=True)
+
 # ── i18n (mirrors dev_cli/dev_main.py init order) ─────────────────
 _locale_dir = os.path.join(_APP_DIR, "locale")
 init_i18n(cfg.language, locale_dir=_locale_dir)
 
 # ── Engine wiring (mirrors dev_cli/dev_main.py) ──────────────────
-# One ApiClient + one GameSession for the lifetime of the server.
-# dev_cli creates these once at startup and reuses them across
-# co-creation → game transitions.  We follow the same pattern.
 _api_client = ApiClient(cfg)
 _game_session = GameSession(_api_client, saves_dir=os.path.join(_APP_DIR, "saves"))
 
@@ -211,7 +214,20 @@ class ConfigUpdate(BaseModel):
 
 
 class ApplyUpdateRequest(BaseModel):
-    layers: list[str]  # e.g. ["app", "system_media"]
+    layers: list[str]  # each must be "app" or "system_media"
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls._validate_layers
+
+    @classmethod
+    def _validate_layers(cls, v):
+        for layer in v.layers:
+            if layer not in ("app", "system_media"):
+                raise ValueError(f"Unknown layer: {layer!r}")
+        if not v.layers:
+            raise ValueError("layers must not be empty")
+        return v
 
 
 @app.post("/api/config")
@@ -1066,28 +1082,11 @@ async def update_stream(stream_id: str):
             check = check_for_updates(__version__, sm_ver, force=False)
 
             for layer in layers:
-                if layer == "app" and check.app.latest:
-                    from storyloom.core.update_manager import (
-                        _http_get_json,
-                        _find_asset_url,
-                        GITHUB_API_RELEASES,
-                    )
-                    release = _http_get_json(GITHUB_API_RELEASES)
-                    assets = release.get("assets", [])
-                    url, _ = _find_asset_url(
-                        assets, "storyloom-v", platform_specific=True
-                    )
-                elif layer == "system_media" and check.system_media.latest:
-                    from storyloom.core.update_manager import (
-                        _http_get_json,
-                        _find_asset_url,
-                        GITHUB_API_RELEASES,
-                    )
-                    release = _http_get_json(GITHUB_API_RELEASES)
-                    assets = release.get("assets", [])
-                    url, _ = _find_asset_url(
-                        assets, "system_media-v", platform_specific=False
-                    )
+                if layer == "app" and check.app.has_update:
+                    url = check.app.asset_url
+                elif layer == "system_media" and check.system_media.has_update:
+                    url = check.system_media.asset_url
+                    sm_target = os.path.join(_APP_DIR, "system_media")
                 else:
                     continue
 
@@ -1107,10 +1106,13 @@ async def update_stream(stream_id: str):
                         },
                     )
 
+                target = (
+                    sm_target if layer == "system_media" else _APP_DIR
+                )
                 download_and_extract(
                     layer=layer,
                     url=url,
-                    target_root=_APP_DIR,
+                    target_root=target,
                     progress_callback=progress_cb,
                 )
 

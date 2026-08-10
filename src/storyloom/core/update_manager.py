@@ -12,7 +12,6 @@ import time
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 
@@ -46,6 +45,7 @@ class VersionInfo:
     current: str  # "1.3.0"
     latest: str   # "1.4.0" (empty if no update or offline)
     release_notes: str = ""
+    asset_url: str = ""  # direct download URL for the release asset
     has_update: bool = field(default=False, init=False)
 
     def __post_init__(self):
@@ -122,14 +122,15 @@ def _find_asset_url(
     If *platform_specific*, matches ``{pattern}*{_PLATFORM}*`` first.
     Falls back to matching ``{pattern}*`` without platform.
     """
-    # First pass: with platform
+    # First pass: with platform (for platform-specific assets)
     if platform_specific:
         for a in assets:
             name = a.get("name", "")
             if pattern in name and _PLATFORM in name:
                 ver = _parse_version_from_asset_name(name, pattern)
                 return a.get("browser_download_url"), ver
-    # Second pass: without platform (for platform-agnostic assets)
+        return None, None  # never fall through to wrong platform
+    # Platform-agnostic pass
     for a in assets:
         name = a.get("name", "")
         if pattern in name:
@@ -204,6 +205,9 @@ def check_for_updates(
     remote_tag = release.get("tag_name", "")
     remote_app_ver = _parse_version_from_tag(remote_tag)
 
+    app_url, _ = _find_asset_url(
+        assets, "storyloom-v", platform_specific=True
+    )
     sm_url, remote_sm_ver = _find_asset_url(
         assets, "system_media-v", platform_specific=False
     )
@@ -213,10 +217,12 @@ def check_for_updates(
             current=app_version,
             latest=remote_app_ver,
             release_notes=release_notes,
+            asset_url=app_url or "",
         ),
         system_media=VersionInfo(
             current=system_media_version,
             latest=remote_sm_ver or "",
+            asset_url=sm_url or "",
         ),
     )
 
@@ -305,7 +311,18 @@ def download_and_extract(
         else:  # system_media
             os.makedirs(target_root, exist_ok=True)
             with zipfile.ZipFile(zip_path, "r") as zf:
-                zf.extractall(target_root)
+                for member in zf.infolist():
+                    # Guard against zip-slip path traversal
+                    member_path = os.path.normpath(
+                        os.path.join(target_root, member.filename)
+                    )
+                    if not member_path.startswith(
+                        os.path.normpath(target_root) + os.sep
+                    ) and member_path != os.path.normpath(target_root):
+                        raise ValueError(
+                            f"Rejected path outside target: {member.filename}"
+                        )
+                    zf.extract(member, target_root)
 
             version_file = os.path.join(target_root, "VERSION")
             if not os.path.isfile(version_file):

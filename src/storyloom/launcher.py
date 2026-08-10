@@ -28,13 +28,20 @@ LAUNCHER_NEW = os.path.join(DIR, "launcher.new")
 
 
 def _apply_app_update():
-    """Atomic swap: app_new → app."""
+    """Atomic swap: app_new → app, with rollback on failure."""
     if not os.path.isdir(APP_NEW):
         return
     shutil.rmtree(APP_OLD, ignore_errors=True)
-    if os.path.isdir(APP):
+    had_old = os.path.isdir(APP)
+    if had_old:
         os.rename(APP, APP_OLD)
-    os.rename(APP_NEW, APP)
+    try:
+        os.rename(APP_NEW, APP)
+    except OSError:
+        # Swap failed — restore old version
+        if had_old:
+            os.rename(APP_OLD, APP)
+        raise
     shutil.rmtree(APP_OLD, ignore_errors=True)
 
 

@@ -138,6 +138,36 @@ const SSEClient = {
         return API.post(`/api/game/${encodeURIComponent(gameId)}/retry`);
     },
 
+    /** Generic SSE connection for any URL with custom event handlers.
+     *  @param {string} url — absolute SSE endpoint path
+     *  @param {object} handlers — { eventName: function(data) }
+     *      e.g. { progress: fn, done: fn, error: fn }
+     *  @returns {Promise} resolves on stream close */
+    open(url, handlers) {
+        this.close();
+        this._handlers = handlers;
+        this._es = new EventSource(url);
+
+        return new Promise((resolve) => {
+            this._es.onerror = () => {
+                if (this._es.readyState === EventSource.CLOSED) {
+                    resolve("closed");
+                }
+            };
+
+            // Register listeners for every handler key
+            Object.keys(handlers).forEach((eventType) => {
+                this._es.addEventListener(eventType, (e) => {
+                    let data = {};
+                    try { data = JSON.parse(e.data); } catch (_) { /* raw string */ }
+                    if (this._handlers[eventType]) {
+                        this._handlers[eventType](data);
+                    }
+                });
+            });
+        });
+    },
+
     /** Close the EventSource connection. */
     close() {
         if (this._es) {

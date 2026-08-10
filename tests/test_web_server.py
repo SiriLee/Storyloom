@@ -747,8 +747,10 @@ def _make_has_update():
     from storyloom.core.update_manager import UpdateCheckResult, VersionInfo
     return UpdateCheckResult(
         app=VersionInfo(current="1.3.0", latest="1.4.0",
-                        release_notes="## v1.4.0"),
-        system_media=VersionInfo(current="1.1.0", latest="1.2.0"),
+                        release_notes="## v1.4.0",
+                        asset_url="https://example.com/app.zip"),
+        system_media=VersionInfo(current="1.1.0", latest="1.2.0",
+                                  asset_url="https://example.com/sm.zip"),
     )
 
 
