@@ -655,8 +655,8 @@ button.accent:hover, .btn-accent:hover {
     overflow-y: auto;
     padding: var(--space-sm) var(--space-sm) var(--space-2xl);
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 0.8rem;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
     align-content: start;
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -666,17 +666,17 @@ button.accent:hover, .btn-accent:hover {
     display: none;
 }
 
-/* ── Asset card — gallery tile ─────────────────────────────────── */
+/* ── Asset card — full-image tile with overlay text ────────────── */
 
 .am-card {
     position: relative;
     display: flex;
-    flex-direction: column;
     border-radius: var(--radius-xl);
     border: 1px solid var(--border-color);
     background: var(--bg-secondary);
     cursor: pointer;
     overflow: hidden;
+    aspect-ratio: 1 / 1;
     transition: transform var(--trans-normal),
                 box-shadow var(--trans-normal),
                 border-color var(--trans-normal);
@@ -684,20 +684,17 @@ button.accent:hover, .btn-accent:hover {
 }
 
 .am-card:hover {
-    transform: scale(1.03);
-    box-shadow: var(--shadow-glow);
+    transform: scale(1.04);
+    box-shadow: var(--shadow-glow-lg);
     border-color: var(--text-accent);
     z-index: 5;
 }
 
-/* ── Thumbnail ─────────────────────────────────────────────────── */
+/* ── Thumbnail (fills entire card) ─────────────────────────────── */
 
 .am-card-img {
-    width: 100%;
-    aspect-ratio: 4 / 3;
-    overflow: hidden;
-    background: var(--bg-primary);
-    border-bottom: 1px solid var(--border-color);
+    position: absolute;
+    inset: 0;
 }
 
 .am-card-img img {
@@ -707,33 +704,39 @@ button.accent:hover, .btn-accent:hover {
     display: block;
 }
 
-/* ── Card body (text content) ──────────────────────────────────── */
+/* ── Text overlay — gradient at bottom ─────────────────────────── */
 
 .am-card-body {
-    padding: 0.7rem 0.9rem;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 2rem 0.9rem 0.8rem;
+    background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.45) 60%, transparent 100%);
+    color: #fff;
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
-    flex: 1;
-    min-width: 0;
+    gap: 0.15rem;
 }
 
 .am-card-label {
     font-family: var(--font-sans);
-    font-size: 0.88rem;
+    font-size: 0.95rem;
     font-weight: 600;
-    color: var(--text-primary);
+    color: #fff;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
 
 .am-card-desc {
-    font-size: 0.78rem;
-    color: var(--text-secondary);
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.85);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
     transition: white-space var(--trans-slow);
 }
 
@@ -745,31 +748,30 @@ button.accent:hover, .btn-accent:hover {
 .am-card-usage {
     font-family: var(--font-mono);
     font-size: 0.72rem;
-    color: var(--text-secondary);
-    opacity: 0.65;
-    margin-top: auto;
-    padding-top: 0.3rem;
+    color: rgba(255,255,255,0.6);
+    margin-top: 0.2rem;
 }
 
-/* ── Trash button (top-right corner of card) ───────────────────── */
+/* ── Trash button (top-right corner) ───────────────────────────── */
 
 .am-card-trash {
     position: absolute;
-    top: 0.4rem;
-    right: 0.4rem;
+    top: 0.5rem;
+    right: 0.5rem;
     display: none;
-    width: 1.8rem;
-    height: 1.8rem;
+    width: 2rem;
+    height: 2rem;
     padding: 0;
     border: none;
     border-radius: var(--radius-sm);
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.55);
     color: #f87171;
     cursor: pointer;
     transition: background var(--trans-normal), transform var(--trans-normal);
     line-height: 1;
     align-items: center;
     justify-content: center;
+    z-index: 2;
 }
 
 .am-card:hover .am-card-trash {
@@ -777,18 +779,18 @@ button.accent:hover, .btn-accent:hover {
 }
 
 .am-card-trash:hover {
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.75);
     transform: scale(1.1);
 }
 
 .am-card-trash.disabled {
-    color: var(--text-secondary);
-    opacity: 0.35;
+    color: rgba(255,255,255,0.3);
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
 .am-card-trash.disabled:hover {
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.55);
     transform: none;
 }
 
