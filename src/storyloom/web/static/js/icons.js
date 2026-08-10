@@ -1,78 +1,179 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Storyloom Web — Shared SVG Icons
+   icons.js — Shared SVG icons (Feather-style: 24×24, 1.5px stroke)
 
-   Global Icons namespace providing inline SVG icons for UI buttons.
-   Replaces hardcoded Unicode characters (←, ↑, ✎, ✓) with scalable
-   fill-based icons styled via currentColor (matches _modeSVG convention).
+   All icons follow Feather design principles: viewBox="0 0 24 24",
+   fill="none", stroke="currentColor", stroke-width="1.5",
+   stroke-linecap="round", stroke-linejoin="round".
 
-   Usage: Icons.arrowLeft() → inline SVG string for the left-arrow icon.
+   Exports (on window): Icons.{name}() → HTML string
+
+   Authority: 2026-08-10-frontend-redesign.md §5.3
    ═══════════════════════════════════════════════════════════════════ */
 
-const Icons = (function () {
+(function () {
     "use strict";
 
-    /** Left arrow — back / return to menu. */
-    function arrowLeft() {
-        return '<svg viewBox="0 0 24 24" width="20" height="20" ' +
-            'fill="currentColor">' +
-            '<path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41' +
-            'L7.83 13H20v-2z"/>' +
-            '</svg>';
-    }
+    var I = {};
 
-    /** Pencil — edit / modify. */
-    function pencil() {
-        return '<svg viewBox="0 0 24 24" width="16" height="16" ' +
-            'fill="currentColor">' +
-            '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z' +
-            'M20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39' +
-            '-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>' +
-            '</svg>';
-    }
+    /* ── Navigation ──────────────────────────────────────────────── */
 
-    /** Checkmark — confirm / save (shown in edit mode). */
-    function checkmark() {
-        return '<svg viewBox="0 0 24 24" width="16" height="16" ' +
-            'fill="currentColor">' +
-            '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41' +
-            'L9 16.17z"/>' +
-            '</svg>';
-    }
+    I.arrowLeft = function () {
+        return '<svg viewBox="0 0 24 24" width="20" height="20" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M19 12H5m0 0l6-6m-6 6l6 6"/></svg>';
+    };
 
-    /** Up arrow — send / submit. */
-    function arrowUp() {
-        return '<svg viewBox="0 0 24 24" width="18" height="18" ' +
-            'fill="currentColor">' +
-            '<path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12' +
-            'l-8-8-8 8z"/>' +
-            '</svg>';
-    }
+    I.arrowUp = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M12 19V5m0 0l-6 6m6-6l6 6"/></svg>';
+    };
 
-    /** Gear — settings / preferences (migrated from game.js). */
-    function gear() {
-        return '<svg viewBox="0 0 24 24" width="20" height="20" ' +
-            'fill="currentColor">' +
-            '<path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 ' +
-            '12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53' +
-            'c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15' +
-            '.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52' +
-            '-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 ' +
-            '0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22' +
-            '-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34' +
-            '-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12' +
-            '.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99' +
-            'l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63' +
-            '-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12' +
-            '-.22.07-.49-.12-.64l-2.11-1.66Z"/>' +
-            '</svg>';
-    }
+    /* ── Actions ─────────────────────────────────────────────────── */
+
+    I.pencil = function () {
+        return '<svg viewBox="0 0 24 24" width="16" height="16" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
+    };
+
+    I.checkmark = function () {
+        return '<svg viewBox="0 0 24 24" width="16" height="16" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M20 6L9 17l-5-5"/></svg>';
+    };
+
+    I.x = function () {
+        return '<svg viewBox="0 0 24 24" width="16" height="16" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M18 6L6 18M6 6l12 12"/></svg>';
+    };
+
+    I.gear = function () {
+        return '<svg viewBox="0 0 24 24" width="20" height="20" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<circle cx="12" cy="12" r="3"/>'
+            + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+    };
+
+    I.trash = function () {
+        return '<svg viewBox="0 0 24 24" width="16" height="16" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<polyline points="3 6 5 6 21 6"/>'
+            + '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
+            + '<line x1="10" y1="11" x2="10" y2="17"/>'
+            + '<line x1="14" y1="11" x2="14" y2="17"/></svg>';
+    };
+
+    /* ── Theme ───────────────────────────────────────────────────── */
+
+    I.sun = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<circle cx="12" cy="12" r="5"/>'
+            + '<path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>';
+    };
+
+    I.moon = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    };
+
+    I.halfMoon = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<circle cx="12" cy="12" r="10"/>'
+            + '<path d="M12 2a10 10 0 0 1 0 20V2z"/></svg>';
+    };
+
+    /* ── Settings Sidebar ────────────────────────────────────────── */
+
+    I.globe = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<circle cx="12" cy="12" r="10"/>'
+            + '<path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
+    };
+
+    I.key = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>';
+    };
+
+    I.image = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>'
+            + '<circle cx="8.5" cy="8.5" r="1.5"/>'
+            + '<path d="M21 15l-5-5L5 21"/></svg>';
+    };
+
+    I.palette = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<circle cx="12" cy="12" r="10"/>'
+            + '<path d="M12 2a10 10 0 0 1 0 20c-1.5 0-2.5-1-2.5-2.5 0-.6.2-1.1.5-1.5.3-.4.5-.9.5-1.5 0-1-1-1.5-2-1.5-3 0-5.5-2-5.5-5A7.5 7.5 0 0 1 12 2z"/>'
+            + '<circle cx="8.5" cy="9" r="1.5" fill="currentColor" stroke="none"/>'
+            + '<circle cx="15.5" cy="8" r="1.5" fill="currentColor" stroke="none"/>'
+            + '<circle cx="8.5" cy="15" r="1.5" fill="currentColor" stroke="none"/>'
+            + '<circle cx="15.5" cy="14" r="1.5" fill="currentColor" stroke="none"/></svg>';
+    };
+
+    I.book = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>'
+            + '<path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>';
+    };
+
+    I.heart = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+    };
+
+    I.refresh = function () {
+        return '<svg viewBox="0 0 24 24" width="18" height="18" '
+            + 'fill="none" stroke="currentColor" stroke-width="1.5" '
+            + 'stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M23 4v6h-6M1 20v-6h6"/>'
+            + '<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+    };
+
+    /* ── Media Controls ──────────────────────────────────────────── */
+
+    I.play = function () {
+        return '<svg viewBox="0 0 24 24" width="16" height="16" '
+            + 'fill="currentColor" stroke="none">'
+            + '<path d="M8 5v14l11-7z"/></svg>';
+    };
+
+    I.pause = function () {
+        return '<svg viewBox="0 0 24 24" width="16" height="16" '
+            + 'fill="currentColor" stroke="none">'
+            + '<rect x="6" y="4" width="4" height="16"/>'
+            + '<rect x="14" y="4" width="4" height="16"/></svg>';
+    };
 
     /* ── Exports ─────────────────────────────────────────────────── */
-    return {
-        arrowLeft: arrowLeft,
-        pencil: pencil,
-        checkmark: checkmark,
-        arrowUp: arrowUp,
-        gear: gear,
-    };
+
+    window.Icons = I;
 })();
