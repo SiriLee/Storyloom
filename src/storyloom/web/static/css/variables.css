@@ -1,0 +1,66 @@
+/* ═══════════════════════════════════════════════════════════════════
+   variables.css — Theme-agnostic design tokens
+
+   Color tokens live in:
+     theme-dark.css  — [data-theme="dark"]
+     theme-light.css — [data-theme="light"]
+
+   System default (data-theme="system") follows prefers-color-scheme
+   via @media queries in each theme file.
+
+   Authority: 2026-08-10-frontend-redesign.md §2.3
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+    /* ── Typography ──────────────────────────────────────────────── */
+    --font-mono: "Consolas", "Courier New", monospace;
+    --font-serif: "Georgia", "Noto Serif SC", serif;
+    --font-sans: "Segoe UI", "PingFang SC", sans-serif;
+
+    --font-xs: 0.8rem;
+    --font-sm: 0.85rem;
+    --font-base: 0.95rem;
+    --font-md: 1.05rem;
+    --font-lg: 1.15rem;
+    --font-xl: 1.3rem;
+    --font-2xl: 1.8rem;
+    --font-3xl: 2.2rem;
+    --font-4xl: 3.2rem;
+
+    /* ── Spacing ─────────────────────────────────────────────────── */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 0.75rem;
+    --space-lg: 1rem;
+    --space-xl: 1.5rem;
+    --space-2xl: 2rem;
+    --space-3xl: 3rem;
+
+    /* ── Layout ──────────────────────────────────────────────────── */
+    --content-width: 960px;
+    --choices-width: 420px;
+    --icon-btn-size: 2.2rem;
+
+    /* ── Border Radius ───────────────────────────────────────────── */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+    --radius-round: 24px;
+
+    /* ── Transitions ─────────────────────────────────────────────── */
+    --trans-fast: 0.15s ease;
+    --trans-normal: 0.2s ease;
+    --trans-slow: 0.3s ease;
+
+    /* ── Shadows — green accent (theme-agnostic base) ────────────── */
+    --shadow-glow-sm: 0 0 10px rgba(63, 185, 80, 0.15);
+    --shadow-glow: 0 0 8px rgba(63, 185, 80, 0.2);
+    --shadow-glow-lg: 0 0 12px rgba(63, 185, 80, 0.4);
+    --shadow-glow-xl: 0 0 18px rgba(63, 185, 80, 0.4);
+    --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --shadow-toast: 0 4px 16px rgba(0, 0, 0, 0.3);
+    --shadow-focus: 0 0 0 2px rgba(63, 185, 80, 0.35);
+
+    interpolate-size: allow-keywords;
+}
