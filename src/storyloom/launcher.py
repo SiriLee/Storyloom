@@ -28,9 +28,25 @@ LAUNCHER_NEW = os.path.join(DIR, "launcher.new")
 
 
 def _apply_app_update():
-    """Atomic swap: app_new → app, with rollback on failure."""
+    """Atomic swap: app_new → app, with rollback on failure.
+
+    Verifies *app_new* is complete before swapping — an incomplete
+    download must never replace a working installation.
+    Spec: docs/superpowers/specs/2026-08-10-auto-update-design.md §9
+    """
     if not os.path.isdir(APP_NEW):
         return
+
+    # Guard: refuse to swap if the new version is missing the main exe.
+    target = os.path.join(APP_NEW, MAIN_EXE)
+    if not os.path.isfile(target):
+        print(
+            f"Warning: {APP_NEW} is incomplete — skipping update",
+            file=sys.stderr,
+        )
+        shutil.rmtree(APP_NEW, ignore_errors=True)
+        return
+
     shutil.rmtree(APP_OLD, ignore_errors=True)
     had_old = os.path.isdir(APP)
     if had_old:
