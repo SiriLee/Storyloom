@@ -164,7 +164,9 @@
         return '<svg viewBox="0 0 24 24" width="18" height="18" '
             + 'fill="none" stroke="currentColor" stroke-width="2" '
             + 'stroke-linecap="round" stroke-linejoin="round">'
-            + '<path d="M5 8l6 6m-6 0l6-6m2-3h7m-3.5 0L18 15l-1.5-4H12m-2 7h.01"/></svg>';
+            + '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/>'
+            + '<path d="M2 12h20"/>'
+            + '<path d="M12 2a13.5 13.5 0 0 1 3.5 9 13.5 13.5 0 0 1-3.5 9 13.5 13.5 0 0 1-3.5-9A13.5 13.5 0 0 1 12 2z"/></svg>';
     };
 
     I.gamepad = function () {

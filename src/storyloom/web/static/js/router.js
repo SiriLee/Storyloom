@@ -759,11 +759,13 @@
         var cls = current ? "settings-row-value" : "settings-row-value muted";
         return '<div class="settings-row" data-key="' + esc(key) + '">'
             + '<span class="settings-row-label">' + esc(label) + '</span>'
+            + '<div class="settings-row-field">'
             + '<span class="' + cls + '">' + esc(display) + '</span>'
-            + '<button class="settings-row-edit" title="' + esc(_("Edit")) + '">'
-            + Icons.pencil() + '</button>'
             + '<input type="text" class="settings-row-input hidden" '
             + 'value="' + esc(current) + '" placeholder="' + esc(placeholder || "") + '">'
+            + '</div>'
+            + '<button class="settings-row-edit" title="' + esc(_("Edit")) + '">'
+            + Icons.pencil() + '</button>'
             + '</div>';
     }
 
@@ -774,11 +776,13 @@
         var cls = current ? "settings-row-value" : "settings-row-value muted";
         return '<div class="settings-row" data-key="' + esc(key) + '">'
             + '<span class="settings-row-label">' + esc(label) + '</span>'
+            + '<div class="settings-row-field">'
             + '<span class="' + cls + '">' + esc(display) + '</span>'
-            + '<button class="settings-row-edit" title="' + esc(_("Edit")) + '">'
-            + Icons.pencil() + '</button>'
             + '<input type="password" class="settings-row-input hidden" '
             + 'value="' + esc(current) + '" placeholder="' + esc(placeholder || "") + '">'
+            + '</div>'
+            + '<button class="settings-row-edit" title="' + esc(_("Edit")) + '">'
+            + Icons.pencil() + '</button>'
             + '</div>';
     }
 
@@ -911,16 +915,14 @@
                         displayEl.classList.toggle("muted", !newVal);
                     }
                     inputEl.classList.add("hidden");
-                    displayEl.classList.remove("hidden");
                     this.innerHTML = Icons.pencil();
                     /* Remove cancel button if present */
                     var cancelBtn = row.querySelector(".settings-row-cancel");
                     if (cancelBtn) cancelBtn.remove();
                 } else {
-                    /* Enter edit mode */
+                    /* Enter edit mode — input overlays value, no layout shift */
                     inputEl.value = getSetting(key);
                     inputEl.classList.remove("hidden");
-                    displayEl.classList.add("hidden");
                     this.innerHTML = Icons.checkmark();
 
                     /* Add cancel button */
@@ -930,7 +932,6 @@
                     cancelBtn.title = _("Cancel");
                     cancelBtn.addEventListener("click", function () {
                         inputEl.classList.add("hidden");
-                        displayEl.classList.remove("hidden");
                         btn.innerHTML = Icons.pencil();
                         cancelBtn.remove();
                     });

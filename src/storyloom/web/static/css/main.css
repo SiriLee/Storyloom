@@ -2766,8 +2766,15 @@ button.accent:hover, .btn-accent:hover {
     min-width: 140px;
 }
 
-.settings-row-value {
+/* ── Field wrapper: keeps layout stable during edit mode ──────── */
+
+.settings-row-field {
     flex: 1;
+    position: relative;
+    min-height: 2rem;
+}
+
+.settings-row-value {
     font-family: var(--font-mono);
     font-size: 0.87rem;
     color: var(--text-primary);
@@ -2775,11 +2782,9 @@ button.accent:hover, .btn-accent:hover {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    /* Same box height as .settings-row-input */
     padding: 0.4rem 0.6rem;
-    min-height: 2rem;
     line-height: 1.4;
-    box-sizing: border-box;
+    /* stays in flow — input overlays on top */
 }
 
 .settings-row-value.muted {
@@ -2788,7 +2793,8 @@ button.accent:hover, .btn-accent:hover {
 }
 
 .settings-row-input {
-    flex: 1;
+    position: absolute;
+    inset: 0;
     padding: 0.4rem 0.6rem;
     border: 1px solid var(--text-accent);
     border-radius: var(--radius-sm);
@@ -2868,9 +2874,7 @@ button.accent:hover, .btn-accent:hover {
 
 .settings-seg-group {
     display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: 1fr;
-    width: 100%;
+    flex: 1;
     gap: 0.5rem;
 }
 
