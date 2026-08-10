@@ -309,19 +309,26 @@ def download_and_extract(
             with zipfile.ZipFile(zip_path, "r") as zf:
                 zf.extractall(extract_tmp)
 
-            src = os.path.join(extract_tmp, "app_new")
+            # The release zip ships with "app/" (ready-to-run).
+            # For an in-place update we rename it to "app_new/"
+            # so the launcher can atomically swap it in.
+            src = os.path.join(extract_tmp, "app")
             if os.path.isdir(src):
                 shutil.move(src, app_new)
             else:
                 raise ValueError(
-                    "Update zip does not contain app_new/ directory"
+                    "Update zip does not contain app/ directory"
                 )
 
-            launcher_new = os.path.join(extract_tmp, "launcher.new")
-            if os.path.isfile(launcher_new):
-                shutil.copy2(
-                    launcher_new, os.path.join(target_root, "launcher.new")
-                )
+            # Launcher self-update: zip ships "Storyloom",
+            # rename to "launcher.new" for the launcher's swap logic.
+            for candidate in ("Storyloom", "Storyloom.exe"):
+                p = os.path.join(extract_tmp, candidate)
+                if os.path.isfile(p):
+                    shutil.copy2(
+                        p, os.path.join(target_root, "launcher.new")
+                    )
+                    break
 
             if not os.path.isfile(
                 os.path.join(app_new, "storyloom-web")

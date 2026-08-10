@@ -108,14 +108,14 @@ $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
     --clean \
     src/storyloom/launcher.py
 
-# 4. Assemble release directory (launcher.new + app_new/ structure)
+# 4. Assemble release directory — ready-to-run structure for first install
 echo "--- Assembling release directory ---"
-mkdir -p "$OUTPUT_DIR/app_new"
-cp "dist/$BIN_NAME" "$OUTPUT_DIR/app_new/"
-cp "dist/$LAUNCHER_NAME" "$OUTPUT_DIR/launcher.new"
-cp -r locale "$OUTPUT_DIR/app_new/"
-cp config.example.json "$OUTPUT_DIR/app_new/"
-cp "dist/storyloom-${VERSION}-"*.whl "dist/storyloom-${VERSION}.tar.gz" "$OUTPUT_DIR/app_new/"
+mkdir -p "$OUTPUT_DIR/app"
+cp "dist/$BIN_NAME" "$OUTPUT_DIR/app/"
+cp "dist/$LAUNCHER_NAME" "$OUTPUT_DIR/$LAUNCHER_NAME"
+cp -r locale "$OUTPUT_DIR/app/"
+cp config.example.json "$OUTPUT_DIR/app/"
+cp "dist/storyloom-${VERSION}-"*.whl "dist/storyloom-${VERSION}.tar.gz" "$OUTPUT_DIR/app/"
 
 # System media — bundled as standalone directory in the release zip.
 # First-time users get a working media library without needing to

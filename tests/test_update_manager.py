@@ -309,9 +309,9 @@ def test_download_extract_app(tmp_path):
     zip_dir = tmp_path / "zip"
     zip_dir.mkdir()
     zip_path = _create_test_zip(str(zip_dir), {
-        "app_new/storyloom-web": b"fake-exe",
-        "app_new/locale/en/LC_MESSAGES/storyloom.mo": b"fake-mo",
-        "app_new/config.example.json": b'{"version": 2}',
+        "app/storyloom-web": b"fake-exe",
+        "app/locale/en/LC_MESSAGES/storyloom.mo": b"fake-mo",
+        "app/config.example.json": b'{"version": 2}',
     })
     target = tmp_path / "target"
 
@@ -343,8 +343,8 @@ def test_download_extract_with_launcher_new(tmp_path):
     zip_dir = tmp_path / "zip"
     zip_dir.mkdir()
     _create_test_zip(str(zip_dir), {
-        "app_new/storyloom-web": b"fake-exe",
-        "launcher.new": b"fake-launcher",
+        "app/storyloom-web": b"fake-exe",
+        "Storyloom": b"fake-launcher",
     })
     target = tmp_path / "target"
 
@@ -407,7 +407,7 @@ def test_download_extract_invalid_zip(tmp_path):
 def test_download_extract_cleans_stale_app_new(tmp_path):
     zip_dir = tmp_path / "zip"
     zip_dir.mkdir()
-    _create_test_zip(str(zip_dir), {"app_new/storyloom-web": b"new-exe"})
+    _create_test_zip(str(zip_dir), {"app/storyloom-web": b"new-exe"})
     target = tmp_path / "target"
     stale = target / "app_new"
     stale.mkdir(parents=True)
