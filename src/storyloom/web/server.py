@@ -886,11 +886,33 @@ async def game_adventure_log(game_id: str):
 # ═══════════════════════════════════════════════════════════════════
 
 
+def _get_asset_library() -> "AssetLibrary":
+    """Load the asset library and sync system assets.
+
+    Called by every asset API endpoint so the library always reflects
+    the current state of ``system_media/``, not just persisted data.
+    Idempotent — if the version hasn't changed, ``import_system_assets``
+    is a no-op.
+    """
+    from storyloom.assets import AssetLibrary
+
+    lib = AssetLibrary.load(_MEDIA_DIR)
+    if os.path.isdir(_SYS_MEDIA_DIR):
+        try:
+            lib.import_system_assets(_SYS_MEDIA_DIR)
+            lib.save()
+        except Exception:
+            # system_media/ exists but is broken — skip, don't block
+            pass
+    return lib
+
+
 @app.get("/api/assets")
 async def assets_list():
     """List all assets grouped by type from the global asset library."""
-    from storyloom.assets import AssetLibrary, AssetType
-    lib = AssetLibrary.load(_MEDIA_DIR)
+    from storyloom.assets import AssetType
+
+    lib = _get_asset_library()
     result: dict[str, dict[str, dict]] = {}
     for atype in AssetType:
         items = lib.list_by_type(atype)
@@ -917,7 +939,7 @@ async def assets_clean(keep_count: int = CLEANUP_KEEP_COUNT, type: str | None = 
         except ValueError:
             raise HTTPException(400, f"Unknown asset type: {type}")
 
-    lib = AssetLibrary.load(_MEDIA_DIR)
+    lib = _get_asset_library()
     deleted = lib.clean(keep_count, asset_type=atype)
     if deleted > 0:
         lib.save()
@@ -934,7 +956,7 @@ async def assets_delete(asset_type: str, asset_id: str):
     except ValueError:
         raise HTTPException(404, f"Unknown asset type: {asset_type}")
 
-    lib = AssetLibrary.load(_MEDIA_DIR)
+    lib = _get_asset_library()
     asset = lib.get(atype, asset_id)
     if asset is None:
         raise HTTPException(404, f"Asset not found: {asset_type}/{asset_id}")
