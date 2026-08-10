@@ -529,16 +529,16 @@ button.accent:hover, .btn-accent:hover {
 .am-header {
     display: flex;
     align-items: center;
-    padding: var(--space-md) var(--space-xs);
+    padding: 1rem 0;
     flex-shrink: 0;
-    gap: 0.6rem;
+    gap: 0.8rem;
 }
 
 .am-title {
-    font-family: var(--font-mono);
-    font-size: var(--font-md);
-    color: var(--text-accent);
-    font-weight: normal;
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    color: var(--text-primary);
+    font-weight: 600;
     flex: 1;
 }
 
@@ -648,15 +648,16 @@ button.accent:hover, .btn-accent:hover {
     padding: var(--space-3xl) 0;
 }
 
-/* ── Card list (right side) ─────────────────────────────────────── */
+/* ── Card list (right side) — gallery grid ─────────────────────── */
 
 .am-list {
     flex: 1;
     overflow-y: auto;
-    padding: var(--space-sm) var(--space-xs) var(--space-2xl);
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
+    padding: var(--space-sm) var(--space-sm) var(--space-2xl);
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.8rem;
+    align-content: start;
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
@@ -665,97 +666,119 @@ button.accent:hover, .btn-accent:hover {
     display: none;
 }
 
-/* ── Asset card (matches .sv-card) ─────────────────────────────── */
+/* ── Asset card — gallery tile ─────────────────────────────────── */
 
 .am-card {
+    position: relative;
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    padding: 0.9rem 1.2rem;
-    border-radius: var(--radius-md);
+    flex-direction: column;
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border-color);
     background: var(--bg-secondary);
     cursor: pointer;
-    transition: background var(--trans-normal), box-shadow var(--trans-normal),
-                transform var(--trans-normal);
+    overflow: hidden;
+    transition: transform var(--trans-normal),
+                box-shadow var(--trans-normal),
+                border-color var(--trans-normal);
     user-select: none;
 }
 
 .am-card:hover {
-    background: var(--button-hover);
-    box-shadow: var(--shadow-glow-sm);
-    transform: translateX(4px);
+    transform: scale(1.03);
+    box-shadow: var(--shadow-glow);
+    border-color: var(--text-accent);
+    z-index: 5;
 }
 
-.am-card-main {
+/* ── Thumbnail ─────────────────────────────────────────────────── */
+
+.am-card-img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.am-card-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* ── Card body (text content) ──────────────────────────────────── */
+
+.am-card-body {
+    padding: 0.7rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
     flex: 1;
     min-width: 0;
 }
 
 .am-card-label {
-    font-family: var(--font-mono);
-    font-size: var(--font-md);
+    font-family: var(--font-sans);
+    font-size: 0.88rem;
+    font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: 0.2rem;
-}
-
-.am-card-meta {
-    font-size: 0.82rem;
-    color: var(--text-secondary);
-    overflow: hidden;
-}
-
-.am-card-meta span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    display: block;
-    height: 1.3em;
-    transition: height var(--trans-slow);
 }
 
-.am-card:hover .am-card-meta span {
+.am-card-desc {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
     overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: white-space var(--trans-slow);
+}
+
+.am-card:hover .am-card-desc {
     white-space: normal;
-    text-overflow: clip;
-    height: auto;
-    max-height: 5em;
+    overflow: visible;
 }
 
 .am-card-usage {
-    flex-shrink: 0;
     font-family: var(--font-mono);
-    font-size: 0.82rem;
+    font-size: 0.72rem;
     color: var(--text-secondary);
-    margin-left: auto;
-    margin-right: 0.8rem;
+    opacity: 0.65;
+    margin-top: auto;
+    padding-top: 0.3rem;
 }
 
+/* ── Trash button (top-right corner of card) ───────────────────── */
+
 .am-card-trash {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
     display: none;
-    flex-shrink: 0;
-    width: 2rem;
-    height: 2rem;
-    margin-left: 0.8rem;
+    width: 1.8rem;
+    height: 1.8rem;
     padding: 0;
     border: none;
     border-radius: var(--radius-sm);
-    background: transparent;
-    color: #c0392b;
-    font-size: 1.1rem;
+    background: rgba(0, 0, 0, 0.5);
+    color: #f87171;
     cursor: pointer;
     transition: background var(--trans-normal), transform var(--trans-normal);
     line-height: 1;
-}
-
-.am-card:hover .am-card-trash {
-    display: flex;
     align-items: center;
     justify-content: center;
 }
 
+.am-card:hover .am-card-trash {
+    display: flex;
+}
+
 .am-card-trash:hover {
-    background: rgba(224, 85, 85, 0.15);
-    transform: scale(1.15);
+    background: rgba(0, 0, 0, 0.7);
+    transform: scale(1.1);
 }
 
 .am-card-trash.disabled {
@@ -765,7 +788,7 @@ button.accent:hover, .btn-accent:hover {
 }
 
 .am-card-trash.disabled:hover {
-    background: transparent;
+    background: rgba(0, 0, 0, 0.5);
     transform: none;
 }
 

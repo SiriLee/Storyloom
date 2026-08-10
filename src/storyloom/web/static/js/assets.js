@@ -166,7 +166,7 @@ const AssetManagerView = (function () {
         });
     }
 
-    /* ── Card list ───────────────────────────────────────────────── */
+    /* ── Card list — gallery grid ────────────────────────────────── */
 
     function _renderCards() {
         var listEl = document.getElementById("am-list");
@@ -178,24 +178,31 @@ const AssetManagerView = (function () {
             return;
         }
 
+        var imgUrl = MEDIA_PATH + "/" + _activeType + "/";
+
         listEl.innerHTML = ids.map(function (id) {
             var a = items[id];
             var name = a.name || id;
             var desc = a.description || "";
             var uc = a.use_count || 0;
+            var trashCls = uc > 0 ? "am-card-trash disabled" : "am-card-trash";
             return '<div class="am-card" data-id="' + esc(id) + '" data-name="' + esc(name) + '">'
-                + '<div class="am-card-main">'
-                    + '<span class="am-card-label">' + esc(name) + '</span>'
-                    + (desc ? '<div class="am-card-meta"><span>' + esc(desc) + '</span></div>' : "")
+                + '<div class="am-card-img">'
+                    + '<img src="' + imgUrl + encodeURIComponent(id) + '"'
+                    + ' alt="' + esc(name) + '" loading="lazy">'
                 + '</div>'
-                + '<span class="am-card-usage">' + esc(_("In Use")) + ': ' + uc + '</span>'
-                + '<button class="am-card-trash' + (uc > 0 ? " disabled" : "") + '"'
+                + '<div class="am-card-body">'
+                    + '<span class="am-card-label" title="' + esc(name) + '">' + esc(name) + '</span>'
+                    + (desc ? '<span class="am-card-desc" title="' + esc(desc) + '">' + esc(desc) + '</span>' : "")
+                    + '<span class="am-card-usage">' + esc(_("In Use")) + ': ' + uc + '</span>'
+                + '</div>'
+                + '<button class="' + trashCls + '"'
                     + ' title="' + esc(_("Delete")) + '" data-id="' + esc(id) + '"'
-                    + (uc > 0 ? ' data-uc="1"' : "") + '>' + TRASH_ICON + '</button>'
+                    + (uc > 0 ? ' data-uc="1"' : "") + '>' + Icons.trash() + '</button>'
             + '</div>';
         }).join("");
 
-        // Card click → viewer
+        // Card click → viewer (ignore clicks on trash button)
         listEl.querySelectorAll(".am-card").forEach(function (card) {
             card.addEventListener("click", function (e) {
                 if (e.target.closest(".am-card-trash")) return;
