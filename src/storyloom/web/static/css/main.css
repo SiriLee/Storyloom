@@ -350,10 +350,10 @@ button.accent:hover, .btn-accent:hover {
 }
 
 .settings-title {
-    font-family: var(--font-mono);
-    font-size: var(--font-md);
-    color: var(--text-accent);
-    font-weight: normal;
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    color: var(--text-primary);
+    font-weight: 600;
 }
 
 /* ── Scrollable form area ─────────────────────────────────────── */

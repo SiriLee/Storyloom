@@ -655,7 +655,7 @@
             + '<span class="settings-row-value" id="update-current-ver">...</span>'
             + '</div>'
             + '<button class="settings-update-btn" id="btn-check-update">'
-            + Icons.download() + esc(_("Check for Updates")) + '</button>'
+            + Icons.refresh() + esc(_("Check for Updates")) + '</button>'
             + '</div>';
 
         /* Lazy-load current version */
@@ -673,11 +673,11 @@
             btn.addEventListener("click", function () {
                 var origHTML = btn.innerHTML;
                 btn.disabled = true;
-                btn.innerHTML = Icons.download() + " ...";
+                btn.innerHTML = Icons.refresh() + " ...";
 
                 API.get("/api/update/check?force=true").then(function (result) {
                     btn.disabled = false;
-                    btn.innerHTML = Icons.download() + esc(_("Check for Updates"));
+                    btn.innerHTML = Icons.refresh() + esc(_("Check for Updates"));
                     var el = document.getElementById("update-current-ver");
                     if (el) el.textContent = result.app.current;
 
@@ -688,7 +688,7 @@
                     _showUpdatePopup(result);
                 }).catch(function (err) {
                     btn.disabled = false;
-                    btn.innerHTML = Icons.download() + esc(_("Check for Updates"));
+                    btn.innerHTML = Icons.refresh() + esc(_("Check for Updates"));
                     showToast(_("Check failed") + ": " + err.message);
                 });
             });
