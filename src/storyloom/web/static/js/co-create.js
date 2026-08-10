@@ -46,14 +46,18 @@ const CoCreateView = (function () {
         _container = container;
         _phase = "loading";
 
+        var currentMode = getSetting("game_mode") || "text";
+        var modeLabel = currentMode === "graph" ? _("Graph") : _("Text");
+
         _container.innerHTML = `
             <div class="co-create-view">
-                <!-- Header: ← back | title | Start -->
+                <!-- Header: ← back | [spacer] | theme | mode | Start -->
                 <div class="cc-header">
                     <button class="cc-back-btn" id="cc-back"
                             title="${esc(_("Back to Menu"))}" disabled>${Icons.arrowLeft()}</button>
-                    <span class="cc-title">${esc(_("Co-Create"))}</span>
+                    <span class="cc-spacer"></span>
                     <button class="theme-toggle-btn" id="cc-theme-btn" title="${esc(_("Toggle Theme"))}"></button>
+                    <button class="cc-mode-btn" id="cc-mode-btn" title="${esc(_("Switch Mode"))}">${esc(modeLabel)}</button>
                     <button class="cc-start-btn" id="cc-start" disabled>${esc(_("Start"))}</button>
                 </div>
 
@@ -121,6 +125,17 @@ const CoCreateView = (function () {
                 ThemeState.toggle();
                 saveConfig();
                 window._updateAllThemeButtons();
+            });
+        }
+
+        /* Mode toggle button */
+        var modeBtn = document.getElementById("cc-mode-btn");
+        if (modeBtn) {
+            modeBtn.addEventListener("click", function () {
+                var current = getSetting("game_mode") || "text";
+                var next = current === "graph" ? "text" : "graph";
+                applySetting("game_mode", next);
+                modeBtn.textContent = next === "graph" ? _("Graph") : _("Text");
             });
         }
     }

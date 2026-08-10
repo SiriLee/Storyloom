@@ -906,20 +906,25 @@ button.accent:hover, .btn-accent:hover {
     display: flex;
     flex-direction: column;
     height: calc(100vh - 4rem);
-    max-width: var(--content-width);
+    max-width: var(--content-wide);
     margin: 0 auto;
+    padding: 0 var(--space-xl);
     background: var(--bg-primary);
 }
 
-/* ── Header bar (no border, blends with background) ───────────── */
+/* ── Header bar ────────────────────────────────────────────────── */
 
 .cc-header {
     display: flex;
     align-items: center;
-    padding: var(--space-md) var(--space-xs);
+    padding: 1rem 0;
     flex-shrink: 0;
     background: var(--bg-primary);
-    gap: 0.6rem;
+    gap: 0.8rem;
+}
+
+.cc-spacer {
+    flex: 1;
 }
 
 .cc-back-btn {
@@ -941,19 +946,36 @@ button.accent:hover, .btn-accent:hover {
 
 .cc-back-btn:hover {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--bg-tertiary);
     box-shadow: none;
 }
 
-.cc-title {
-    font-family: var(--font-mono);
-    font-size: var(--font-md);
-    color: var(--text-accent);
-    font-weight: normal;
+/* ── Mode toggle button ────────────────────────────────────────── */
+
+.cc-mode-btn {
+    padding: 0.35rem 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: var(--font-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: color var(--trans-normal), border-color var(--trans-normal),
+                background var(--trans-normal);
+    flex-shrink: 0;
 }
 
+.cc-mode-btn:hover {
+    color: var(--text-accent);
+    border-color: var(--text-accent);
+    background: var(--accent-light);
+}
+
+/* ── Start button ──────────────────────────────────────────────── */
+
 .cc-start-btn {
-    margin-left: auto;
     padding: 0.35rem 0.9rem;
     border: 1px solid var(--text-accent);
     border-radius: var(--radius-md);
@@ -961,13 +983,14 @@ button.accent:hover, .btn-accent:hover {
     color: var(--text-accent);
     font-family: var(--font-sans);
     font-size: var(--font-sm);
+    font-weight: 500;
     cursor: pointer;
     transition: background var(--trans-normal), box-shadow var(--trans-normal);
     flex-shrink: 0;
 }
 
 .cc-start-btn:hover {
-    background: rgba(78, 204, 163, 0.1);
+    background: var(--accent-light);
     box-shadow: var(--shadow-glow);
 }
 
