@@ -153,7 +153,7 @@
         app.innerHTML = `
             <div class="menu-view">
                 <h1 class="menu-title">${esc(_("Storyloom"))}</h1>
-                <p class="menu-subtitle">${esc(_("AI Text Adventure"))}</p>
+                <p class="menu-subtitle">${esc(_("AI Real-Time Visual Novel"))}</p>
 
                 <div class="menu-buttons">
                     <button class="menu-btn accent" id="btn-new-game">

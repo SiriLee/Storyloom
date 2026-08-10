@@ -1341,7 +1341,7 @@ def main():
         if sys.stderr is None:
             sys.stderr = f
 
-    parser = argparse.ArgumentParser(description="Storyloom — AI Text Adventure")
+    parser = argparse.ArgumentParser(description="Storyloom — AI Real-Time Visual Novel")
     parser.add_argument(
         "--browser", action="store_true",
         help="Open in system browser instead of a native desktop window.",

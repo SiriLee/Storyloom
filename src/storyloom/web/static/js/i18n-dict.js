@@ -8,7 +8,7 @@ const T = {
     },
     "zh-CN": {
         "(or write your own answer)": "（或输入你自己的答案）",
-        "AI Text Adventure": "AI 文字冒险",
+        "AI Real-Time Visual Novel": "AI 实时视觉小说",
         "API": "API",
         "API Base URL": "API 地址",
         "API Configuration": "API 配置",
@@ -183,7 +183,7 @@ const T = {
     },
     "zh-TW": {
         "(or write your own answer)": "（或輸入你自己的答案）",
-        "AI Text Adventure": "AI 文字冒險",
+        "AI Real-Time Visual Novel": "AI 即時視覺小說",
         "API": "API",
         "API Base URL": "API 位址",
         "API Configuration": "API 設定",

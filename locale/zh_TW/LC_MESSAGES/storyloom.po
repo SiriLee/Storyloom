@@ -28,8 +28,8 @@ msgstr "（或輸入你自己的答案）"
 msgid "Storyloom"
 msgstr "Storyloom"
 
-msgid "AI Text Adventure"
-msgstr "AI 文字冒險"
+msgid "AI Real-Time Visual Novel"
+msgstr "AI 即時視覺小說"
 
 msgid "New Game"
 msgstr "新遊戲"
