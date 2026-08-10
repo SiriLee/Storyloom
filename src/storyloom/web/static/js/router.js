@@ -505,16 +505,21 @@
     function _renderGeneralSection(container) {
         var lang = getSetting("lang") || GameState.lang || "zh-CN";
         var gameMode = getSetting("game_mode") || "text";
+        /* activeLang: when lang_mode is "system", the "System" button is
+           highlighted regardless of the resolved concrete language.  When
+           "manual", the specific language button is highlighted. */
+        var langMode = getLangMode();
+        var activeLang = langMode === "system" ? "system" : lang;
 
         container.innerHTML =
             _sectionHeading(Icons.globe, _("General"), "general")
             + '<div class="settings-card">'
             + '<div class="settings-card-title">' + Icons.language() + esc(_("Language")) + '</div>'
             + '<div class="lang-grid">'
-            + _langBtn("system", _("System"), lang, false)
-            + _langBtn("zh-CN", "中文", lang, false)
-            + _langBtn("zh-TW", "繁體中文", lang, false)
-            + _langBtn("en", "English", lang, false)
+            + _langBtn("system", _("System"), activeLang, false)
+            + _langBtn("zh-CN", "中文", activeLang, false)
+            + _langBtn("zh-TW", "繁體中文", activeLang, false)
+            + _langBtn("en", "English", activeLang, false)
             + _langBtn("ja", "日本語", lang, true)
             + _langBtn("ko", "한국어", lang, true)
             + '</div>'
@@ -840,6 +845,7 @@
                     });
                     if (group.dataset.key === "theme") {
                         ThemeState.set(val);
+                        saveConfig();
                         _updateAllThemeButtons();
                     } else if (group.dataset.key === "game_mode") {
                         applySetting("game_mode", val);
@@ -855,14 +861,11 @@
             btn.addEventListener("click", function () {
                 var val = this.dataset.lang;
                 if (val === "system") {
-                    // Resolve browser language
-                    var navLang = (navigator.language || "en").split("-")[0];
-                    var supported = { "zh": "zh-CN", "en": "en" };
-                    val = supported[navLang] || "en";
+                    setLangMode("system");
+                    val = resolveBrowserLang();
+                } else {
+                    setLangMode("manual");
                 }
-                container.querySelectorAll(".lang-btn").forEach(function (b) {
-                    b.classList.toggle("active", b.dataset.lang === this.dataset.lang);
-                }, this);
                 applySetting("lang", val);
                 GameState.setLang(val);
                 renderSettings();

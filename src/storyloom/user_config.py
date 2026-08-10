@@ -24,6 +24,8 @@ class UserConfig:
     _DEFAULTS = {
         "version": 2,
         "language": "en",
+        "theme": "system",
+        "accent_color": "green",
         "api_key": "",
         "api_base_url": "https://api.deepseek.com",
         "api_model": "deepseek-v4-pro",
@@ -39,6 +41,8 @@ class UserConfig:
         self._app_dir: Path | None = Path(app_dir) if app_dir is not None else None
         self._version: int = self._DEFAULTS["version"]
         self._language: str = self._DEFAULTS["language"]
+        self._theme: str = self._DEFAULTS["theme"]
+        self._accent_color: str = self._DEFAULTS["accent_color"]
         self._api_key: str = self._DEFAULTS["api_key"]
         self._api_base_url: str = self._DEFAULTS["api_base_url"]
         self._api_model: str = self._DEFAULTS["api_model"]
@@ -62,6 +66,33 @@ class UserConfig:
     @language.setter
     def language(self, value: str) -> None:
         self._language = value
+
+    @property
+    def theme(self) -> str:
+        """UI theme: 'system', 'dark', or 'light'."""
+        return self._theme
+
+    @theme.setter
+    def theme(self, value: str) -> None:
+        if value not in ("system", "dark", "light"):
+            raise ValueError(
+                f"theme must be 'system', 'dark', or 'light', got {value!r}"
+            )
+        self._theme = value
+
+    @property
+    def accent_color(self) -> str:
+        """Accent color preset id: green, emerald, blue, amber, rose, violet."""
+        return self._accent_color
+
+    @accent_color.setter
+    def accent_color(self, value: str) -> None:
+        if value not in ("green", "emerald", "blue", "amber", "rose", "violet"):
+            raise ValueError(
+                f"accent_color must be one of green/emerald/blue/amber/rose/violet, "
+                f"got {value!r}"
+            )
+        self._accent_color = value
 
     @property
     def api_key(self) -> str:
@@ -196,6 +227,8 @@ class UserConfig:
             return
 
         self._language = data.get("language", self._DEFAULTS["language"])
+        self._theme = data.get("theme", self._DEFAULTS["theme"])
+        self._accent_color = data.get("accent_color", self._DEFAULTS["accent_color"])
         self._api_key = data.get("api_key", self._DEFAULTS["api_key"])
         self._api_base_url = data.get("api_base_url", self._DEFAULTS["api_base_url"])
         self._api_model = data.get("api_model", self._DEFAULTS["api_model"])
@@ -238,6 +271,8 @@ class UserConfig:
     def _apply_defaults(self) -> None:
         self._version = self._DEFAULTS["version"]
         self._language = self._DEFAULTS["language"]
+        self._theme = self._DEFAULTS["theme"]
+        self._accent_color = self._DEFAULTS["accent_color"]
         self._api_key = self._DEFAULTS["api_key"]
         self._api_base_url = self._DEFAULTS["api_base_url"]
         self._api_model = self._DEFAULTS["api_model"]
@@ -265,6 +300,8 @@ class UserConfig:
         data = {
             "version": self._version,
             "language": self._language,
+            "theme": self._theme,
+            "accent_color": self._accent_color,
             "api_key": self._api_key,
             "api_base_url": self._api_base_url,
             "api_model": self._api_model,

@@ -140,6 +140,41 @@ const ThemeState = {
 
 const SETTINGS_STORE = "storyloom-setting-";
 
+/* ── Language mode ──────────────────────────────────────────────────── */
+/* Tracks whether the user chose "system" (follow browser language) or
+   "manual" (explicit language selection).  Persisted in localStorage.
+   When "system", the effective language is re-resolved from the browser
+   on every page load.  The server always stores a concrete language code
+   for i18n purposes — it never receives the sentinel "system" value.    */
+
+const LANG_MODE_KEY = "storyloom-lang-mode";
+
+function getLangMode() {
+    return localStorage.getItem(LANG_MODE_KEY) || "system";
+}
+
+function setLangMode(mode) {
+    localStorage.setItem(LANG_MODE_KEY, mode);
+}
+
+/** Resolve browser language to a supported language code.
+ *  Strategy: direct match first (e.g. "zh-TW"), then primary-language
+ *  prefix fallback (e.g. "zh" → "zh-CN"), finally "en" as ultimate
+ *  default.  The returned value is always a member of the server-side
+ *  SUPPORTED_LANGUAGES set. */
+function resolveBrowserLang() {
+    var raw = navigator.language || "en";
+    // Direct match — covers zh-CN, zh-TW, en, en-US (normalized below)
+    var supported = ["zh-CN", "zh-TW", "en"];
+    if (supported.indexOf(raw) !== -1) return raw;
+    // Prefix fallback (zh-* → zh-CN, en-* → en)
+    var primary = raw.split("-")[0];
+    var prefixMap = { "zh": "zh-CN", "en": "en" };
+    if (prefixMap[primary]) return prefixMap[primary];
+    // Ultimate default
+    return "en";
+}
+
 /* ── Deprecated SETTINGS array (2026-08-10 redesign) ──────────────
  * Kept as reference for config key definitions.
  * Router now uses _renderSettingsSection / factory functions instead.
@@ -187,8 +222,16 @@ function applySetting(key, value) {
 async function saveConfig() {
     const key = getSetting("api_key");
     const imgKey = getSetting("img_api_key");
+    /* Language: when lang_mode is "system", resolve the effective language
+       to send to the server (server never receives the sentinel "system"). */
+    var langToSave = getSetting("lang");
+    if (getLangMode() === "system") {
+        langToSave = resolveBrowserLang();
+    }
     const body = {
-        language: getSetting("lang"),
+        language: langToSave,
+        theme: ThemeState.current,
+        accent_color: getSetting("accent_color") || "green",
         game_mode: getSetting("game_mode"),
         api_base_url: getSetting("api_base_url"),
         api_model: getSetting("api_model"),
@@ -220,9 +263,24 @@ async function initConfig() {
         }
 
         const data = await API.get("/api/config");
-        if (data.language) {
-            GameState.setLang(data.language);
-            localStorage.setItem(SETTINGS_STORE + "lang", data.language);
+        /* Language: resolve based on lang_mode.  "system" → browser language;
+           "manual" → server-stored language.  Default lang_mode is "system"
+           so first-time users automatically get their browser language. */
+        var langMode = getLangMode();
+        var effectiveLang;
+        if (langMode === "system") {
+            effectiveLang = resolveBrowserLang();
+        } else {
+            effectiveLang = data.language || "en";
+        }
+        GameState.setLang(effectiveLang);
+        localStorage.setItem(SETTINGS_STORE + "lang", effectiveLang);
+        /* If system mode, push the resolved language to the server so the
+           stored config stays in sync (don't wait for explicit save). */
+        if (langMode === "system" && effectiveLang !== data.language) {
+            try {
+                await API.post("/api/config", { language: effectiveLang });
+            } catch (_) { /* non-critical — will sync on next saveConfig */ }
         }
         /* Server returns masked key for display hint only.
            Store it separately so the masked value never pollutes
@@ -255,6 +313,12 @@ async function initConfig() {
         }
         if (data.game_mode) {
             localStorage.setItem(SETTINGS_STORE + "game_mode", data.game_mode);
+        }
+        if (data.theme) {
+            ThemeState.set(data.theme);
+        }
+        if (data.accent_color) {
+            localStorage.setItem(SETTINGS_STORE + "accent_color", data.accent_color);
         }
     } catch (err) {
         console.warn("initConfig: server unreachable, using localStorage", err);

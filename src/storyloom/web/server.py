@@ -182,6 +182,8 @@ async def get_config():
 
     return {
         "language": cfg.language,
+        "theme": cfg.theme,
+        "accent_color": cfg.accent_color,
         "api_key": _mask(cfg.api_key),
         "api_base_url": cfg.api_base_url,
         "api_model": cfg.api_model,
@@ -196,6 +198,8 @@ async def get_config():
 
 class ConfigUpdate(BaseModel):
     language: str | None = None
+    theme: str | None = None
+    accent_color: str | None = None
     api_key: str | None = None
     api_base_url: str | None = None
     api_model: str | None = None
@@ -232,6 +236,22 @@ async def update_config(body: ConfigUpdate):
             )
         cfg.language = body.language
         switch_language(body.language)
+    if body.theme is not None:
+        if body.theme not in ("system", "dark", "light"):
+            raise HTTPException(
+                400,
+                f"theme must be 'system', 'dark', or 'light', "
+                f"got {body.theme!r}",
+            )
+        cfg.theme = body.theme
+    if body.accent_color is not None:
+        if body.accent_color not in ("green", "emerald", "blue", "amber", "rose", "violet"):
+            raise HTTPException(
+                400,
+                f"accent_color must be one of green/emerald/blue/amber/rose/violet, "
+                f"got {body.accent_color!r}",
+            )
+        cfg.accent_color = body.accent_color
     if body.api_key is not None:
         cfg.api_key = body.api_key
     if body.api_base_url is not None:
