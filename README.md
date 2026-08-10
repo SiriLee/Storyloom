@@ -19,12 +19,15 @@ Or install from source:
 
 ```bash
 git clone https://github.com/SiriLee/Storyloom.git && cd Storyloom
-pip install -e ".[bg]"
+pip install -e ".[bg,desktop]"
 ```
 
-`[bg]` adds background removal (`onnxruntime` + a one-time ~4.4 MB model
-download during install).  Omit it if you don't need the feature.  The download
-is non-fatal — install succeeds either way.
+| Extra | Adds |
+|-------|------|
+| `bg` | Background removal (`onnxruntime` + ~4.4 MB model download on install) |
+| `desktop` | Native desktop window (`pywebview`; no browser needed). Falls back to browser automatically if unavailable. |
+
+Both are optional — `pip install -e .` gives you a working app either way.
 
 Graph mode needs a one-time asset download into your working directory:
 
@@ -57,10 +60,16 @@ additional `img_api_*` block — configure it in the Settings UI on first launch
 ## Run
 
 ```bash
-storyloom-web          # → http://127.0.0.1:8000
+storyloom-web                 # native desktop window (or browser fallback)
+storyloom-web --browser       # always open in browser
+storyloom-web --port 8080     # custom port (default: auto-assign free port)
+storyloom-web --help          # show all options
 # or
 python -m storyloom.web
 ```
+
+The default mode opens a native desktop window when `pywebview` is installed.
+Without it the app opens in your system browser at `http://127.0.0.1:{port}`.
 
 ---
 

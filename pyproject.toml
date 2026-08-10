@@ -15,6 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 bg = ["onnxruntime>=1.18", "numpy>=1.24", "pillow>=10.0"]
+desktop = ["pywebview>=5.0"]
 
 [project.scripts]
 storyloom-web = "storyloom.web.server:main"

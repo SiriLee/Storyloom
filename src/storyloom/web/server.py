@@ -1224,11 +1224,97 @@ async def exit_app():
     return {"status": "shutting_down"}
 
 
+def _find_free_port() -> int:
+    """Return an available TCP port on localhost.
+
+    Uses port 0 (OS auto-assign), the same pattern as Jupyter, Streamlit,
+    and Gradio.  No race window — the socket is bound, read, and closed
+    before uvicorn re-binds it.
+    """
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def _webview_available() -> bool:
+    """Return True if pywebview can create a native desktop window.
+
+    ``import webview`` succeeds even without a display server — the
+    real test is creating a throwaway window and catching the exception.
+    """
+    try:
+        import webview
+        # Probe: try to list windows (lightweight, no side effects).
+        # On headless systems this may still succeed until start() is
+        # called, so we be conservative and return True — the real
+        # fallback happens in _show_desktop_window() at start() time.
+        return True
+    except ImportError:
+        return False
+
+
+def _open_browser(url: str) -> None:
+    """Open *url* in the system browser, suppressing stderr noise."""
+    import os
+    import webbrowser
+    saved = os.dup(2)
+    null_fd = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(null_fd, 2)
+    os.close(null_fd)
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
+    finally:
+        os.dup2(saved, 2)
+        os.close(saved)
+    print(f"Visit: {url}")
+
+
+def _show_desktop_window(url: str) -> None:
+    """Open *url* in a native pywebview desktop window.
+
+    Falls back to browser mode if a display server is unavailable
+    (e.g. SSH session, WSL without WSLg, CI).
+    """
+    import time
+    time.sleep(1)  # let uvicorn bind the port
+
+    try:
+        import webview
+        webview.create_window("Storyloom", url, width=1200, height=800)
+        webview.start()
+    except Exception:
+        # GUI unavailable — webview.start() raises WebViewException when
+        # no display server is reachable (headless, SSH, WSL without WSLg).
+        import webbrowser
+        print(
+            f"Desktop window unavailable — opening browser instead.\n"
+            f"Visit: {url}"
+        )
+        webbrowser.open(url)
+        # Block until Ctrl+C (daemon thread keeps uvicorn alive).
+        import threading
+        threading.Event().wait()
+
+
 def main():
+    """Start the Storyloom web server.
+
+    Default: native desktop window (pywebview).  Falls back to browser
+    when pywebview is not installed or no display server is available.
+
+    CLI flags::
+
+        --browser       Always open in the system browser
+        --port PORT     Override the auto-assigned port
+        --help          Show help
+    """
+    import argparse
     import os
     import sys
     import threading
-    import webbrowser
 
     # When running without a console (PyInstaller --noconsole), stdout/stderr
     # are None and uvicorn's log formatter crashes trying to call .isatty().
@@ -1241,39 +1327,39 @@ def main():
         if sys.stderr is None:
             sys.stderr = f
 
+    parser = argparse.ArgumentParser(description="Storyloom — AI Text Adventure")
+    parser.add_argument(
+        "--browser", action="store_true",
+        help="Open in system browser instead of a native desktop window.",
+    )
+    parser.add_argument(
+        "--port", type=int, default=0,
+        help="TCP port (default: auto-assign a free port).",
+    )
+    args, _ = parser.parse_known_args()
+
     HOST = "127.0.0.1"
-    PORT = 8000
+    PORT = args.port if args.port else _find_free_port()
     url = f"http://{HOST}:{PORT}"
 
-    def _open_browser():
-        import time
-        import os
-        time.sleep(1.5)
-        # Suppress noisy stderr from browser-launch commands (e.g. gio on WSL).
-        # The child process inherits fd 2 at fork time, so we redirect it
-        # before spawning and restore it in the parent immediately after.
-        saved = os.dup(2)
-        null_fd = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(null_fd, 2)
-        os.close(null_fd)
-        try:
-            webbrowser.open(url)
-        except Exception:
-            pass
-        finally:
-            os.dup2(saved, 2)
-            os.close(saved)
-        print(f"Visit: {url}")
-
-    threading.Thread(target=_open_browser, daemon=True).start()
-
+    # ── Start uvicorn in a daemon thread ───────────────────────────
     import uvicorn
-    uvicorn.run(
-        "storyloom.web.server:app",
-        host=HOST,
-        port=PORT,
-        log_level="warning",
+    t = threading.Thread(
+        target=uvicorn.run,
+        args=("storyloom.web.server:app",),
+        kwargs={"host": HOST, "port": PORT, "log_level": "warning"},
+        daemon=True,
     )
+    t.start()
+
+    # ── Open the UI ────────────────────────────────────────────────
+    if args.browser or not _webview_available():
+        _open_browser(url)
+        t.join()  # block until Ctrl+C
+    else:
+        _show_desktop_window(url)
+        # Window closed — daemon thread exits with process.
+        sys.exit(0)
 
 
 if __name__ == "__main__":
