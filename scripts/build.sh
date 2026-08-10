@@ -117,6 +117,17 @@ cp -r locale "$OUTPUT_DIR/app_new/"
 cp config.example.json "$OUTPUT_DIR/app_new/"
 cp "dist/storyloom-${VERSION}-"*.whl "dist/storyloom-${VERSION}.tar.gz" "$OUTPUT_DIR/app_new/"
 
+# System media — bundled as standalone directory in the release zip.
+# First-time users get a working media library without needing to
+# download it separately via the update UI.  The independent
+# system_media-v{ver}.zip asset is still published for users who
+# only need a media update without a full app upgrade.
+if _has_media; then
+    cp -r system_media "$OUTPUT_DIR/"
+else
+    echo "WARNING: system_media/ not found — release will lack built-in media"
+fi
+
 # 5. Create zip for GitHub Release upload
 echo "--- Creating release archive ---"
 # Map platform to friendly name for release assets
