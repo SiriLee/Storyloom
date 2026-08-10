@@ -677,17 +677,14 @@ button.accent:hover, .btn-accent:hover {
     cursor: pointer;
     overflow: hidden;
     aspect-ratio: 1 / 1;
-    transition: transform var(--trans-normal),
-                box-shadow var(--trans-normal),
+    transition: box-shadow var(--trans-normal),
                 border-color var(--trans-normal);
     user-select: none;
 }
 
 .am-card:hover {
-    transform: scale(1.04);
     box-shadow: var(--shadow-glow-lg);
     border-color: var(--text-accent);
-    z-index: 5;
 }
 
 /* ── Thumbnail (fills entire card) ─────────────────────────────── */
