@@ -43,7 +43,7 @@ echo "--- Building pip packages ---"
 $PYTHON -m build --no-isolation
 
 # System media: use local copy or download from GitHub Release.
-SM_VERSION="1.1.0"
+SM_VERSION=$(head -1 system_media/VERSION | tr -d '[:space:]')
 SM_ZIP="system_media-v${SM_VERSION}.zip"
 SM_URL="https://github.com/SiriLee/Storyloom/releases/download/system-media/${SM_ZIP}"
 
@@ -141,7 +141,7 @@ case "$(uname -s)" in
 esac
 ZIP_NAME="storyloom-v${VERSION}-${PLATFORM}"
 ZIP_DIR="storyloom-v${VERSION}"
-# root_dir=dist/$ZIP_DIR — no base_dir, so zip has app_new/ at root
+# root_dir=dist/$ZIP_DIR — no base_dir, so zip contents are at root
 $PYTHON -c "import shutil; shutil.make_archive('dist/$ZIP_NAME', 'zip', 'dist/$ZIP_DIR')"
 
 echo ""
