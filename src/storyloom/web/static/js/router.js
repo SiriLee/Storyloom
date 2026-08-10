@@ -427,6 +427,7 @@
         }).join("");
 
         /* ── Render initial section ───────────────────────────────── */
+        _settingsScrollActive = true;
         _renderSettingsSection(currentSection);
 
         /* ── Sidebar navigation ──────────────────────────────────── */
@@ -444,15 +445,17 @@
         });
 
         /* ── Scroll tracking: highlight sidebar as user scrolls ──── */
+        var trackedIds = settingsSections.map(function (s) { return s.id; });
         var contentEl = document.getElementById("settings-content");
+
         contentEl.addEventListener("scroll", function () {
-            var tracked = settingsSections.map(function (s) { return s.id; });
-            var scrollTop = contentEl.scrollTop + 80; // offset for heading
-            var active = tracked[0];
-            for (var i = tracked.length - 1; i >= 0; i--) {
-                var el = document.getElementById("section-" + tracked[i]);
-                if (el && el.offsetTop - contentEl.offsetTop <= scrollTop) {
-                    active = tracked[i];
+            if (!_settingsScrollActive) return;
+            var scrollTop = contentEl.scrollTop + 80;
+            var active = trackedIds[0];
+            for (var i = trackedIds.length - 1; i >= 0; i--) {
+                var el = document.getElementById("section-" + trackedIds[i]);
+                if (el && el.offsetTop <= scrollTop) {
+                    active = trackedIds[i];
                     break;
                 }
             }
@@ -492,6 +495,11 @@
     function _renderSettingsSection(id) {
         var container = document.getElementById("settings-inner");
         if (!container) return;
+
+        // Disable scroll tracking for non-settings sections (guide, credits)
+        // so the sidebar doesn't jump when those headings aren't in the DOM.
+        var tracked = ["general", "api", "image", "appearance", "updates"];
+        _settingsScrollActive = tracked.indexOf(id) !== -1;
 
         switch (id) {
             case "general":    _renderGeneralSection(container);    break;
