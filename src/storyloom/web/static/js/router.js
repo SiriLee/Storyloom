@@ -382,15 +382,17 @@
             SSEClient.close();
         }
 
-        var sections = [
+        /* Scroll-tracked settings sections + secondary sections after divider */
+        var settingsSections = [
             { id: "general",    icon: "globe",   label: _("General") },
             { id: "api",        icon: "key",     label: _("API") },
             { id: "image",      icon: "image",   label: _("Image") },
             { id: "appearance", icon: "palette", label: _("Appearance") },
-            { id: null,         icon: null,      label: null },
+            { id: "updates",    icon: "refresh", label: _("Updates") },
+        ];
+        var secondarySections = [
             { id: "guide",      icon: "book",    label: _("API Guide") },
             { id: "credits",    icon: "heart",   label: _("Credits") },
-            { id: "updates",    icon: "refresh", label: _("Updates") },
         ];
 
         var currentSection = "general";
@@ -407,13 +409,16 @@
             + '</div>'
             + '<div class="settings-body">'
             + '<nav class="settings-nav" id="settings-nav"></nav>'
-            + '<div class="settings-content" id="settings-content"></div>'
+            + '<div class="settings-content" id="settings-content">'
+            + '<div class="settings-content-inner" id="settings-inner"></div>'
+            + '</div>'
             + '</div>'
             + '</div>';
 
         /* ── Render sidebar ──────────────────────────────────────── */
         var nav = document.getElementById("settings-nav");
-        nav.innerHTML = sections.map(function (s) {
+        var allSections = settingsSections.concat([{ id: null, icon: null, label: null }], secondarySections);
+        nav.innerHTML = allSections.map(function (s) {
             if (s.id === null) return '<div class="settings-nav-divider"></div>';
             var cls = (s.id === currentSection)
                 ? "settings-nav-item active" : "settings-nav-item";
@@ -430,11 +435,31 @@
                 var sid = this.dataset.section;
                 if (sid === currentSection) return;
                 currentSection = sid;
-                nav.querySelectorAll(".settings-nav-item").forEach(function (b) {
-                    b.classList.toggle("active", b.dataset.section === sid);
-                });
+                _updateSidebarActive(nav, sid);
                 _renderSettingsSection(sid);
+                // Scroll to the target section heading
+                var heading = document.getElementById("section-" + sid);
+                if (heading) heading.scrollIntoView({ behavior: "smooth", block: "start" });
             });
+        });
+
+        /* ── Scroll tracking: highlight sidebar as user scrolls ──── */
+        var contentEl = document.getElementById("settings-content");
+        contentEl.addEventListener("scroll", function () {
+            var tracked = settingsSections.map(function (s) { return s.id; });
+            var scrollTop = contentEl.scrollTop + 80; // offset for heading
+            var active = tracked[0];
+            for (var i = tracked.length - 1; i >= 0; i--) {
+                var el = document.getElementById("section-" + tracked[i]);
+                if (el && el.offsetTop - contentEl.offsetTop <= scrollTop) {
+                    active = tracked[i];
+                    break;
+                }
+            }
+            if (active !== currentSection) {
+                currentSection = active;
+                _updateSidebarActive(nav, active);
+            }
         });
 
         /* ── Back button ──────────────────────────────────────────── */
@@ -446,13 +471,26 @@
         _bindThemeToggle(document.getElementById("settings-theme-btn"));
     }
 
+    /** Update sidebar active state. */
+    function _updateSidebarActive(nav, activeId) {
+        nav.querySelectorAll(".settings-nav-item").forEach(function (b) {
+            b.classList.toggle("active", b.dataset.section === activeId);
+        });
+    }
+
+    /** Render a section heading (icon + text, matches sidebar weight). */
+    function _sectionHeading(iconFn, text, sectionId) {
+        return '<div class="settings-section-heading" id="section-' + esc(sectionId) + '">'
+            + iconFn() + '<span class="settings-section-heading-text">' + esc(text) + '</span></div>';
+    }
+
     /* ═══════════════════════════════════════════════════════════════
        Settings Section Renderers
        ═══════════════════════════════════════════════════════════════ */
 
     /** Dispatch to the correct section renderer. */
     function _renderSettingsSection(id) {
-        var container = document.getElementById("settings-content");
+        var container = document.getElementById("settings-inner");
         if (!container) return;
 
         switch (id) {
@@ -460,9 +498,9 @@
             case "api":        _renderApiSection(container);        break;
             case "image":      _renderImageSection(container);      break;
             case "appearance": _renderAppearanceSection(container); break;
+            case "updates":    _renderUpdatesSection(container);    break;
             case "guide":      _renderApiGuideSection(container);   break;
             case "credits":    _renderCreditsSection(container);    break;
-            case "updates":    _renderUpdatesSection(container);    break;
         }
     }
 
@@ -471,16 +509,20 @@
         var gameMode = getSetting("game_mode") || "text";
 
         container.innerHTML =
-            '<div class="settings-card">'
-            + '<div class="settings-card-title">' + esc(_("Language")) + '</div>'
+            _sectionHeading(Icons.globe, _("General"), "general")
+            + '<div class="settings-card">'
+            + '<div class="settings-card-title">' + Icons.globe() + esc(_("Language")) + '</div>'
             + '<div class="lang-grid">'
-            + _langBtn("zh-CN", "中文", lang)
-            + _langBtn("zh-TW", "繁體中文", lang)
-            + _langBtn("en", "English", lang)
+            + _langBtn("system", _("System"), lang, false)
+            + _langBtn("zh-CN", "中文", lang, false)
+            + _langBtn("zh-TW", "繁體中文", lang, false)
+            + _langBtn("en", "English", lang, false)
+            + _langBtn("ja", "日本語", lang, true)
+            + _langBtn("ko", "한국어", lang, true)
             + '</div>'
             + '</div>'
             + '<div class="settings-card">'
-            + '<div class="settings-card-title">' + esc(_("Game Mode")) + '</div>'
+            + '<div class="settings-card-title">' + Icons.key() + esc(_("Game Mode")) + '</div>'
             + _settingSegmented("game_mode", "", [
                 { value: "text", label: _("Text") },
                 { value: "graph", label: _("Graph") },
@@ -489,15 +531,20 @@
         _bindSettingsInputs(container);
     }
 
-    function _langBtn(value, label, current) {
-        var cls = value === current ? "lang-btn active" : "lang-btn";
-        return '<button class="' + cls + '" data-lang="' + esc(value) + '">' + esc(label) + '</button>';
+    function _langBtn(value, label, current, disabled) {
+        var cls = "lang-btn";
+        if (disabled) cls += "";
+        else if (value === current) cls += " active";
+        var disAttr = disabled ? " disabled" : "";
+        return '<button class="' + cls + '" data-lang="' + esc(value) + '"' + disAttr + '>'
+            + esc(label) + '</button>';
     }
 
     function _renderApiSection(container) {
         container.innerHTML =
-            '<div class="settings-card">'
-            + '<div class="settings-card-title">' + esc(_("API Configuration")) + '</div>'
+            _sectionHeading(Icons.key, _("API"), "api")
+            + '<div class="settings-card">'
+            + '<div class="settings-card-title">' + Icons.key() + esc(_("API Configuration")) + '</div>'
             + _settingText("api_base_url", _("API Base URL"), "https://api.deepseek.com")
             + _settingPassword("api_key", _("API Key"), "sk-...")
             + _settingText("api_model", _("Model"), "deepseek-v4-pro")
@@ -507,27 +554,33 @@
 
     function _renderImageSection(container) {
         var enabled = getSetting("img_generation_enabled") !== "false";
-        var cardHtml =
-            '<div class="settings-card">'
-            + '<div class="settings-card-title">' + esc(_("Image Generation")) + '</div>'
+        var cutout = getSetting("portrait_remove_bg") || "auto";
+
+        container.innerHTML =
+            _sectionHeading(Icons.image, _("Image"), "image")
+            + '<div class="settings-card">'
+            + '<div class="settings-card-title">' + Icons.image() + esc(_("Image Generation")) + '</div>'
             + _settingToggle("img_generation_enabled", _("Image Generation"))
             + '</div>';
 
         if (enabled) {
-            cardHtml +=
+            container.innerHTML +=
                 '<div class="settings-card" id="image-settings-group">'
+                + '<div class="settings-card-title">' + Icons.image() + esc(_("Image API")) + '</div>'
                 + _settingText("img_api_base_url", _("Image API URL"), "https://api.apiyi.com/v1")
                 + _settingPassword("img_api_key", _("Image API Key"), "sk-...")
                 + _settingText("img_api_model", _("Image Model"), "flux-2-pro")
-                + _settingSelect("portrait_remove_bg", _("Sprite Cutout"), [
+                + '</div>'
+                + '<div class="settings-card">'
+                + '<div class="settings-card-title">' + Icons.image() + esc(_("Sprite Cutout")) + '</div>'
+                + _settingSegmented("portrait_remove_bg", "", [
                     { value: "never", label: _("Never") },
                     { value: "auto", label: _("Auto") },
                     { value: "always", label: _("Always") },
-                ])
+                ], cutout)
                 + '</div>';
         }
 
-        container.innerHTML = cardHtml;
         _bindSettingsInputs(container);
     }
 
@@ -539,14 +592,15 @@
             { id: "green",    color: "#3fb950", label: _("Green") },
             { id: "emerald",  color: "#10b981", label: _("Emerald") },
             { id: "blue",     color: "#3b82f6", label: _("Blue") },
-            { id: "lava",     color: "#f59e0b", label: _("Amber") },
+            { id: "amber",    color: "#f59e0b", label: _("Amber") },
             { id: "rose",     color: "#f43f5e", label: _("Rose") },
             { id: "violet",   color: "#8b5cf6", label: _("Violet") },
         ];
 
         container.innerHTML =
-            '<div class="settings-card">'
-            + '<div class="settings-card-title">' + esc(_("Theme")) + '</div>'
+            _sectionHeading(Icons.palette, _("Appearance"), "appearance")
+            + '<div class="settings-card">'
+            + '<div class="settings-card-title">' + Icons.palette() + esc(_("Theme")) + '</div>'
             + _settingSegmented("theme", "", [
                 { value: "system", label: _("System") },
                 { value: "dark", label: _("Dark") },
@@ -554,7 +608,7 @@
             ], theme)
             + '</div>'
             + '<div class="settings-card">'
-            + '<div class="settings-card-title">' + esc(_("Accent Color")) + '</div>'
+            + '<div class="settings-card-title">' + Icons.palette() + esc(_("Accent Color")) + '</div>'
             + '<div class="accent-grid">'
             + accentColors.map(function (a) {
                 var cls = a.id === accent ? "accent-tile active" : "accent-tile";
@@ -595,8 +649,9 @@
 
     function _renderUpdatesSection(container) {
         container.innerHTML =
-            '<div class="settings-card">'
-            + '<div class="settings-card-title">' + esc(_("Updates")) + '</div>'
+            _sectionHeading(Icons.refresh, _("Updates"), "updates")
+            + '<div class="settings-card">'
+            + '<div class="settings-card-title">' + Icons.refresh() + esc(_("Updates")) + '</div>'
             + '<div class="settings-row">'
             + '<span class="settings-row-label">' + esc(_("Current Version")) + '</span>'
             + '<span class="settings-row-value" id="update-current-ver">...</span>'
@@ -762,13 +817,6 @@
                 if (this.dataset.key === "lang") {
                     renderSettings();
                 }
-                if (this.dataset.key === "portrait_remove_bg" && this.value !== "never") {
-                    API.get("/api/config/bg-removal-status").then(function (status) {
-                        if (!status.available) {
-                            showToast(_("Background removal model not available"), 4000);
-                        }
-                    }).catch(function () { /* best-effort */ });
-                }
             });
         });
 
@@ -796,18 +844,26 @@
                         _updateAllThemeButtons();
                     } else if (group.dataset.key === "game_mode") {
                         applySetting("game_mode", val);
+                    } else if (group.dataset.key === "portrait_remove_bg") {
+                        applySetting("portrait_remove_bg", val);
                     }
                 });
             });
         });
 
         /* Language button grid */
-        container.querySelectorAll(".lang-btn").forEach(function (btn) {
+        container.querySelectorAll(".lang-btn:not([disabled])").forEach(function (btn) {
             btn.addEventListener("click", function () {
                 var val = this.dataset.lang;
+                if (val === "system") {
+                    // Resolve browser language
+                    var navLang = (navigator.language || "en").split("-")[0];
+                    var supported = { "zh": "zh-CN", "en": "en" };
+                    val = supported[navLang] || "en";
+                }
                 container.querySelectorAll(".lang-btn").forEach(function (b) {
-                    b.classList.toggle("active", b.dataset.lang === val);
-                });
+                    b.classList.toggle("active", b.dataset.lang === this.dataset.lang);
+                }, this);
                 applySetting("lang", val);
                 GameState.setLang(val);
                 renderSettings();

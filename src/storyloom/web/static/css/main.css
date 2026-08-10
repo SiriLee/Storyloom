@@ -2643,13 +2643,13 @@ button.accent:hover, .btn-accent:hover {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 0.7rem;
+    padding: 0.55rem 0.75rem;
     border: none;
     border-radius: var(--radius-lg);
     background: transparent;
     color: var(--text-secondary);
     font-family: var(--font-sans);
-    font-size: 0.87rem;
+    font-size: 0.92rem;
     font-weight: 500;
     text-align: left;
     cursor: pointer;
@@ -2687,11 +2687,18 @@ button.accent:hover, .btn-accent:hover {
     padding: var(--space-lg) var(--space-xl) var(--space-2xl);
     scrollbar-width: none;
     -ms-overflow-style: none;
-    display: block;              /* override old flex column */
-    align-items: initial;        /* override old center */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .settings-view .settings-content::-webkit-scrollbar { display: none; }
+
+/* Fixed-width inner wrapper — components don't stretch with viewport */
+.settings-content-inner {
+    width: 100%;
+    max-width: 660px;
+}
 
 /* ── Settings Card (MXU-style: rounded-xl, clean, no hover) ─────── */
 
@@ -2704,11 +2711,38 @@ button.accent:hover, .btn-accent:hover {
 }
 
 .settings-card-title {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.8rem;
+}
+
+.settings-card-title svg {
+    flex-shrink: 0;
+    color: var(--text-accent);
+}
+
+/* Section heading (above cards, matches sidebar weight) */
+.settings-section-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+    padding: 0 var(--space-xs);
+}
+
+.settings-section-heading svg {
+    flex-shrink: 0;
+    color: var(--text-accent);
+}
+
+.settings-section-heading-text {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
 }
 
 /* ── Settings Row (inside card) ──────────────────────────────────── */
@@ -2727,9 +2761,9 @@ button.accent:hover, .btn-accent:hover {
 
 .settings-row-label {
     color: var(--text-secondary);
-    font-size: 0.9rem;
+    font-size: 0.92rem;
     flex-shrink: 0;
-    min-width: 130px;
+    min-width: 140px;
 }
 
 .settings-row-value {
@@ -2741,6 +2775,9 @@ button.accent:hover, .btn-accent:hover {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    /* Reserve space so switching to input doesn't shift layout */
+    min-height: 2rem;
+    line-height: 2rem;
 }
 
 .settings-row-value.muted {
@@ -2758,7 +2795,8 @@ button.accent:hover, .btn-accent:hover {
     font-family: var(--font-mono);
     font-size: 0.87rem;
     outline: none;
-    max-width: 380px;
+    /* Match the width of the value display to prevent jump */
+    box-sizing: border-box;
 }
 
 .settings-row-select {
@@ -2833,13 +2871,13 @@ button.accent:hover, .btn-accent:hover {
 
 .settings-seg-btn {
     flex: 1;
-    padding: 0.45rem 1rem;
+    padding: 0.5rem 1rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     background: var(--bg-primary);
     color: var(--text-secondary);
     font-family: var(--font-sans);
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
     transition: all var(--trans-normal);
@@ -3073,13 +3111,13 @@ button.accent:hover, .btn-accent:hover {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.45rem 0.7rem;
+    padding: 0.5rem 0.7rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     background: var(--bg-primary);
     cursor: pointer;
     transition: all var(--trans-normal);
-    font-size: 0.83rem;
+    font-size: 0.88rem;
     font-weight: 500;
     color: var(--text-secondary);
 }
@@ -3121,7 +3159,7 @@ button.accent:hover, .btn-accent:hover {
     background: var(--bg-primary);
     color: var(--text-secondary);
     font-family: var(--font-sans);
-    font-size: 0.87rem;
+    font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
     text-align: center;
@@ -3135,6 +3173,18 @@ button.accent:hover, .btn-accent:hover {
     color: #fff;
     border-color: var(--text-accent);
     font-weight: 600;
+}
+
+.lang-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+}
+
+.lang-btn:disabled:hover {
+    background: var(--bg-primary);
+    color: var(--text-secondary);
 }
 
 /* ── Toast: error variant ────────────────────────────────────────── */
