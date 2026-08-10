@@ -654,10 +654,10 @@ button.accent:hover, .btn-accent:hover {
     flex: 1;
     overflow-y: auto;
     padding: var(--space-sm) var(--space-sm) var(--space-2xl);
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 1rem;
-    align-content: start;
+    align-content: flex-start;
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
@@ -666,64 +666,59 @@ button.accent:hover, .btn-accent:hover {
     display: none;
 }
 
-/* ── Asset card — full-image tile with overlay text ────────────── */
+/* ── Asset card ────────────────────────────────────────────────── */
 
 .am-card {
     position: relative;
-    display: flex;
+    width: 280px;
+    height: 210px;
+    flex-shrink: 0;
     border-radius: var(--radius-xl);
     border: 1px solid var(--border-color);
     background: var(--bg-secondary);
     cursor: pointer;
     overflow: hidden;
-    aspect-ratio: 1 / 1;
-    transition: box-shadow var(--trans-normal),
+    transition: transform var(--trans-normal),
+                box-shadow var(--trans-normal),
                 border-color var(--trans-normal);
     user-select: none;
 }
 
 .am-card:hover {
+    transform: scale(1.04);
     box-shadow: var(--shadow-glow-lg);
     border-color: var(--text-accent);
+    z-index: 5;
 }
 
-/* ── Thumbnail (fills entire card) ─────────────────────────────── */
+/* ── Image ─────────────────────────────────────────────────────── */
 
 .am-card-img {
     position: absolute;
     inset: 0;
-}
-
-.am-card-img img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
-    transition: transform var(--trans-slow);
 }
 
-.am-card:hover .am-card-img img {
-    transform: scale(1.06);
-}
+/* ── Text overlay ──────────────────────────────────────────────── */
 
-/* ── Text overlay — gradient at bottom ─────────────────────────── */
-
-.am-card-body {
+.am-card-overlay {
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
-    padding: 2rem 0.9rem 0.8rem;
-    background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.45) 60%, transparent 100%);
-    color: #fff;
+    padding: 2rem 0.85rem 0.75rem;
+    background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 60%, transparent 100%);
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
+    gap: 0.12rem;
 }
 
 .am-card-label {
     font-family: var(--font-sans);
-    font-size: 0.95rem;
+    font-size: 0.88rem;
     font-weight: 600;
     color: #fff;
     overflow: hidden;
@@ -733,43 +728,41 @@ button.accent:hover, .btn-accent:hover {
 }
 
 .am-card-desc {
-    font-size: 0.8rem;
-    color: rgba(255,255,255,0.85);
+    font-size: 0.76rem;
+    color: rgba(255,255,255,0.82);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     text-shadow: 0 1px 2px rgba(0,0,0,0.4);
-    transition: white-space var(--trans-slow);
 }
 
 .am-card:hover .am-card-desc {
     white-space: normal;
+    overflow: visible;
 }
 
 .am-card-usage {
     font-family: var(--font-mono);
-    font-size: 0.72rem;
-    color: rgba(255,255,255,0.6);
-    margin-top: 0.2rem;
+    font-size: 0.68rem;
+    color: rgba(255,255,255,0.5);
+    margin-top: 0.1rem;
 }
 
-/* ── Trash button (top-right corner) ───────────────────────────── */
+/* ── Trash button ──────────────────────────────────────────────── */
 
 .am-card-trash {
     position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
+    top: 0.4rem;
+    right: 0.4rem;
     display: none;
-    width: 2rem;
-    height: 2rem;
+    width: 1.9rem;
+    height: 1.9rem;
     padding: 0;
     border: none;
     border-radius: var(--radius-sm);
     background: rgba(0, 0, 0, 0.55);
     color: #f87171;
     cursor: pointer;
-    transition: background var(--trans-normal), transform var(--trans-normal);
-    line-height: 1;
     align-items: center;
     justify-content: center;
     z-index: 2;
