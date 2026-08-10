@@ -2,7 +2,7 @@
 
 > An LLM-powered interactive fiction engine with a visual novel mode.
 
-[![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-%3E%3D10-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/SiriLee/e809f4fcaea1700560591c9867659fc0/raw/badge.json)](https://github.com/SiriLee/Storyloom/actions)
 
@@ -10,88 +10,75 @@
 
 ---
 
-## Install
+## Installation
 
-Download the latest binary for your platform from
-[Releases](https://github.com/SiriLee/Storyloom/releases).  No Python required.
+### Standalone binary
 
-Or install from source:
+*No Python required.*
+
+Download `storyloom-v{VERSION}-{platform}.zip` from
+[Releases](https://github.com/SiriLee/Storyloom/releases/latest), extract,
+and run `Storyloom`.
+
+### Wheel
+
+*Requires Python ≥ 3.10.*
+
+Download `storyloom-{VERSION}-py3-none-any.whl` from
+[Releases](https://github.com/SiriLee/Storyloom/releases/latest), then:
 
 ```bash
-git clone https://github.com/SiriLee/Storyloom.git && cd Storyloom
-pip install -e ".[bg,desktop]"
+pip install ./storyloom-{VERSION}-py3-none-any.whl
+storyloom-web
+```
+
+Optional dependencies (install separately if needed):
+
+```bash
+pip install pywebview           # native desktop window (falls back to browser)
+pip install onnxruntime         # background removal (model already bundled)
+```
+
+System media assets are not included in the wheel.  Download them via
+**Settings → Updates** on first launch.
+
+### From source
+
+```bash
+git clone https://github.com/SiriLee/Storyloom.git
+cd Storyloom
+pip install -e ".[desktop,bg]"
 ```
 
 | Extra | Adds |
 |-------|------|
-| `bg` | Background removal (`onnxruntime` + ~4.4 MB model download on install) |
-| `desktop` | Native desktop window (`pywebview`; no browser needed). Falls back to browser automatically if unavailable. |
-
-Both are optional — `pip install -e .` gives you a working app either way.
-
-Graph mode needs a one-time asset download into your working directory:
-
-```bash
-# 1. Download system media assets (~267 MB)
-curl -L -o _sm.zip https://github.com/SiriLee/Storyloom/releases/download/system-media/system_media-v1.1.0.zip
-
-# 2. Extract to system_media/
-python3 -c "import zipfile; zipfile.ZipFile('_sm.zip').extractall('system_media')"
-
-# 3. Clean up
-rm _sm.zip
-```
+| `desktop` | Native desktop window via `pywebview` — falls back to browser if unavailable |
+| `bg` | Background removal for generated images (`onnxruntime`; model already bundled) |
 
 ---
 
-## Configure
-
-```bash
-cp config.example.json config.json
-```
-
-```json
-{
-  "api_key": "sk-...",
-  "api_base_url": "https://api.deepseek.com",
-  "api_model": "deepseek-v4-pro",
-  "game_mode": "graph"
-}
-```
-
-Any OpenAI-compatible provider works. Image generation (graph mode) needs an
-additional `img_api_*` block — configure it in the Settings UI on first launch.
-
----
-
-## Run
+## Usage
 
 ```bash
 storyloom-web                 # native desktop window (or browser fallback)
 storyloom-web --browser       # always open in browser
-storyloom-web --port 8080     # custom port (default: auto-assign free port)
+storyloom-web --port 8080     # custom port (default: auto-assign)
 storyloom-web --help          # show all options
+
 # or
 python -m storyloom.web
 ```
 
-The default mode opens a native desktop window when `pywebview` is installed.
-Without it the app opens in your system browser at `http://127.0.0.1:{port}`.
+First launch opens the Settings page.  Enter your API key, select a mode
+(**Text** or **Graph**), and start a new game.
+
+> **System media assets** (~267 MB of character portraits and background
+> images) are bundled in the standalone binary.  Wheel and source users can
+> download them via **Settings → Updates** inside the app.
 
 ---
 
-## What It Does
-
-You describe a story idea. The AI interviews you, builds a world, and becomes
-your game master. You play through branching narrative — choices matter, state
-persists, and the engine handles pacing so you never see a loading spinner.
-
-**Graph mode** adds character portraits and scene backgrounds, declared on the
-fly by the AI and resolved by the engine's asset pipeline in real time.
-
----
-
-## Capabilities
+## Features
 
 | | |
 |---|---|
@@ -106,7 +93,7 @@ fly by the AI and resolved by the engine's asset pipeline in real time.
 | i18n | English, 简体中文, 繁體中文 (gettext) |
 | Web UI | FastAPI + SSE + vanilla JS SPA |
 | CLI | Terminal client with debug observer |
-| Packaged | `pip install` + standalone binary (PyInstaller) + system asset zip |
+| Packaging | Standalone binary (PyInstaller) + pip wheel + system asset pack |
 
 ---
 
@@ -134,9 +121,9 @@ graph TD
     State -. "pre-fetch" .-> LLM
 ```
 
-Solid lines are streaming data flow. Dotted lines are one-shot triggers.
-Graph-mode asset tags spawn tasks that resolve asynchronously, without blocking
-the text pipeline.
+Solid lines are streaming data flow.  Dotted lines are one-shot triggers.
+Graph-mode asset tags spawn tasks that resolve asynchronously, without
+blocking the text pipeline.
 
 ---
 
@@ -152,28 +139,29 @@ the text pipeline.
 
 ---
 
-## Develop
+## Development
 
 ```bash
-git clone https://github.com/SiriLee/Storyloom.git && cd Storyloom
-pip install -e ".[bg]"
+# Clone and install
+git clone https://github.com/SiriLee/Storyloom.git
+cd Storyloom
+pip install -e ".[desktop,bg]"
 
-pytest                          # no API key needed
+# Tests (no API key needed)
+pytest
 
 # Build
-bash scripts/build.sh           # standalone binary + wheel
-bash scripts/pack_system_media.sh  # system asset zip for release
-```
+bash scripts/build.sh                # standalone binary + wheel
+bash scripts/pack_system_media.sh    # system asset pack for release
 
-```bash
-# Generate system assets from source (needs image API key)
+# Generate system assets from source definitions (requires image API key)
 python scripts/generate_system_assets.py
-python scripts/generate_single_asset.py sys_student_female --dry-run
+python scripts/generate_manifest.py
 ```
 
-**Conventions:** Python ≥ 3.10 · stdlib-first · Conventional Commits · English
-code & docs · mock tests (no real API calls) · Chinese internal discussions.
+**Conventions:** Python ≥ 3.10 · stdlib-first · Conventional Commits ·
+English code & docs · mock tests (no real API calls).
 
 ---
 
-MIT
+[MIT](./LICENSE)
