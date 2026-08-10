@@ -2881,7 +2881,6 @@ button.accent:hover, .btn-accent:hover {
 }
 
 .settings-seg-group {
-    flex: 1;
     /* grid-template-columns set inline by JS: repeat(N, 1fr) */
 }
 
