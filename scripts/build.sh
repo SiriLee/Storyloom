@@ -57,8 +57,8 @@ fi
 
 # 1. Install project + build tools (PyInstaller needs deps to discover imports)
 echo "--- Installing project + build tools ---"
-$PYTHON -m pip install -q -e ".[bg]" build pyinstaller wheel 2>/dev/null || \
-    $PYTHON -m pip install -q --break-system-packages -e ".[bg]" build pyinstaller wheel
+$PYTHON -m pip install -q -e ".[bg,desktop]" build pyinstaller wheel 2>/dev/null || \
+    $PYTHON -m pip install -q --break-system-packages -e ".[bg,desktop]" build pyinstaller wheel
 
 # 2. pip packages (wheel + sdist)
 #    i18n (.mo + frontend JS dict) compiled automatically by setup.py build hook
@@ -99,6 +99,7 @@ $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
     --hidden-import uvicorn.protocols.http.auto \
     --hidden-import onnxruntime \
     --hidden-import numpy \
+    --hidden-import webview \
     src/storyloom/web/__main__.py
 
 # 3b. Build Launcher — minimal PyInstaller exe (no --add-data)
