@@ -1292,8 +1292,18 @@ def _show_desktop_window(url: str) -> None:
     print(f"Storyloom {__version__} — application server")
     print("Opening desktop window.  You may minimize this window.")
 
+    # Suppress noisy GTK/QT import warnings from pywebview internals.
+    saved = os.dup(2)
+    null_fd = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(null_fd, 2)
+    os.close(null_fd)
     try:
         import webview
+    finally:
+        os.dup2(saved, 2)
+        os.close(saved)
+
+    try:
         webview.create_window("Storyloom", url, width=1200, height=800)
         webview.start()
     except Exception:
