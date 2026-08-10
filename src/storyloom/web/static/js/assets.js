@@ -74,6 +74,7 @@ const AssetManagerView = (function () {
                     <button class="cc-back-btn" id="am-back"
                             title="${esc(_("Back to Menu"))}">${Icons.arrowLeft()}</button>
                     <span class="am-title">${esc(_("Asset Management"))}</span>
+                    <button class="theme-toggle-btn" id="am-theme-btn" title="Toggle Theme"></button>
                 </div>
                 <div class="am-body">
                     <div class="am-sidebar" id="am-sidebar">
@@ -92,6 +93,15 @@ const AssetManagerView = (function () {
         document.getElementById("am-back").addEventListener("click", function () {
             Router.navigate("menu");
         });
+
+        var themeBtn = document.getElementById("am-theme-btn");
+        if (themeBtn) {
+            _updateThemeButton(themeBtn);
+            themeBtn.addEventListener("click", function () {
+                ThemeState.cycle();
+                _updateAllThemeButtons();
+            });
+        }
 
         API.get("/api/assets").then(function (data) {
             _assets = data.types || {};

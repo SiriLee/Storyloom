@@ -68,6 +68,7 @@ const AdventureLogView = (function () {
                     <button class="cc-back-btn" id="al-back"
                             title="${_("Back to Menu")}">${Icons.arrowLeft()}</button>
                     <span class="al-label">${escHtml(title)}</span>
+                    <button class="theme-toggle-btn" id="al-theme-btn" title="Toggle Theme"></button>
                     <button class="al-export-btn" id="al-export" disabled>
                         ${_("Export")}
                     </button>
@@ -92,6 +93,16 @@ const AdventureLogView = (function () {
 
         /* ── Export button → download .md file ─────────────────── */
         $("#al-export").addEventListener("click", () => _exportLog());
+
+        /* ── Theme toggle ──────────────────────────────────────── */
+        var themeBtn = document.getElementById("al-theme-btn");
+        if (themeBtn) {
+            _updateThemeButton(themeBtn);
+            themeBtn.addEventListener("click", function () {
+                ThemeState.cycle();
+                _updateAllThemeButtons();
+            });
+        }
     }
 
     /* ═══════════════════════════════════════════════════════════════

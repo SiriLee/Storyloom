@@ -818,6 +818,8 @@
                 b.classList.toggle("active", b.dataset.value === ThemeState.current);
             });
         }
+        window._updateThemeButton = _updateThemeButton;
+        window._updateAllThemeButtons = _updateAllThemeButtons;
     }
 
     /** Bind the update check/apply flow on the settings page. */
@@ -1064,6 +1066,7 @@
                 <div class="gp-header">
                     <button class="cc-back-btn" id="gp-back"
                             title="${esc(_("Back to Menu"))}">${Icons.arrowLeft()}</button>
+                    <button class="theme-toggle-btn" id="gp-theme-btn" title="Toggle Theme"></button>
                 </div>
 
                 <div class="gp-content">
@@ -1086,6 +1089,15 @@
         document.getElementById("gp-start").addEventListener("click", () => {
             navigate(`game/${encodeURIComponent(gameId)}`);
         });
+
+        var themeBtn = document.getElementById("gp-theme-btn");
+        if (themeBtn) {
+            _updateThemeButton(themeBtn);
+            themeBtn.addEventListener("click", function () {
+                ThemeState.cycle();
+                _updateAllThemeButtons();
+            });
+        }
     }
 
     /* ═══════════════════════════════════════════════════════════════
@@ -1129,6 +1141,7 @@
                     <button class="cc-back-btn" id="sv-back"
                             title="${esc(_("Back to Menu"))}">${Icons.arrowLeft()}</button>
                     <span class="sv-title">${esc(_("Load Save"))}</span>
+                    <button class="theme-toggle-btn" id="sv-theme-btn" title="Toggle Theme"></button>
                 </div>
                 <div class="sv-list sv-list--expandable" id="sv-game-list">
                     <p class="sv-card-empty">${esc(_("Loading..."))}</p>
@@ -1139,6 +1152,15 @@
         document.getElementById("sv-back").addEventListener("click", () => {
             navigate("menu");
         });
+
+        var themeBtn = document.getElementById("sv-theme-btn");
+        if (themeBtn) {
+            _updateThemeButton(themeBtn);
+            themeBtn.addEventListener("click", function () {
+                ThemeState.cycle();
+                _updateAllThemeButtons();
+            });
+        }
 
         API.get("/api/saves/games").then(games => {
             const list = document.getElementById("sv-game-list");
@@ -1206,6 +1228,7 @@
                     <button class="cc-back-btn" id="sv-back"
                             title="${esc(_("Back to Menu"))}">${Icons.arrowLeft()}</button>
                     <span class="sv-title" id="sv-cp-title">${esc(_("Loading..."))}</span>
+                    <button class="theme-toggle-btn" id="cp-theme-btn" title="Toggle Theme"></button>
                     <button class="sv-restart-btn" id="sv-restart">${esc(_("Restart"))}</button>
                 </div>
                 <div class="sv-list sv-list--expandable" id="sv-cp-list">
@@ -1234,6 +1257,15 @@
                 showToast(err.message);
             }
         });
+
+        var themeBtn = document.getElementById("cp-theme-btn");
+        if (themeBtn) {
+            _updateThemeButton(themeBtn);
+            themeBtn.addEventListener("click", function () {
+                ThemeState.cycle();
+                _updateAllThemeButtons();
+            });
+        }
 
         /* Fetch saves + game metadata in parallel.
            Saves come back in directory order; re-sort by saved_at

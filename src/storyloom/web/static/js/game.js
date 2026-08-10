@@ -162,6 +162,7 @@ const GameView = (function () {
                                 title="${_("Settings")}">
                             ${Icons.gear()}
                         </button>
+                        <button class="theme-toggle-btn" id="game-theme-btn" title="Toggle Theme"></button>
                     </div>
                 </div>
 
@@ -179,6 +180,15 @@ const GameView = (function () {
         $("#game-exit").addEventListener("click", _handleExit);
         $("#game-mode-btn").addEventListener("click", _toggleMode);
         $("#game-settings-btn").addEventListener("click", _openSettings);
+
+        var themeBtn = document.getElementById("game-theme-btn");
+        if (themeBtn) {
+            _updateThemeButton(themeBtn);
+            themeBtn.addEventListener("click", function () {
+                ThemeState.cycle();
+                _updateAllThemeButtons();
+            });
+        }
 
         /* Manual mode advance: click story area, Space, or Enter */
         const storyEl = $("#game-story");

@@ -53,6 +53,7 @@ const CoCreateView = (function () {
                     <button class="cc-back-btn" id="cc-back"
                             title="${esc(_("Back to Menu"))}" disabled>${Icons.arrowLeft()}</button>
                     <span class="cc-title">${esc(_("Co-Create"))}</span>
+                    <button class="theme-toggle-btn" id="cc-theme-btn" title="Toggle Theme"></button>
                     <button class="cc-start-btn" id="cc-start" disabled>${esc(_("Start"))}</button>
                 </div>
 
@@ -112,6 +113,15 @@ const CoCreateView = (function () {
 
         $("#cc-back").addEventListener("click", _handleBack);
         $("#cc-start").addEventListener("click", _handleStart);
+
+        var themeBtn = document.getElementById("cc-theme-btn");
+        if (themeBtn) {
+            _updateThemeButton(themeBtn);
+            themeBtn.addEventListener("click", function () {
+                ThemeState.cycle();
+                _updateAllThemeButtons();
+            });
+        }
     }
 
     /* ── Back button — follows same gating as Start (via _setInputEnabled) ── */
