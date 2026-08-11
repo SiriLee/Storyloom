@@ -18,6 +18,21 @@ from storyloom.config import (
     SUPPORTED_LANGUAGES,
 )
 
+# ══════════════════════════════════════════════════════════════════════════
+# Streaming section constants
+# ══════════════════════════════════════════════════════════════════════════
+
+# Top-level JSON keys in generation order — used by _SectionStreamer
+# to detect completed sections during streaming.  Must match the key
+# order in ``CO_CREATE_GENERATION_PROMPT``.
+_GENERATE_SECTION_ORDER = [
+    "story_config",
+    "characters",
+    "locations",
+    "variables",
+    "outline",
+]
+
 
 # ══════════════════════════════════════════════════════════════════════════
 # CoCreateValidator — JSON parsing + field-level validation
@@ -692,6 +707,52 @@ class CoCreateError(Exception):
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# Streaming section detection
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class _SectionStreamer:
+    """Token accumulator that detects completed JSON sections during streaming.
+
+    Wraps ``stream_chat_iter()``, accumulates delta text, and detects when
+    each top-level key in ``_GENERATE_SECTION_ORDER`` has begun (simple
+    substring match).  Yields ``section_complete`` events with just the
+    section key — no data extraction (the frontend task list only needs
+    the name).
+    """
+
+    def __init__(self, token_iter):
+        self._iter = token_iter
+        self._buffer = ""
+        self._next_idx = 0
+
+    def __iter__(self):
+        return self._process()
+
+    def _process(self):
+        for chunk in self._iter:
+            if chunk.get("done"):
+                break
+
+            delta = chunk.get("delta", "")
+            if delta:
+                self._buffer += delta
+
+            # When the next key's opening quote appears in the buffer,
+            # the previous section is complete.
+            while self._next_idx < len(_GENERATE_SECTION_ORDER):
+                key = _GENERATE_SECTION_ORDER[self._next_idx]
+                key_str = f'"{key}"'
+                if key_str not in self._buffer:
+                    break
+                yield {"type": "section_complete", "section": key}
+                self._next_idx += 1
+
+        # Stream ended — yield final event with full buffer for validation
+        yield {"type": "generate_done", "content": self._buffer}
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # CoCreateFlow — orchestration
 # ══════════════════════════════════════════════════════════════════════════
 
@@ -985,6 +1046,77 @@ class CoCreateFlow:
                 phase="generate_parse",
                 message=f"Parse failed: {e}",
             ) from e
+
+    def generate_stream(self):
+        """Stream story setup generation via SSE-friendly event iterator.
+
+        Same semantics as ``generate()`` (appends generation prompt, calls
+        LLM, validates result), but uses ``stream_chat_iter()`` and yields
+        ``section_complete`` events for each top-level JSON key as it
+        finishes, then a final ``generate_done`` event with the parsed
+        result.
+
+        Yields:
+            Dicts with ``type`` key:
+            - ``section_complete`` — ``{section, data}``
+            - ``generate_done`` — ``{content, result}`` (parsed + validated)
+
+        Raises:
+            RuntimeError: If not in awaiting_answer phase.
+            CoCreateError: On API or validation failure (UI can retry).
+        """
+        if self._phase != "awaiting_answer":
+            raise RuntimeError(
+                f"Cannot generate in phase: {self._phase}"
+            )
+
+        # Append generation prompt as user message
+        gen_prompt = self._build_generation_prompt()
+        self._messages.append({"role": "user", "content": gen_prompt})
+
+        # Stream the API call
+        try:
+            token_iter = self._api.stream_chat_iter(
+                self._messages, response_format={"type": "json_object"}
+            )
+        except ApiError as e:
+            self._retry_state = ("generate_api", "")
+            raise CoCreateError(
+                phase="generate_api",
+                message=f"Generation API call failed: {e}",
+            ) from e
+
+        streamer = _SectionStreamer(token_iter)
+        full_content = ""
+
+        for event in streamer:
+            if event["type"] == "section_complete":
+                yield event
+            elif event["type"] == "generate_done":
+                full_content = event["content"]
+
+        if not full_content:
+            self._retry_state = ("generate_api", "")
+            raise CoCreateError(
+                phase="generate_api",
+                message="Generation returned empty response.",
+            )
+
+        self._messages.append({"role": "assistant", "content": full_content})
+
+        # Parse and validate (same pipeline as generate())
+        try:
+            result = self._parse_generation(full_content)
+        except CoCreateError:
+            raise  # retry state already set by _parse_generation
+        except Exception as e:
+            self._retry_state = ("generate_parse", str(e))
+            raise CoCreateError(
+                phase="generate_parse",
+                message=f"Parse failed: {e}",
+            ) from e
+
+        yield {"type": "generate_done", "result": result}
 
     def _parse_generation(self, response: str) -> dict:
         """Parse and validate a generation response.
