@@ -3077,6 +3077,42 @@ button.accent:hover, .btn-accent:hover {
     text-decoration: underline;
 }
 
+
+	/* ── About: Project & Community link rows ──────────────────────── */
+
+	.settings-about-row {
+	    display: flex;
+	    align-items: center;
+	    justify-content: space-between;
+	    padding: 0.55rem 0;
+	    gap: 1rem;
+	}
+
+	.settings-about-row + .settings-about-row {
+	    border-top: 1px solid var(--border-color);
+	}
+
+	.settings-about-label {
+	    font-size: 0.92rem;
+	    font-weight: 500;
+	    color: var(--text-primary);
+	    flex-shrink: 0;
+	}
+
+	.settings-about-link {
+	    font-family: var(--font-mono);
+	    font-size: 0.82rem;
+	    color: var(--text-accent);
+	    text-decoration: none;
+	    overflow: hidden;
+	    text-overflow: ellipsis;
+	    white-space: nowrap;
+	    transition: opacity var(--trans-normal);
+	}
+
+	.settings-about-link:hover {
+	    opacity: 0.75;
+	}
 /* ── API Guide (rendered Markdown inside settings card) ──────────── */
 
 .settings-guide {

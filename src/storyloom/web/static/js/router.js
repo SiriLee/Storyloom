@@ -361,7 +361,7 @@
 
        Sidebar sections: General, API, Image, Appearance,
                          — divider —
-                         API Guide, Credits, Updates
+                         API Guide, About, Updates
 
        Authority:
          2026-08-10-frontend-redesign.md §3
@@ -383,7 +383,7 @@
         ];
         var secondarySections = [
             { id: "guide",      icon: "book",    label: _("API Guide") },
-            { id: "credits",    icon: "heart",   label: _("Credits") },
+            { id: "about",      icon: "info",    label: _("About") },
         ];
 
         var currentSection = "general";
@@ -487,7 +487,7 @@
         var container = document.getElementById("settings-inner");
         if (!container) return;
 
-        // Disable scroll tracking for non-settings sections (guide, credits)
+        // Disable scroll tracking for non-settings sections (guide, about)
         // so the sidebar doesn't jump when those headings aren't in the DOM.
         var tracked = ["general", "api", "image", "appearance", "updates"];
         _settingsScrollActive = tracked.indexOf(id) !== -1;
@@ -499,7 +499,7 @@
             case "appearance": _renderAppearanceSection(container); break;
             case "updates":    _renderUpdatesSection(container);    break;
             case "guide":      _renderApiGuideSection(container);   break;
-            case "credits":    _renderCreditsSection(container);    break;
+            case "about":      _renderAboutSection(container);      break;
         }
     }
 
@@ -626,29 +626,36 @@
         _bindSettingsInputs(container);
     }
 
-    function _renderCreditsSection(container) {
-        container.innerHTML =
-            '<div class="settings-card">'
-            + '<div class="settings-card-title">' + esc(_("Credits")) + '</div>'
-            + '<div class="settings-credits-group">'
-            + '<h3>' + esc(_("Developers")) + '</h3>'
-            + '<p class="settings-credits-name">'
-            + CREDITS.developers.map(function (p) {
-                return '<a class="settings-credits-link" href="' + esc(p.url)
-                    + '" target="_blank" rel="noopener">' + esc(p.name) + '</a>';
-            }).join(" ")
-            + '</p>'
-            + '</div>'
-            + '<div class="settings-credits-group">'
-            + '<h3>' + esc(_("Contributors")) + '</h3>'
-            + '<p class="settings-credits-name">'
-            + CREDITS.contributors.map(function (p) {
-                return '<a class="settings-credits-link" href="' + esc(p.url)
-                    + '" target="_blank" rel="noopener">' + esc(p.name) + '</a>';
-            }).join(" ")
-            + '</p>'
-            + '</div>'
-            + '</div>';
+    function _renderAboutSection(container) {
+        var html = '';
+
+        /* ── Project & Community card ────────────────────────────── */
+        html += '<div class="settings-card">';
+        html += '<div class="settings-card-title">'
+            + Icons.users() + esc(_("Project & Community")) + '</div>';
+        CREDITS.links.forEach(function (link) {
+            html += '<div class="settings-about-row">'
+                + '<span class="settings-about-label">' + esc(_(link.label)) + '</span>'
+                + '<a class="settings-about-link" href="' + esc(link.url)
+                    + '" target="_blank" rel="noopener">'
+                    + esc(link.url.replace(/^https?:\/\//, "")) + '</a>'
+                + '</div>';
+        });
+        html += '</div>';
+
+        /* ── Contributors card ───────────────────────────────────── */
+        html += '<div class="settings-card">';
+        html += '<div class="settings-card-title">'
+            + Icons.heart() + esc(_("Contributors")) + '</div>';
+        html += '<p class="settings-credits-name">';
+        CREDITS.contributors.forEach(function (p) {
+            html += '<a class="settings-credits-link" href="' + esc(p.url)
+                + '" target="_blank" rel="noopener">' + esc(p.name) + '</a> ';
+        });
+        html += '</p>';
+        html += '</div>';
+
+        container.innerHTML = html;
     }
 
     function _renderUpdatesSection(container) {
