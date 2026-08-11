@@ -1243,6 +1243,7 @@ button.accent:hover, .btn-accent:hover {
 .pb-title {
     font-family: var(--font-sans);
     font-size: var(--font-lg);
+    font-weight: 600;
     color: var(--text-accent);
     margin-left: 0.8rem;
 }
@@ -1401,6 +1402,134 @@ button.accent:hover, .btn-accent:hover {
         grid-template-columns: 1fr;
         gap: 0.5rem;
     }
+}
+
+/* ── Generate Task List (§7.8c streaming) ────────────────────────── */
+/* Simple vertical task list — items complete one by one as the LLM
+   finishes each JSON section.  MXU-aligned: Feather icons, same spacing
+   and typography as the prebuild view.                               */
+
+.gen-view {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 4rem);
+    max-width: 540px;
+    margin: 0 auto;
+    animation: fadeIn var(--trans-slow);
+}
+
+.gen-header {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 0 0.4rem;
+}
+
+.gen-title {
+    font-family: var(--font-sans);
+    font-size: var(--font-lg);
+    font-weight: 600;
+    color: var(--text-accent);
+    margin-left: 0.8rem;
+}
+
+/* ── Task list ───────────────────────────────────────────────────── */
+
+.gen-tasks {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-lg) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.gen-task {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-lg) var(--space-lg);
+    border-radius: var(--radius-md);
+    transition: background var(--trans-normal), opacity var(--trans-normal);
+    animation: pbCardIn 0.35s ease-out both;
+}
+
+.gen-task-icon {
+    display: flex;
+    align-items: center;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.gen-task-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-accent);
+    flex-shrink: 0;
+    opacity: 0;
+    animation: none;
+}
+
+.gen-task-label {
+    font-family: var(--font-sans);
+    font-size: var(--font-base);
+    color: var(--text-secondary);
+    flex: 1;
+}
+
+.gen-task-status {
+    display: flex;
+    align-items: center;
+    color: var(--text-accent);
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity var(--trans-normal);
+}
+
+/* ── Task states ─────────────────────────────────────────────────── */
+
+/* pending: muted, dot hidden */
+.gen-task.pending {
+    opacity: 0.45;
+}
+
+/* active: highlight + pulsing dot (matches pb-card .selecting) */
+.gen-task.active {
+    opacity: 1;
+    background: var(--accent-light);
+}
+.gen-task.active .gen-task-icon { color: var(--text-accent); }
+.gen-task.active .gen-task-dot {
+    opacity: 1;
+    animation: pbPulse 0.8s ease-in-out infinite;
+}
+.gen-task.active .gen-task-label { color: var(--text-primary); }
+
+/* complete: green icon + checkmark revealed, dot hidden */
+.gen-task.complete {
+    opacity: 1;
+}
+.gen-task.complete .gen-task-icon { color: var(--text-accent); }
+.gen-task.complete .gen-task-dot { opacity: 0; animation: none; }
+.gen-task.complete .gen-task-label { color: var(--text-primary); }
+.gen-task.complete .gen-task-status { opacity: 1; }
+
+/* ── Progress line ──────────────────────────────────────────────── */
+
+.gen-progress {
+    font-family: var(--font-mono);
+    font-size: var(--font-xs);
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 0.5rem 0 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+}
+
+.gen-progress .cc-dots {
+    font-size: var(--font-xs);
 }
 
 /* ── Game Preview Screen ────────────────────────────────────────── */
