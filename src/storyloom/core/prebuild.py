@@ -800,11 +800,26 @@ class Prebuilder:
                     roster, self._library,
                 )
                 roster.set_target(entity.asset_type, entity.name, asset_id)
+                yield {
+                    "type": "prebuild_progress",
+                    "phase": "fallback",
+                    "entity": entity.name,
+                    "asset_type": entity.asset_type.value,
+                    "status": "force_selected",
+                    "asset_id": asset_id,
+                }
             except Exception as e:
                 errors.append(
                     f"Force-select failed for '{entity.name}' "
                     f"({entity.asset_type.value}): {e}"
                 )
+                yield {
+                    "type": "prebuild_progress",
+                    "phase": "fallback",
+                    "entity": entity.name,
+                    "asset_type": entity.asset_type.value,
+                    "status": "fallback_failed",
+                }
 
         # ── Persist library (single save — thread-safe, all mutations done) ─
         self._library.save()

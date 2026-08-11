@@ -306,6 +306,18 @@ const CoCreateView = (function () {
                 _("Generating images...") + ' ' + data.completed + '/' + data.total + ' ' + _("complete"));
             return;
         }
+
+        if (phase === 'fallback') {
+            /* Force-select fallback result for a failed generation. */
+            var card = cards[data.entity];
+            if (!card) return;
+            if (data.status === 'force_selected') {
+                _setCardState(card, 'matched', data.asset_id || _("fallback selected"));
+            } else {
+                _setCardState(card, 'failed', _("fallback failed"));
+            }
+            return;
+        }
     }
 
     /** Connect to the prebuild SSE stream and drive the card UI.
