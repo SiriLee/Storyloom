@@ -643,7 +643,16 @@ async def co_create_prebuild_stream(game_id: str):
                 game_id, game_loop=gl, cancel_event=stop_evt,
             ):
                 loop.call_soon_threadsafe(q.put_nowait, event)
-                if event["type"] in ("prebuild_complete", "prebuild_cancelled"):
+                if event["type"] == "prebuild_cancelled":
+                    # Prebuild was cancelled — roster was cleared at
+                    # Step 0 (§7.8c) and not rebuilt.  The _init.json
+                    # save file exists but the game cannot be played in
+                    # graph mode without a prebuilt roster.  Remove the
+                    # game so the user doesn't see a broken entry.
+                    sessions.remove_game(game_id)
+                    _game_session.delete_game(game_id)
+                    return
+                if event["type"] == "prebuild_complete":
                     return
         except Exception as exc:
             loop.call_soon_threadsafe(

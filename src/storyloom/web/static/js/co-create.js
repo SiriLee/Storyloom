@@ -793,6 +793,11 @@ const CoCreateView = (function () {
             _updateGenProgress(genState.progressEl, _("Retry") + '...');
 
             const genData = await API.post("/api/co-create/retry-generate");
+
+            // Phase guard: user may have clicked back during the blocking
+            // POST.  If so, exit quietly — the menu is about to render.
+            if (_phase !== "generating") return;
+
             GameState.gameId = genData.game_id;
             GameState.gameMode = genData.game_mode || "text";  // §7.7
             GameState.storyConfig = genData.story_config;
