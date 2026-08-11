@@ -1,6 +1,6 @@
 """Co-creation pre-build pipeline — §7.8c (design.md §5.3, §6.1 Step 4).
 
-Batch LLM selection (library-only, full thinking) → concurrent AI image
+Batch LLM selection (library-only, light thinking) → concurrent AI image
 generation → force-select fallback → hard verification that every base
 entity has a non-null target in the game asset roster.
 
@@ -492,7 +492,7 @@ def run_batch_selection(
         entities: All entities of this type.
         library: Global ``AssetLibrary`` for library entries + validation.
         forced: If True, use forced-mode prompt (match-only).
-        thinking_mode: ``"enabled"`` (production) | ``"light"`` | ``"disabled"``.
+        thinking_mode: ``"light"`` (production) | ``"disabled"`` | ``"enabled"``.
 
     Returns:
         ``(results, error_message)`` — *results* is empty on failure;
@@ -555,7 +555,7 @@ class Prebuilder:
     """Co-creation phase asset pre-builder.  (§7.8c / design.md §5.3, §6.1)
 
     Runs after story generation, before entering the game loop.
-    Two batch LLM selection calls (portrait + background, full thinking,
+    Two batch LLM selection calls (portrait + background, light thinking,
     library-only scope) → concurrent AI image generation for unmatched
     entities → force-select fallback → hard verification.
 
@@ -644,7 +644,7 @@ class Prebuilder:
         ]:
             return run_batch_selection(
                 self._api, asset_type, by_type.get(asset_type, []),
-                self._library, forced=forced, thinking_mode="disabled",
+                self._library, forced=forced, thinking_mode="light",
             )
 
         # Run both selection calls concurrently
