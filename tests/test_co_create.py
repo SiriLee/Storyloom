@@ -405,14 +405,15 @@ class TestCoCreateValidatorVariables:
         errors = CoCreateValidator.validate_variables(data)
         assert any("integer" in e.lower() or "bool" in str(e).lower() for e in errors)
 
-    def test_string_empty_initial(self):
+    def test_string_empty_initial_allowed(self):
+        """Empty string is a valid initial value for string variables."""
         data = {
             "variables": [
                 {"name": "tag", "type": "string", "initial": ""},
             ]
         }
         errors = CoCreateValidator.validate_variables(data)
-        assert any("empty" in e.lower() or "non-empty" in e.lower() for e in errors)
+        assert len(errors) == 0
 
     def test_duplicate_names(self):
         data = {

@@ -309,9 +309,10 @@ class CoCreateValidator:
                             f"'{name}': initial value {ival} out of range [0, 100]"
                         )
             elif var_type == "string":
-                if not isinstance(initial, str) or not initial.strip():
+                if not isinstance(initial, str):
                     errors.append(
-                        f"'{name}': string initial value must be non-empty"
+                        f"'{name}': initial value must be a string, "
+                        f"got {type(initial).__name__}"
                     )
 
         return errors
