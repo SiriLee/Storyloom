@@ -174,6 +174,7 @@ const AssetManagerView = (function () {
 
         if (!ids.length) {
             listEl.innerHTML = "";
+            listEl.scrollTop = 0;
             return;
         }
 
@@ -198,6 +199,9 @@ const AssetManagerView = (function () {
                     + (uc > 0 ? ' data-uc="1"' : "") + '>' + Icons.trash() + '</button>'
             + '</div>';
         }).join("");
+
+        // Reset scroll position — same DOM element reused across tab switches
+        listEl.scrollTop = 0;
 
         // Card click → viewer (ignore clicks on trash button)
         listEl.querySelectorAll(".am-card").forEach(function (card) {
