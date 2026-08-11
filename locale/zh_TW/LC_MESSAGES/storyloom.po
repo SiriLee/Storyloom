@@ -43,6 +43,18 @@ msgstr "讀取存檔"
 msgid "Settings"
 msgstr "設定"
 
+msgid "About"
+msgstr "關於"
+
+msgid "Issue Tracker"
+msgstr "問題回饋"
+
+msgid "Project & Community"
+msgstr "專案與社群"
+
+msgid "Source Code"
+msgstr "原始碼"
+
 msgid "Credits"
 msgstr "製作人員"
 
@@ -378,8 +390,8 @@ msgstr "貢獻者"
 msgid "App Core"
 msgstr "程式核心"
 
-msgid "Network"
-msgstr "網路"
+msgid "System"
+msgstr "系統"
 
 msgid "Network Proxy"
 msgstr "網路代理"
@@ -466,9 +478,6 @@ msgstr "主題：淺色"
 
 msgid "Toggle Theme"
 msgstr "切換主題"
-
-msgid "System"
-msgstr "跟隨系統"
 
 msgid "Dark"
 msgstr "深色"

@@ -379,7 +379,7 @@
             { id: "api",        icon: "key",     label: _("API") },
             { id: "image",      icon: "image",   label: _("Image") },
             { id: "appearance", icon: "palette", label: _("Appearance") },
-            { id: "updates",    icon: "server",  label: _("Network") },
+            { id: "updates",    icon: "monitor", label: _("System") },
         ];
         var secondarySections = [
             { id: "guide",      icon: "book",    label: _("API Guide") },
@@ -660,9 +660,9 @@
 
     function _renderUpdatesSection(container) {
         container.innerHTML =
-            _sectionHeading(Icons.server, _("Network"), "updates")
+            _sectionHeading(Icons.monitor, _("System"), "updates")
             + '<div class="settings-card">'
-            + '<div class="settings-card-title">' + Icons.server() + esc(_("Network Proxy")) + '</div>'
+            + '<div class="settings-card-title">' + Icons.monitor() + esc(_("Network Proxy")) + '</div>'
             + _settingText("proxy_url", _("Proxy URL"), _("e.g. http://127.0.0.1:7890"))
             + '<div class="settings-row-hint">'
             + esc(_("Supports HTTP/SOCKS5. Leave empty to use system default."))
