@@ -1332,8 +1332,59 @@ def _show_desktop_window(url: str) -> None:
 
     import webview
 
+    # Determine the port from the URL for asset download support
+    from urllib.parse import urlparse
+    port = urlparse(url).port or 8000
+
+    class _JsApi:
+        """Exposed to frontend via pywebview JS bridge.
+
+        Provides native OS save dialogs for file downloads —
+        browser-based download mechanisms (<a download>, Blob URLs)
+        are silently ignored by pywebview/WebView2.
+        """
+
+        def _get_window(self):
+            return webview.active_window()
+
+        def save_asset(self, asset_url: str, filename: str) -> None:
+            """Download asset from local server, save via native dialog."""
+            import urllib.request
+            url = f"http://127.0.0.1:{port}{asset_url}"
+            win = self._get_window()
+            path = win.create_file_dialog(
+                dialog_type=webview.FileDialog.SAVE,
+                save_filename=filename,
+            )
+            if not path:
+                return
+            try:
+                with urllib.request.urlopen(url) as resp:
+                    with open(path[0] if isinstance(path, list) else path, 'wb') as f:
+                        f.write(resp.read())
+            except Exception as exc:
+                print(f"Asset download failed: {exc}", file=sys.stderr)
+
+        def save_text(self, content: str, filename: str) -> None:
+            """Save text content via native save dialog (log export)."""
+            win = self._get_window()
+            path = win.create_file_dialog(
+                dialog_type=webview.FileDialog.SAVE,
+                save_filename=filename,
+                file_types=["Markdown (*.md)", "Text (*.txt)"],
+            )
+            if not path:
+                return
+            try:
+                out = path[0] if isinstance(path, list) else path
+                with open(out, 'w', encoding='utf-8') as f:
+                    f.write(content)
+            except Exception as exc:
+                print(f"Text save failed: {exc}", file=sys.stderr)
+
     try:
-        webview.create_window("Storyloom", url, width=1200, height=800)
+        webview.create_window("Storyloom", url, width=1200, height=800,
+                              js_api=_JsApi())
         webview.start()
     except Exception:
         # GUI unavailable — webview.start() raises WebViewException when

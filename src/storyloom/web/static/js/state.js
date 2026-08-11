@@ -381,3 +381,13 @@ function showToast(message, duration = 3000) {
         setTimeout(cleanup, 500);
     }, duration);
 }
+
+/**
+ * True when running inside a pywebview desktop window.
+ * Used to switch download/export from browser Blob/anchor
+ * patterns to the native save-dialog bridge (pywebview.api).
+ */
+function isPywebview() {
+    return typeof window.pywebview !== "undefined"
+        && typeof window.pywebview.api !== "undefined";
+}

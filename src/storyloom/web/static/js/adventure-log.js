@@ -180,15 +180,23 @@ const AdventureLogView = (function () {
     }
 
     /** Download the adventure log as a Markdown (.md) file.
-     *  Uses Blob + URL.createObjectURL — no server round-trip. */
+     *  In pywebview: uses native save dialog via the JS-Python bridge.
+     *  In browser: uses Blob + URL.createObjectURL. */
     function _exportLog() {
         if (!_logText) return;
 
-        const safeName = (_title || "adventure").replace(/[\\/:*?"<>|]/g, "-");
-        const filename = `${safeName} - Adventure Log.md`;
-        const blob = new Blob([_logText], { type: "text/markdown;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
+        var safeName = (_title || "adventure").replace(/[\\/:*?"<>|]/g, "-");
+        var filename = safeName + " - Adventure Log.md";
+
+        if (typeof isPywebview === "function" && isPywebview()) {
+            window.pywebview.api.save_text(_logText, filename);
+            return;
+        }
+
+        /* Browser path */
+        var blob = new Blob([_logText], { type: "text/markdown;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
         a.href = url;
         a.download = filename;
         document.body.appendChild(a);

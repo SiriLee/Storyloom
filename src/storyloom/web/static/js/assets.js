@@ -280,8 +280,8 @@ const AssetManagerView = (function () {
         overlay.id = "am-viewer-overlay";
         overlay.innerHTML =
             '<div class="am-viewer-toolbar">'
-                + '<a class="am-viewer-btn" href="' + url + '" download'
-                    + ' title="' + esc(_("Download")) + '">' + Icons.download() + '</a>'
+                + '<button class="am-viewer-btn" id="am-viewer-download"'
+                    + ' title="' + esc(_("Download")) + '">' + Icons.download() + '</button>'
                 + '<button class="am-viewer-btn" id="am-viewer-close"'
                     + ' title="' + esc(_("Close")) + '">' + X_ICON + '</button>'
             + '</div>'
@@ -290,6 +290,22 @@ const AssetManagerView = (function () {
             + '</div>';
 
         document.body.appendChild(overlay);
+
+        // Download: use native save dialog in pywebview, fall back to
+        // <a download> in regular browsers.
+        document.getElementById("am-viewer-download").addEventListener("click", function () {
+            var filename = (name || assetId) + ".png";
+            if (typeof isPywebview === "function" && isPywebview()) {
+                window.pywebview.api.save_asset(url, filename);
+            } else {
+                var a = document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        });
 
         var closeViewer = function () { overlay.remove(); };
         document.getElementById("am-viewer-close").addEventListener("click", closeViewer);
