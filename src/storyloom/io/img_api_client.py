@@ -450,7 +450,12 @@ class ImgApiClient:
         httpx default transport is NOT thread-safe. Each thread gets its
         own Client instance via threading.local().
         """
-        if not hasattr(self._local, "client"):
+        proxy = self._cfg.proxy_url if self._cfg else ""
+        cached = getattr(self._local, "client", None)
+        if cached is not None and getattr(self._local, "client_proxy", "") != proxy:
+            cached.close()
+            self._local.client = None
+        if not hasattr(self._local, "client") or self._local.client is None:
             kwargs: dict = {
                 "timeout": httpx.Timeout(
                     IMAGE_GEN_TIMEOUT_SEC,
@@ -458,10 +463,10 @@ class ImgApiClient:
                 ),
                 "follow_redirects": True,
             }
-            proxy = self._cfg.proxy_url if self._cfg else ""
             if proxy:
                 kwargs["proxy"] = proxy
             self._local.client = httpx.Client(**kwargs)
+            self._local.client_proxy = proxy
         return self._local.client
 
     # ── size resolution ─────────────────────────────────────────────
