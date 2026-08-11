@@ -1,6 +1,9 @@
 """Tests for co-create validator and flow."""
 import pytest
-from storyloom.core.co_create import CoCreateValidator, CoCreateFlow, CoCreateError
+from storyloom.core.co_create import (
+    CoCreateValidator, CoCreateFlow, CoCreateError,
+    _SectionStreamer, _GENERATE_SECTION_ORDER,
+)
 from storyloom.io.api_client import ApiError
 from storyloom.i18n import init_i18n
 init_i18n("en")  # Use English for deterministic test output
@@ -517,6 +520,30 @@ class MockApiClient:
     def stream_chat(self, messages, max_tokens=None, response_format=None, extra_params=None):
         return self.chat(messages)
 
+    def stream_chat_iter(self, messages, max_tokens=None, response_format=None, extra_params=None):
+        """Yield token chunks for streaming tests.
+
+        If responses is a list of chunk dicts (each with 'delta' or 'done'),
+        yields them.  Otherwise falls back to yielding the response as one chunk.
+        """
+        self.messages_history.append(messages)
+        if self.call_count < len(self.responses):
+            resp = self.responses[self.call_count]
+            self.call_count += 1
+            if isinstance(resp, list):
+                yield from resp
+            else:
+                yield {"delta": resp}
+        elif self.responses:
+            last = self.responses[-1]
+            if isinstance(last, list):
+                yield from last
+            else:
+                yield {"delta": last}
+        else:
+            yield {"delta": ""}
+        yield {"done": True, "usage": {"prompt": 100, "completion": 50, "total": 150}}
+
 
 def make_mock_api_client():
     """Create a bare MockApiClient for send() error tests."""
@@ -933,3 +960,110 @@ class TestGenerate:
         result = flow.generate()
         expected_keys = {"story_config", "characters", "locations", "variables", "outline", "outline_text"}
         assert set(result.keys()) == expected_keys
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# _SectionStreamer tests (simplified — no data extraction)
+# ══════════════════════════════════════════════════════════════════════════
+
+class TestSectionStreamer:
+    """Tests for the simplified token→event processor."""
+
+    def _make_chunks(self, text, chunk_size=15):
+        for i in range(0, len(text), chunk_size):
+            yield {"delta": text[i:i + chunk_size]}
+
+    def test_yields_five_section_events_in_order(self):
+        json_text = (
+            '{"story_config":{"title":"N","tier":"short","language":"en","premise":"p"},'
+            '"characters":[{"name":"K","role":"protagonist","description":"d","appearance":"a"}],'
+            '"locations":[{"id":"l","name":"L","description":"d"}],'
+            '"variables":[{"name":"v","type":"number","initial":10}],'
+            '"outline":[{"id":"ch1","title":"T","goal":"G","routes":[]}]}'
+        )
+        streamer = _SectionStreamer(iter(self._make_chunks(json_text)))
+        events = list(streamer)
+
+        section_events = [e for e in events if e["type"] == "section_complete"]
+        done_events = [e for e in events if e["type"] == "generate_done"]
+
+        assert len(section_events) == 5
+        for i, ev in enumerate(section_events):
+            assert ev["section"] == _GENERATE_SECTION_ORDER[i]
+            # Simplified streamer: no "data" key
+            assert "data" not in ev
+        assert len(done_events) == 1
+        assert "content" in done_events[0]
+
+    def test_sections_detected_via_key_boundaries(self):
+        """Sections are detected when the next key name appears in buffer."""
+        json_text = (
+            '{"story_config":{"title":"X","tier":"short","language":"en","premise":"p"},'
+            '"characters":[{"name":"A","role":"protagonist","description":"d","appearance":"a"}],'
+            '"locations":[{"id":"l","name":"L","description":"d"}],'
+            '"variables":[],'
+            '"outline":[{"id":"c1","title":"T","goal":"G","routes":[]}]}'
+        )
+        streamer = _SectionStreamer(iter(self._make_chunks(json_text, chunk_size=5)))
+        events = list(streamer)
+        sections = [e["section"] for e in events if e["type"] == "section_complete"]
+        assert sections == _GENERATE_SECTION_ORDER
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# generate_stream integration tests
+# ══════════════════════════════════════════════════════════════════════════
+
+class TestGenerateStream:
+    """Integration tests for CoCreateFlow.generate_stream()."""
+
+    def test_yields_sections_and_done(self):
+        json_text = (
+            '{"story_config":{"title":"S","tier":"short","language":"en","premise":"A premise for testing."},'
+            '"characters":[{"name":"A","role":"protagonist","description":"A test character.","appearance":"Tall."}],'
+            '"locations":[{"id":"l","name":"L","description":"A location."}],'
+            '"variables":[{"name":"v","type":"number","initial":10}],'
+            '"outline":[{"id":"ch1","title":"T","goal":"G","routes":[]}]}'
+        )
+        chunks = [{"delta": json_text[i:i + 10]} for i in range(0, len(json_text), 10)]
+        api = MockApiClient(responses=[chunks])
+        flow = CoCreateFlow(api)
+        flow._messages = [
+            {"role": "system", "content": "test"},
+            {"role": "user", "content": "idea"},
+            {"role": "assistant", "content": "q"},
+        ]
+        flow._phase = "awaiting_answer"
+
+        events = list(flow.generate_stream())
+        section_events = [e for e in events if e["type"] == "section_complete"]
+        done_events = [e for e in events if e["type"] == "generate_done" and "result" in e]
+
+        assert len(section_events) == 5
+        assert len(done_events) == 1
+        assert done_events[0]["result"]["story_config"]["title"] == "S"
+        assert flow.phase == "complete"
+
+    def test_raises_when_not_awaiting_answer(self):
+        api = MockApiClient()
+        flow = CoCreateFlow(api)
+        flow._phase = "init"
+        with pytest.raises(RuntimeError):
+            list(flow.generate_stream())
+
+    def test_raises_on_empty_response(self):
+        api = MockApiClient(responses=[[{"delta": ""}]])
+        flow = CoCreateFlow(api)
+        flow._messages = [
+            {"role": "system", "content": "test"},
+            {"role": "user", "content": "idea"},
+            {"role": "assistant", "content": "q"},
+        ]
+        flow._phase = "awaiting_answer"
+        with pytest.raises(CoCreateError):
+            list(flow.generate_stream())
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# _SectionStreamer tests
+# ══════════════════════════════════════════════════════════════════════════
