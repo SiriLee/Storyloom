@@ -128,7 +128,7 @@ graph TD
 Thread 1: Server Main  — HTTP + SSE 推送
 Thread 2: Event Pipe   — StreamParser → StateManager → EventDispatcher（generator yield，同线程）
 Thread 3: API Reader   — LLM token 流式读取（阻塞）
-Thread 4: Task Pool    — ThreadPoolExecutor
+Thread 4: Task Pool    — ThreadPoolExecutor（多线程并发；共享对象须线程安全）
 ```
 
 | 队列 | 生产者 | 消费者 |
