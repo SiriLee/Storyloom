@@ -595,3 +595,35 @@ msgstr "紫羅蘭"
 
 msgid "Image API"
 msgstr "影像 API"
+
+# ── Generate view (streaming section cards) ──
+
+msgid "Creating Your Story"
+msgstr "創造你的故事"
+
+msgid "Story Setting"
+msgstr "故事設定"
+
+msgid "Story Structure"
+msgstr "故事結構"
+
+msgid "Variables"
+msgstr "變數"
+
+msgid "chapters"
+msgstr "個章節"
+
+msgid "branches"
+msgstr "條分支"
+
+msgid "protagonist"
+msgstr "主角"
+
+msgid "supporting"
+msgstr "配角"
+
+msgid "antagonist"
+msgstr "反派"
+
+msgid "Building"
+msgstr "正在構建"
