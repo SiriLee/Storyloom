@@ -6,6 +6,7 @@ Supports streaming (SSE) and non-streaming chat completions.
 
 import json
 import os
+import threading
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -45,7 +46,10 @@ class ApiClient:
     def __init__(self, config: "UserConfig | None" = None):
         from storyloom.user_config import UserConfig
         self._cfg = config if config is not None else UserConfig()
-        self._client: httpx.Client | None = None
+        # Thread-local httpx.Client: default transport is not thread-safe,
+        # and the prebuild pipeline (§7.8c) calls chat() from a daemon
+        # thread while the main event loop may also hold a reference.
+        self._local = threading.local()
 
     # ── lazy config accessors ───────────────────────────────────────
 
@@ -66,25 +70,30 @@ class ApiClient:
         )
 
     def _get_client(self) -> httpx.Client:
-        """Return the shared httpx.Client, creating or recreating as needed.
+        """Return a per-thread httpx.Client, creating or recreating as needed.
+
+        httpx default transport is NOT thread-safe.  Each thread gets its
+        own Client instance via threading.local(), matching the pattern
+        used by ImgApiClient (§7.8b).
 
         The client is recreated when the proxy URL changes so that
         runtime config changes take effect without a restart.
         """
         proxy = self._cfg.proxy_url if self._cfg else ""
-        if self._client is not None and getattr(self, "_client_proxy", "") != proxy:
-            self._client.close()
-            self._client = None
-        if self._client is None:
+        cached = getattr(self._local, "client", None)
+        if cached is not None and getattr(self._local, "client_proxy", "") != proxy:
+            cached.close()
+            self._local.client = None
+        if not hasattr(self._local, "client") or self._local.client is None:
             kwargs: dict = {
                 "timeout": httpx.Timeout(STREAM_STALL_TIMEOUT_SEC, connect=30.0),
                 "follow_redirects": True,
             }
             if proxy:
                 kwargs["proxy"] = proxy
-            self._client = httpx.Client(**kwargs)
-            self._client_proxy = proxy
-        return self._client
+            self._local.client = httpx.Client(**kwargs)
+            self._local.client_proxy = proxy
+        return self._local.client
 
     def _validate_config(self) -> None:
         """Validate that required config is present."""
@@ -377,9 +386,18 @@ class ApiClient:
     # ── lifecycle ────────────────────────────────────────────────────
 
     def close(self) -> None:
-        """Close the underlying HTTP client connection pool."""
-        self._client.close()
+        """Close this thread's HTTP client connection pool.
+
+        Note: only closes the current thread's client.  Other threads'
+        clients remain active until their threads exit.
+        """
+        if hasattr(self._local, "client"):
+            self._local.client.close()
+            del self._local.client
 
     def __del__(self) -> None:
-        if hasattr(self, "_client") and self._client is not None:
-            self._client.close()
+        if hasattr(self, "_local") and hasattr(self._local, "client"):
+            try:
+                self._local.client.close()
+            except Exception:
+                pass

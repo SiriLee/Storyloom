@@ -18,6 +18,7 @@ Usage::
 from __future__ import annotations
 
 import struct
+import threading
 import time
 from io import BytesIO
 
@@ -148,6 +149,7 @@ from storyloom.config import (
 
 # Lazy-cached ONNX session (thread-safe for inference).
 _onnx_session: "ort.InferenceSession | None" = None
+_onnx_lock = threading.Lock()
 """Module-level cache for the InferenceSession.  Set by _get_session()."""
 
 
@@ -205,20 +207,24 @@ def _get_session() -> "ort.InferenceSession | None":
     """Return a cached onnxruntime InferenceSession, or None if unavailable.
 
     The session is created once and reused — ``InferenceSession.run()``
-    is thread-safe for inference.
+    is thread-safe for inference.  Session creation is guarded by a lock
+    to prevent concurrent first-time loads from racing.
     """
-    global _onnx_session
+    global _onnx_session, _onnx_lock
     if _onnx_session is not None:
         return _onnx_session
-    try:
-        import onnxruntime as ort
-    except ImportError:
-        return None
-    _onnx_session = ort.InferenceSession(
-        str(_model_path()),
-        providers=["CPUExecutionProvider"],
-    )
-    return _onnx_session
+    with _onnx_lock:
+        if _onnx_session is not None:
+            return _onnx_session
+        try:
+            import onnxruntime as ort
+        except ImportError:
+            return None
+        _onnx_session = ort.InferenceSession(
+            str(_model_path()),
+            providers=["CPUExecutionProvider"],
+        )
+        return _onnx_session
 
 
 def _preprocess(img: "PILImage") -> np.ndarray:

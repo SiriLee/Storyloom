@@ -30,10 +30,11 @@ def mock_http():
 
 @pytest.fixture
 def client(cfg, mock_http):
-    """ApiClient with mocked httpx.Client (injected after construction
-    since the real client is now created lazily on first API call)."""
+    """ApiClient with mocked httpx.Client injected into thread-local
+    storage so _get_client() returns the mock instead of creating a
+    real httpx.Client."""
     c = ApiClient(cfg)
-    c._client = mock_http
+    c._local.client = mock_http
     return c
 
 
