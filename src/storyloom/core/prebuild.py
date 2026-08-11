@@ -13,7 +13,7 @@ import json as _json
 from dataclasses import dataclass, field
 
 from storyloom.assets import AssetLibrary, AssetType, GameAssetRoster
-from storyloom.config import GENERATE_LIBRARY_TOP_N
+from storyloom.config import GENERATE_LIBRARY_TOP_N, PREBUILD_MAX_WORKERS
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -574,7 +574,7 @@ class Prebuilder:
         img_client_background,   # ImgApiClient (remove_bg=NEVER)
         library: AssetLibrary,
         img_generation_enabled: bool = True,
-        max_workers: int = 4,
+        max_workers: int = PREBUILD_MAX_WORKERS,
     ):
         self._api = api_client
         self._img_clients = {

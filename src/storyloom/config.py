@@ -78,9 +78,10 @@ BG_REMOVAL_MODEL_SHA256 = (
 CLEANUP_KEEP_COUNT = 50      # per-type keep target for auto-clean
 
 # ── Task framework (Phase 2) ────────────────────────────────────
-TASK_POOL_MAX_WORKERS = 4    # Thread 4 default pool size
+TASK_POOL_MAX_WORKERS = 6    # Thread pool for LLM match/select/generate tasks
 
 # ── Asset generation (Phase 2 §7.8b) ────────────────────────────
+PREBUILD_MAX_WORKERS = 6     # Prebuilder concurrent image generation
 GENERATE_LIBRARY_TOP_N = 30      # library entries in LLM selection prompt
 GENERATE_REF_IMAGE_COUNT = 3     # max reference images for style guidance
 
