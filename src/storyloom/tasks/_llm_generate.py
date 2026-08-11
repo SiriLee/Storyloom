@@ -148,6 +148,7 @@ You are an artist for a real-time visual novel game. Create a background scene.
 
 ## Requirements
 - {style_line}
+- Pure environment art — no text, no dialogue boxes, no UI elements of any kind.
 
 ## Scene
 Name: {name}
