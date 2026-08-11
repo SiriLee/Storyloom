@@ -180,7 +180,9 @@ def _check_app_update(app_version: str) -> VersionInfo:
     release_notes = release.get("body", "")
     remote_tag = release.get("tag_name", "")
     remote_app_ver = _parse_version_from_tag(remote_tag)
-    app_url, _ = _find_asset_url(assets, "storyloom-v", platform_specific=True)
+    app_url, _ = _find_asset_url(
+        assets, "storyloom-app-v", platform_specific=True
+    )
 
     return VersionInfo(
         current=app_version,

@@ -131,8 +131,7 @@ else
     echo "WARNING: no system_media zip — release will lack built-in media"
 fi
 
-# 5. Create zip for GitHub Release upload
-echo "--- Creating release archive ---"
+# 5. Create release zips
 # Map platform to friendly name for release assets
 case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*) PLATFORM="Windows" ;;
@@ -140,13 +139,33 @@ case "$(uname -s)" in
     Linux)                 PLATFORM="Linux" ;;
     *)                     PLATFORM="$(uname -s)" ;;
 esac
-ZIP_NAME="storyloom-v${VERSION}-${PLATFORM}"
-ZIP_DIR="storyloom-v${VERSION}"
-# root_dir=dist/$ZIP_DIR — no base_dir, so zip contents are at root
-$PYTHON -c "import shutil; shutil.make_archive('dist/$ZIP_NAME', 'zip', 'dist/$ZIP_DIR')"
+
+# 5a. Full zip — for first-time users.  Includes system_media/.
+echo "--- Creating full release archive ---"
+FULL_ZIP="storyloom-v${VERSION}-${PLATFORM}"
+$PYTHON -c "import shutil; shutil.make_archive('dist/$FULL_ZIP', 'zip', 'dist/storyloom-v${VERSION}')"
+
+# 5b. App-only zip — for in-app updates.  No system_media/ (can be 250+ MB).
+echo "--- Creating app-only release archive ---"
+APP_ZIP="storyloom-app-v${VERSION}-${PLATFORM}"
+# Zip Storyloom + app/ but NOT system_media/
+$PYTHON -c "
+import shutil, os, tempfile
+root = 'dist/storyloom-v${VERSION}'
+tmp = tempfile.mkdtemp()
+staging = os.path.join(tmp, 'staging')
+shutil.copytree(root, staging, ignore=shutil.ignore_patterns('system_media'))
+# also skip system_media-v*.zip if present
+for f in os.listdir(staging):
+    if f.startswith('system_media-v') and f.endswith('.zip'):
+        os.remove(os.path.join(staging, f))
+shutil.make_archive('dist/$APP_ZIP', 'zip', staging)
+shutil.rmtree(tmp)
+"
 
 echo ""
 echo "=== Done ==="
 echo "Release dir:  $OUTPUT_DIR"
-echo "GitHub asset: dist/${ZIP_NAME}.zip"
+echo "Full zip:     dist/${FULL_ZIP}.zip"
+echo "App zip:      dist/${APP_ZIP}.zip"
 ls -lh "$OUTPUT_DIR/"

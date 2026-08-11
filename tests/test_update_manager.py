@@ -136,7 +136,7 @@ def _make_app_release(tag="v1.4.0", assets=None, body="## Release notes"):
     plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
     if assets is None:
         assets = [
-            {"name": f"storyloom-{tag}-{plat}.zip",
+            {"name": f"storyloom-app-{tag}-{plat}.zip",
              "browser_download_url": "https://example.com/app.zip"},
         ]
     return {
@@ -182,7 +182,7 @@ def test_check_no_update(mock_get):
     _patch_updates(
         mock_get,
         app_release=_make_app_release(tag="v1.3.0", assets=[
-            {"name": f"storyloom-v1.3.0-{plat}.zip",
+            {"name": f"storyloom-app-v1.3.0-{plat}.zip",
              "browser_download_url": "https://example.com/app.zip"},
         ]),
         sm_release=_make_sm_release(assets=[
@@ -202,7 +202,7 @@ def test_check_app_update(mock_get):
     _patch_updates(
         mock_get,
         app_release=_make_app_release(tag="v1.4.0", assets=[
-            {"name": f"storyloom-v1.4.0-{plat}.zip",
+            {"name": f"storyloom-app-v1.4.0-{plat}.zip",
              "browser_download_url": "https://example.com/app.zip"},
         ]),
         sm_release=_make_sm_release(assets=[
@@ -223,7 +223,7 @@ def test_check_system_media_update(mock_get):
     _patch_updates(
         mock_get,
         app_release=_make_app_release(tag="v1.3.0", assets=[
-            {"name": f"storyloom-v1.3.0-{plat}.zip",
+            {"name": f"storyloom-app-v1.3.0-{plat}.zip",
              "browser_download_url": "https://example.com/app.zip"},
         ]),
         sm_release=_make_sm_release(assets=[
@@ -243,7 +243,7 @@ def test_check_no_system_media_asset(mock_get):
     _patch_updates(
         mock_get,
         app_release=_make_app_release(tag="v1.3.0", assets=[
-            {"name": f"storyloom-v1.3.0-{plat}.zip",
+            {"name": f"storyloom-app-v1.3.0-{plat}.zip",
              "browser_download_url": "https://example.com/app.zip"},
         ]),
         sm_release=_make_sm_release(assets=[]),  # no system_media asset
