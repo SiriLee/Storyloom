@@ -662,7 +662,7 @@
         container.innerHTML =
             _sectionHeading(Icons.monitor, _("System"), "updates")
             + '<div class="settings-card">'
-            + '<div class="settings-card-title">' + Icons.monitor() + esc(_("Network Proxy")) + '</div>'
+            + '<div class="settings-card-title">' + Icons.server() + esc(_("Network Proxy")) + '</div>'
             + _settingText("proxy_url", _("Proxy URL"), _("e.g. http://127.0.0.1:7890"))
             + '<div class="settings-row-hint">'
             + esc(_("Supports HTTP/SOCKS5. Leave empty to use system default."))
