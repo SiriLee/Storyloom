@@ -75,14 +75,14 @@ BG_REMOVAL_MODEL_SHA256 = (
 )
 
 # ── Asset management ────────────────────────────────────────────
-CLEANUP_KEEP_COUNT = 50      # per-type keep target for auto-clean
+CLEANUP_KEEP_COUNT = 80      # per-type keep target for auto-clean (> TOP_N=60 margin)
 
 # ── Task framework (Phase 2) ────────────────────────────────────
 TASK_POOL_MAX_WORKERS = 6    # Thread pool for LLM match/select/generate tasks
 
 # ── Asset generation (Phase 2 §7.8b) ────────────────────────────
 PREBUILD_MAX_WORKERS = 6     # Prebuilder concurrent image generation
-GENERATE_LIBRARY_TOP_N = 30      # library entries in LLM selection prompt
+GENERATE_LIBRARY_TOP_N = 60      # library entries in LLM selection prompt (system ~25 + user ~35)
 # Reference images cause 4.4x slowdown on FLUX.2 Pro (15s→64s, see
 # scripts/bench_ref_images.py).  Set to 0 for speed; restore to 3 if
 # future models handle references faster or strong style consistency is needed.
