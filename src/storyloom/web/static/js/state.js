@@ -239,6 +239,7 @@ async function saveConfig() {
         img_api_model: getSetting("img_api_model"),
         portrait_remove_bg: getSetting("portrait_remove_bg"),
         img_generation_enabled: getSetting("img_generation_enabled") !== "false",
+        proxy_url: getSetting("proxy_url") || "",
     };
     /* Only send api_key if the user typed a real one — an empty or
        masked value means "keep the existing key on disk". */

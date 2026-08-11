@@ -381,6 +381,18 @@ msgstr "貢獻者"
 msgid "App Core"
 msgstr "程式核心"
 
+msgid "Network Proxy"
+msgstr "網路代理"
+
+msgid "Proxy URL"
+msgstr "代理地址"
+
+msgid "e.g. http://127.0.0.1:7890"
+msgstr "例如：http://127.0.0.1:7890"
+
+msgid "Supports HTTP/SOCKS5. Leave empty to use system default."
+msgstr "支援 HTTP/SOCKS5，留空則不使用代理"
+
 msgid "Check failed"
 msgstr "檢查失敗"
 

@@ -451,13 +451,17 @@ class ImgApiClient:
         own Client instance via threading.local().
         """
         if not hasattr(self._local, "client"):
-            self._local.client = httpx.Client(
-                timeout=httpx.Timeout(
+            kwargs: dict = {
+                "timeout": httpx.Timeout(
                     IMAGE_GEN_TIMEOUT_SEC,
                     connect=30.0,
                 ),
-                follow_redirects=True,
-            )
+                "follow_redirects": True,
+            }
+            proxy = self._cfg.proxy_url if self._cfg else ""
+            if proxy:
+                kwargs["proxy"] = proxy
+            self._local.client = httpx.Client(**kwargs)
         return self._local.client
 
     # ── size resolution ─────────────────────────────────────────────

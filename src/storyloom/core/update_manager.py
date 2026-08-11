@@ -11,7 +11,7 @@ import tempfile
 import time
 import zipfile
 from dataclasses import dataclass, field
-from urllib.request import Request, urlopen
+from urllib.request import Request, ProxyHandler, build_opener
 
 
 # ── Config ────────────────────────────────────────────────────────
@@ -28,6 +28,31 @@ elif sys.platform == "darwin":
     _PLATFORM = "macOS"
 else:
     _PLATFORM = "Linux"
+
+# ── Proxy ─────────────────────────────────────────────────────────
+
+_proxy_url: str = ""
+
+
+def set_update_proxy_url(url: str) -> None:
+    """Set the proxy URL for update-related HTTP requests.
+
+    Call once at startup with ``UserConfig.proxy_url`` and again whenever
+    the user changes the proxy setting.  Pass ``""`` to clear.
+    """
+    global _proxy_url
+    _proxy_url = url.strip() if url else ""
+
+
+def _get_opener():
+    """Return a urllib opener, with proxy if configured."""
+    if _proxy_url:
+        return build_opener(ProxyHandler({
+            "https": _proxy_url,
+            "http": _proxy_url,
+        }))
+    return build_opener()
+
 
 # ── Cache ─────────────────────────────────────────────────────────
 
@@ -94,7 +119,7 @@ def _version_gt(a: str, b: str) -> bool:
 def _http_get_json(url: str) -> dict:
     """GET JSON from a URL.  Raises on HTTP errors or connection failure."""
     req = Request(url, headers={"Accept": "application/vnd.github+json"})
-    with urlopen(req, timeout=15) as resp:
+    with _get_opener().open(req, timeout=15) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -147,7 +172,7 @@ def _download_file(url: str, dest: str, progress_callback=None) -> None:
     *progress_callback* receives (received_bytes: int, total_bytes: int | None).
     """
     req = Request(url, headers={"Accept": "application/octet-stream"})
-    with urlopen(req, timeout=120) as resp:
+    with _get_opener().open(req, timeout=120) as resp:
         total = resp.headers.get("Content-Length")
         total = int(total) if total else None
         received = 0

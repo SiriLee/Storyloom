@@ -36,6 +36,7 @@ class UserConfig:
         "img_api_model": "flux-2-pro",
         "portrait_remove_bg": "auto",
         "img_generation_enabled": True,
+        "proxy_url": "",
     }
 
     def __init__(self, app_dir: str | Path | None = None):
@@ -53,6 +54,7 @@ class UserConfig:
         self._img_api_model: str = self._DEFAULTS["img_api_model"]
         self._portrait_remove_bg: str = self._DEFAULTS["portrait_remove_bg"]
         self._img_generation_enabled: bool = self._DEFAULTS["img_generation_enabled"]
+        self._proxy_url: str = self._DEFAULTS["proxy_url"]
         self._needs_migration: bool = False
 
         if self._app_dir is not None:
@@ -181,6 +183,18 @@ class UserConfig:
         self._img_generation_enabled = value
 
     @property
+    def proxy_url(self) -> str:
+        """HTTP(S) proxy URL for network calls (update checks, API requests).
+
+        Empty string means no proxy (use system default / env vars).
+        """
+        return self._proxy_url
+
+    @proxy_url.setter
+    def proxy_url(self, value: str) -> None:
+        self._proxy_url = value
+
+    @property
     def needs_migration(self) -> bool:
         """True when ``config.json`` schema version doesn't match current."""
         return self._needs_migration
@@ -246,6 +260,7 @@ class UserConfig:
         self._img_generation_enabled = data.get(
             "img_generation_enabled", self._DEFAULTS["img_generation_enabled"]
         )
+        self._proxy_url = data.get("proxy_url", self._DEFAULTS["proxy_url"])
 
         # Version check — if schema version doesn't match, mark for
         # migration instead of backfilling.  Old values are already
@@ -287,6 +302,7 @@ class UserConfig:
         self._img_api_model = self._DEFAULTS["img_api_model"]
         self._portrait_remove_bg = self._DEFAULTS["portrait_remove_bg"]
         self._img_generation_enabled = self._DEFAULTS["img_generation_enabled"]
+        self._proxy_url = self._DEFAULTS["proxy_url"]
 
     def save(self) -> None:
         """Atomically write current values to config.json.
@@ -316,6 +332,7 @@ class UserConfig:
             "img_api_model": self._img_api_model,
             "portrait_remove_bg": self._portrait_remove_bg,
             "img_generation_enabled": self._img_generation_enabled,
+            "proxy_url": self._proxy_url,
         }
 
         path.parent.mkdir(parents=True, exist_ok=True)

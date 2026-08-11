@@ -2969,6 +2969,12 @@ button.accent:hover, .btn-accent:hover {
     background: rgba(248, 81, 73, 0.12);
 }
 
+.settings-row-hint {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    padding: 0.25rem 0 0.4rem 0;
+}
+
 /* ── Segmented Control (MXU-style: individual rounded buttons) ──── */
 
 /* ── Segmented controls / language grid share the same base ────── */

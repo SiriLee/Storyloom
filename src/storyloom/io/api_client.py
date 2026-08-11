@@ -68,10 +68,14 @@ class ApiClient:
     def _get_client(self) -> httpx.Client:
         """Return the shared httpx.Client, creating it on first use."""
         if self._client is None:
-            self._client = httpx.Client(
-                timeout=httpx.Timeout(STREAM_STALL_TIMEOUT_SEC, connect=30.0),
-                follow_redirects=True,
-            )
+            kwargs: dict = {
+                "timeout": httpx.Timeout(STREAM_STALL_TIMEOUT_SEC, connect=30.0),
+                "follow_redirects": True,
+            }
+            proxy = self._cfg.proxy_url if self._cfg else ""
+            if proxy:
+                kwargs["proxy"] = proxy
+            self._client = httpx.Client(**kwargs)
         return self._client
 
     def _validate_config(self) -> None:

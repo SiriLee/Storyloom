@@ -442,7 +442,7 @@
         contentEl.addEventListener("scroll", function () {
             if (!_settingsScrollActive) return;
             var scrollTop = contentEl.scrollTop + 80;
-            var active = trackedIds[0];
+            var active = null;
             for (var i = trackedIds.length - 1; i >= 0; i--) {
                 var el = document.getElementById("section-" + trackedIds[i]);
                 if (el && el.offsetTop <= scrollTop) {
@@ -450,7 +450,7 @@
                     break;
                 }
             }
-            if (active !== currentSection) {
+            if (active && active !== currentSection) {
                 currentSection = active;
                 _updateSidebarActive(nav, active);
             }
@@ -655,6 +655,13 @@
         container.innerHTML =
             _sectionHeading(Icons.download, _("Updates"), "updates")
             + '<div class="settings-card">'
+            + '<div class="settings-card-title">' + Icons.server() + esc(_("Network Proxy")) + '</div>'
+            + _settingText("proxy_url", _("Proxy URL"), _("e.g. http://127.0.0.1:7890"))
+            + '<div class="settings-row-hint">'
+            + esc(_("Supports HTTP/SOCKS5. Leave empty to use system default."))
+            + '</div>'
+            + '</div>'
+            + '<div class="settings-card">'
             + '<div class="settings-card-title">' + Icons.download() + esc(_("Updates")) + '</div>'
             + '<div class="settings-row">'
             + '<span class="settings-row-label">' + esc(_("Current Version")) + '</span>'
@@ -663,6 +670,8 @@
             + '<button class="settings-update-btn" id="btn-check-update">'
             + Icons.refresh() + esc(_("Check for Updates")) + '</button>'
             + '</div>';
+
+        _bindSettingsInputs(container);
 
         /* Show current version instantly (no network call). */
         API.get("/api/version").then(function (result) {

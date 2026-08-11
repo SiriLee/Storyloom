@@ -57,6 +57,7 @@ from storyloom.core.session import GameSession
 from storyloom.core.update_manager import (
     check_for_updates,
     download_and_extract,
+    set_update_proxy_url,
     UpdateCheckResult,
     UpdateProgress,
 )
@@ -86,6 +87,7 @@ _APP_DIR = os.environ.get("STORYLOOM_APP_DIR", str(_PROJECT_ROOT))
 
 app = FastAPI(title="Storyloom", docs_url=None, redoc_url=None)
 cfg = UserConfig(_APP_DIR)
+set_update_proxy_url(cfg.proxy_url)
 
 # ── First-run bootstrap ────────────────────────────────────────────
 # Ensure user data directories exist.  system_media/ is created empty
@@ -240,6 +242,7 @@ async def get_config():
         "img_api_model": cfg.img_api_model,
         "portrait_remove_bg": cfg.portrait_remove_bg,
         "img_generation_enabled": cfg.img_generation_enabled,
+        "proxy_url": cfg.proxy_url,
     }
 
 
@@ -256,6 +259,7 @@ class ConfigUpdate(BaseModel):
     img_api_model: str | None = None
     portrait_remove_bg: str | None = None
     img_generation_enabled: bool | None = None
+    proxy_url: str | None = None
 
 
 class ApplyUpdateRequest(BaseModel):
@@ -328,6 +332,9 @@ async def update_config(body: ConfigUpdate):
         cfg.portrait_remove_bg = body.portrait_remove_bg
     if body.img_generation_enabled is not None:
         cfg.img_generation_enabled = body.img_generation_enabled
+    if body.proxy_url is not None:
+        cfg.proxy_url = body.proxy_url.strip()
+        set_update_proxy_url(cfg.proxy_url)
     cfg.save()
     return {"status": "ok"}
 
