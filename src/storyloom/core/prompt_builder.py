@@ -687,6 +687,46 @@ class PromptBuilder:
     """
 
     @staticmethod
+    def build_text_system_prompt(
+        story_config: dict,
+        characters: list[dict] | None = None,
+        locations: list[dict] | None = None,
+    ) -> str:
+        """Build the text-mode system prompt — role, format, rules, story setting.
+
+        Sent once as ``{"role": "system"}``, never compressed.  Contains
+        everything the LLM needs to understand its role and the story world.
+        Does NOT include round-level state (outline, variables, bridge text).
+
+        Args:
+            story_config: Story configuration dict (tier, title,
+                          language, premise).
+            characters: Character definitions (name, role, description,
+                        appearance).
+            locations: Location definitions (id, name, description).
+
+        Returns:
+            System prompt string.
+        """
+        language = story_config.get("language", DEFAULT_LANGUAGE)
+        premise = story_config.get("premise", "")
+        premise_text = premise if premise else "(none)"
+        characters_text = PromptBuilder._format_characters(characters or [])
+        locations_text = PromptBuilder._format_locations(locations or [])
+        bridge_pct = BRIDGE_POSITION_RATIO * 100
+
+        return ROUND1_PREFIX.format(
+            MIN_LINES=LINES_PER_ROUND_MIN,
+            MAX_LINES=LINES_PER_ROUND_MAX,
+            BRIDGE_PCT=bridge_pct,
+            BRANCH_VAR_NAME=BRANCH_VAR_NAME,
+            LANGUAGE=language,
+            premise=premise_text,
+            characters=characters_text,
+            locations=locations_text,
+        )
+
+    @staticmethod
     def build_round1(
         story_config: dict,
         outline_text: str,
@@ -719,30 +759,12 @@ class PromptBuilder:
         Returns:
             Full Round 1 prompt string.
         """
-        language = story_config.get("language", DEFAULT_LANGUAGE)
+        prefix = PromptBuilder.build_text_system_prompt(
+            story_config, characters, locations,
+        )
 
         state_vars_text = PromptBuilder._format_current_state(
             state_vars, variables or [],
-        )
-
-        # Build story setting
-        premise = story_config.get("premise", "")
-        premise_text = premise if premise else "(none)"
-        characters_text = PromptBuilder._format_characters(characters or [])
-        locations_text = PromptBuilder._format_locations(locations or [])
-
-        # Bridge position reference
-        bridge_pct = BRIDGE_POSITION_RATIO * 100
-
-        prefix = ROUND1_PREFIX.format(
-            MIN_LINES=LINES_PER_ROUND_MIN,
-            MAX_LINES=LINES_PER_ROUND_MAX,
-            BRIDGE_PCT=bridge_pct,
-            BRANCH_VAR_NAME=BRANCH_VAR_NAME,
-            LANGUAGE=language,
-            premise=premise_text,
-            characters=characters_text,
-            locations=locations_text,
         )
 
         round_part = ROUND_TEMPLATE.format(
@@ -755,6 +777,48 @@ class PromptBuilder:
         )
 
         return prefix + "\n" + round_part
+
+    @staticmethod
+    def build_graph_system_prompt(
+        story_config: dict,
+        characters: list[dict] | None = None,
+        locations: list[dict] | None = None,
+    ) -> str:
+        """Build the graph-mode system prompt — role, format, rules, story setting.
+
+        Sent once as ``{"role": "system"}``, never compressed.  Contains
+        everything the LLM needs to understand its role, the XML element
+        vocabulary, and the story world.  Does NOT include round-level
+        state (outline, variables, bridge text, current scene).
+
+        Args:
+            story_config: Story configuration dict (tier, title,
+                          language, premise).
+            characters: Character definitions (name, role, description,
+                        appearance).
+            locations: Location definitions (id, name, description).
+
+        Returns:
+            System prompt string.
+        """
+        language = story_config.get("language", DEFAULT_LANGUAGE)
+        premise = story_config.get("premise", "")
+        premise_text = premise if premise else "(none)"
+        characters_text = PromptBuilder._format_characters(characters or [])
+        locations_text = PromptBuilder._format_locations(locations or [])
+        bridge_pct = BRIDGE_POSITION_RATIO * 100
+
+        return GRAPH_ROUND1_PREFIX.format(
+            MIN_LINES=LINES_PER_ROUND_MIN,
+            MAX_LINES=LINES_PER_ROUND_MAX,
+            BRIDGE_PCT=bridge_pct,
+            BRANCH_VAR_NAME=BRANCH_VAR_NAME,
+            SCENE_VAR_NAME=SCENE_VAR_NAME,
+            LANGUAGE=language,
+            premise=premise_text,
+            characters=characters_text,
+            locations=locations_text,
+        )
 
     @staticmethod
     def build_round1_graph(
@@ -778,29 +842,12 @@ class PromptBuilder:
         an initial scene).  When loading a save it carries the scene from
         the checkpoint, so the LLM knows where the story left off.
         """
-        language = story_config.get("language", DEFAULT_LANGUAGE)
+        prefix = PromptBuilder.build_graph_system_prompt(
+            story_config, characters, locations,
+        )
 
         state_vars_text = PromptBuilder._format_current_state(
             state_vars, variables or [],
-        )
-
-        premise = story_config.get("premise", "")
-        premise_text = premise if premise else "(none)"
-        characters_text = PromptBuilder._format_characters(characters or [])
-        locations_text = PromptBuilder._format_locations(locations or [])
-
-        bridge_pct = BRIDGE_POSITION_RATIO * 100
-
-        prefix = GRAPH_ROUND1_PREFIX.format(
-            MIN_LINES=LINES_PER_ROUND_MIN,
-            MAX_LINES=LINES_PER_ROUND_MAX,
-            BRIDGE_PCT=bridge_pct,
-            BRANCH_VAR_NAME=BRANCH_VAR_NAME,
-            SCENE_VAR_NAME=SCENE_VAR_NAME,
-            LANGUAGE=language,
-            premise=premise_text,
-            characters=characters_text,
-            locations=locations_text,
         )
 
         if current_scene:

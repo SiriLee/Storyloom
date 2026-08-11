@@ -113,17 +113,25 @@ class TestIntegration:
         pb = PromptBuilder()
         cm = ContextManager()
 
-        # Round 1
-        r1_prompt = pb.build_round1(
-            SAMPLE_STORY, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子完成交易",
-            {"GLOBAL": {"体力": 80, "信任度": 10}},
-            characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS,
-            variables=SAMPLE_VARIABLES,
+        # Build system prompt and Round 1 user message
+        sys_prompt = pb.build_text_system_prompt(
+            SAMPLE_STORY, characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
         )
-        cm.set_round1(r1_prompt, ROUND1_OUTPUT,
-                      bridge_text=_parse_bridge_text(ROUND1_OUTPUT))
+        r1_user = pb.build_round_n(
+            outline_text=SAMPLE_OUTLINE,
+            current_node="ch2_confrontation",
+            goal="与耗子完成交易",
+            state_vars={"GLOBAL": {"体力": 80, "信任度": 10}},
+            variables=SAMPLE_VARIABLES,
+            bridge_text="(Story begins)",
+        )
+        cm.set_system_prompt(sys_prompt)
+        cm.add_round(r1_user, ROUND1_OUTPUT,
+                     bridge_text=_parse_bridge_text(ROUND1_OUTPUT))
         msgs = cm.get_messages()
-        assert len(msgs) == 2
+        assert len(msgs) == 3  # system + user(r1) + assistant(r1)
+        assert msgs[0]["role"] == "system"
         assert cm.round_count == 1
         assert cm.get_compressed_rounds() == []
 
@@ -162,40 +170,56 @@ class TestIntegration:
         assert len(compressed) >= 1
 
         msgs = cm.get_messages()
-        assert msgs[0]["role"] == "user"
-        assert msgs[1]["role"] == "assistant"
+        assert msgs[0]["role"] == "system"
 
-    def test_context_manager_preserves_round1(self):
-        """Round 1 messages should never be removed."""
+    def test_context_manager_preserves_system_prompt(self):
+        """System prompt should never be removed or compressed."""
         pb = PromptBuilder()
         cm = ContextManager()
 
-        r1 = pb.build_round1(
-            SAMPLE_STORY, SAMPLE_OUTLINE, "ch2_confrontation", "与耗子交易",
-            {"GLOBAL": {"体力": 80, "信任度": 10}},
-            characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS,
-            variables=SAMPLE_VARIABLES,
+        sys = pb.build_text_system_prompt(
+            SAMPLE_STORY, characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
         )
-        cm.set_round1(r1, ROUND1_OUTPUT)
+        r1 = pb.build_round_n(
+            outline_text=SAMPLE_OUTLINE,
+            current_node="ch2_confrontation",
+            goal="与耗子交易",
+            state_vars={"GLOBAL": {"体力": 80, "信任度": 10}},
+            variables=SAMPLE_VARIABLES,
+            bridge_text="(Story begins)",
+        )
+        cm.set_system_prompt(sys)
+        cm.add_round(r1, ROUND1_OUTPUT)
 
         for i in range(2, 10):
             cm.add_round(f"r{i}", ROUND2_OUTPUT)
 
         msgs = cm.get_messages()
-        assert msgs[0]["content"] == r1
+        assert msgs[0]["role"] == "system"
+        assert msgs[0]["content"] == sys
         assert "text adventure game" in msgs[0]["content"]
-        assert "<story>" in msgs[0]["content"]
 
     def test_bridge_text_flows_between_rounds(self):
         """Bridge text extracted from round N feeds into round N+1 context."""
         pb = PromptBuilder()
         cm = ContextManager()
 
-        cm.set_round1(
-            pb.build_round1(SAMPLE_STORY, SAMPLE_OUTLINE, "ch2", "交易", {"GLOBAL": {"体力": 80, "信任度": 10}}, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES),
-            ROUND1_OUTPUT,
-            bridge_text=_parse_bridge_text(ROUND1_OUTPUT),
+        sys = pb.build_text_system_prompt(
+            SAMPLE_STORY, characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
         )
+        r1 = pb.build_round_n(
+            outline_text=SAMPLE_OUTLINE,
+            current_node="ch2",
+            goal="交易",
+            state_vars={"GLOBAL": {"体力": 80, "信任度": 10}},
+            variables=SAMPLE_VARIABLES,
+            bridge_text="(Story begins)",
+        )
+        cm.set_system_prompt(sys)
+        cm.add_round(r1, ROUND1_OUTPUT,
+                     bridge_text=_parse_bridge_text(ROUND1_OUTPUT))
 
         bridge1 = cm.get_last_bridge_text()
         r2 = pb.build_round_n(
@@ -213,11 +237,21 @@ class TestIntegration:
         pb = PromptBuilder()
         cm = ContextManager()
 
-        cm.set_round1(
-            pb.build_round1(SAMPLE_STORY, SAMPLE_OUTLINE, "ch2", "交易", {"GLOBAL": {"体力": 80, "信任度": 10}}, characters=SAMPLE_CHARACTERS, locations=SAMPLE_LOCATIONS, variables=SAMPLE_VARIABLES),
-            ROUND1_OUTPUT,
-            bridge_text=_parse_bridge_text(ROUND1_OUTPUT),
+        sys = pb.build_text_system_prompt(
+            SAMPLE_STORY, characters=SAMPLE_CHARACTERS,
+            locations=SAMPLE_LOCATIONS,
         )
+        r1 = pb.build_round_n(
+            outline_text=SAMPLE_OUTLINE,
+            current_node="ch2",
+            goal="交易",
+            state_vars={"GLOBAL": {"体力": 80, "信任度": 10}},
+            variables=SAMPLE_VARIABLES,
+            bridge_text="(Story begins)",
+        )
+        cm.set_system_prompt(sys)
+        cm.add_round(r1, ROUND1_OUTPUT,
+                     bridge_text=_parse_bridge_text(ROUND1_OUTPUT))
 
         for i in range(2, 6):
             cm.add_round(f"r{i}", ROUND2_OUTPUT,

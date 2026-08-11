@@ -658,31 +658,42 @@ class GameLoop:
         self._game_started = True
 
         if self._roster is not None:
-            r1_prompt = self._prompter.build_round1_graph(
+            sys_prompt = self._prompter.build_graph_system_prompt(
                 story_config=self.story_config,
+                characters=self.characters,
+                locations=self.locations,
+            )
+            r1_user = self._prompter.build_round_n_graph(
                 outline_text=self.outline_text,
                 current_node=self.current_node or "",
                 goal=self.goal or "",
                 state_vars=self.game_state.state_vars,
-                characters=self.characters,
-                locations=self.locations,
                 variables=self.variables,
+                bridge_text="(Story begins)",
                 current_scene=self._last_scene,
             )
         else:
-            r1_prompt = self._prompter.build_round1(
+            sys_prompt = self._prompter.build_text_system_prompt(
                 story_config=self.story_config,
+                characters=self.characters,
+                locations=self.locations,
+            )
+            r1_user = self._prompter.build_round_n(
                 outline_text=self.outline_text,
                 current_node=self.current_node or "",
                 goal=self.goal or "",
                 state_vars=self.game_state.state_vars,
-                characters=self.characters,
-                locations=self.locations,
                 variables=self.variables,
+                bridge_text="(Story begins)",
             )
 
-        messages = [{"role": "user", "content": r1_prompt}]
-        self._launch_api(messages, r1_prompt)
+        self._context_mgr.set_system_prompt(sys_prompt)
+
+        messages = [
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": r1_user},
+        ]
+        self._launch_api(messages, r1_user)
 
     # ── stream_round (unified) ─────────────────────────────────────
 
@@ -947,21 +958,14 @@ class GameLoop:
 
         # ── Store round in context manager ──────────────────────────
         bridge_text = state_mgr.get_bridge_text(current_branch)
-        is_first_round = self._context_mgr.round_count == 0
-        if is_first_round:
-            self._context_mgr.set_round1(
-                user_content, response,
-                bridge_text=bridge_text,
-            )
-        else:
-            self._context_mgr.add_round(
-                user_content,
-                response,
-                bridge_text=bridge_text,
-                selected_branch=(
-                    current_branch if current_branch != "main" else None
-                ),
-            )
+        self._context_mgr.add_round(
+            user_content,
+            response,
+            bridge_text=bridge_text,
+            selected_branch=(
+                current_branch if current_branch != "main" else None
+            ),
+        )
 
         self.last_parsed = parsed
 

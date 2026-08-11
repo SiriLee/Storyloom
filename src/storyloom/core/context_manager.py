@@ -8,20 +8,18 @@ class ContextManager:
     """Manages the messages array for conversation-based LLM interaction.
 
     Architecture:
-      [0] Round 1 user (permanent anchor - format + story)
-      [1] Round 1 assistant (permanent anchor - story opening)
+      [0] System prompt (permanent — role, format, rules, story setting)
       [... compressed rounds as user/assistant pair ...]
       [... last WINDOW_SIZE full rounds (user + assistant each) ...]
       [last] Current round user message
 
-    Round 1 messages are NEVER removed or compressed.
-    Rounds 2..N-WINDOW_SIZE-1 are compressed into checkpoint summaries.
-    Rounds N-WINDOW_SIZE..N-1 are kept as full conversation history.
+    The system prompt is set once and NEVER removed or compressed.
+    All rounds (including Round 1) go through the same window/compression
+    cycle — the system prompt replaces the old Round 1 permanent anchor.
     """
 
     def __init__(self):
-        self._round1_user: str | None = None
-        self._round1_assistant: str | None = None
+        self._system_prompt: str | None = None
         self._rounds: list[dict] = []
         self._compressed_summaries: list[str] = []
         self._round_count: int = 0
@@ -31,16 +29,13 @@ class ContextManager:
     def round_count(self) -> int:
         return self._round_count
 
-    def set_round1(
-        self, user_content: str, assistant_content: str, bridge_text: str = ""
-    ) -> None:
-        """Set Round 1 messages (permanent anchor). Can only be called once."""
-        if self._round1_user is not None:
-            raise RuntimeError("Round 1 already set")
-        self._round1_user = user_content
-        self._round1_assistant = assistant_content
-        self._round_count = 1
-        self._last_bridge_text = bridge_text
+    def set_system_prompt(self, content: str) -> None:
+        """Set the system prompt (permanent anchor).  Call once before
+        the first ``add_round``.  The system prompt is always the first
+        message in the array and is never compressed."""
+        if self._system_prompt is not None:
+            raise RuntimeError("System prompt already set")
+        self._system_prompt = content
 
     def add_round(
         self,
@@ -57,10 +52,12 @@ class ContextManager:
             bridge_text: Post-bridge text filtered by ``current_branch``
                          at parse time (provided by GameLoop).
             selected_branch: The branch name the player chose (None if no
-                            choice was presented or Round 1).
+                            choice was presented).
         """
-        if self._round1_user is None:
-            raise RuntimeError("Round 1 not set - call set_round1 first")
+        if self._system_prompt is None:
+            raise RuntimeError(
+                "System prompt not set — call set_system_prompt first"
+            )
 
         checkpoint_text = self._extract_checkpoint_summaries(assistant_content)
 
@@ -81,11 +78,9 @@ class ContextManager:
         """Build the full messages array for the next API call."""
         messages = []
 
-        # Round 1 is always first and never compressed
-        if self._round1_user:
-            messages.append({"role": "user", "content": self._round1_user})
-        if self._round1_assistant:
-            messages.append({"role": "assistant", "content": self._round1_assistant})
+        # System prompt is always first and never compressed
+        if self._system_prompt:
+            messages.append({"role": "system", "content": self._system_prompt})
 
         # Insert compressed summaries as a user/assistant pair
         if self._compressed_summaries:
@@ -106,13 +101,12 @@ class ContextManager:
     def get_compressed_rounds(self) -> list[int]:
         """Return list of round numbers that have been compressed."""
         num_rounds = len(self._rounds)
-        total_rounds = num_rounds + 1  # includes Round 1
-        if total_rounds < FIRST_COMPRESSION_AT:
+        if num_rounds < FIRST_COMPRESSION_AT:
             return []
         window_count = min(WINDOW_SIZE, num_rounds)
         compressed_count = num_rounds - window_count
         if compressed_count > 0:
-            return list(range(2, 2 + compressed_count))
+            return list(range(1, 1 + compressed_count))
         return []
 
     def get_window_rounds(self) -> list[int]:
@@ -122,7 +116,7 @@ class ContextManager:
             return []
         window_count = min(WINDOW_SIZE, num_rounds)
         start = num_rounds - window_count
-        return list(range(start + 2, num_rounds + 2))
+        return list(range(start + 1, num_rounds + 1))
 
     def get_last_bridge_text(self) -> str:
         """Return bridge_text from the most recent round."""
@@ -134,7 +128,7 @@ class ContextManager:
 
     def _maybe_compress(self) -> None:
         """Compress rounds that have fallen out of the window."""
-        total_rounds = len(self._rounds) + 1
+        total_rounds = len(self._rounds)
         if total_rounds < FIRST_COMPRESSION_AT:
             return
 

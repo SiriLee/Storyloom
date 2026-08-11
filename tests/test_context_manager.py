@@ -20,60 +20,67 @@ class TestContextManagerInit:
         assert cm.get_window_rounds() == []
 
 
-class TestRound1Setup:
-    def test_set_round1_stores_messages(self):
+class TestSystemPrompt:
+    def test_system_prompt_is_first_message(self):
         cm = ContextManager()
-        cm.set_round1(
-            user_content="你是叙事引擎...",
+        cm.set_system_prompt("You are the director...")
+        cm.add_round(
+            user_content="Round 1 context",
             assistant_content="<story>...</story>",
         )
         assert cm.round_count == 1
         msgs = cm.get_messages()
-        assert len(msgs) == 2
-        assert msgs[0]["role"] == "user"
-        assert msgs[1]["role"] == "assistant"
+        assert len(msgs) >= 3  # system + user(r1) + assistant(r1)
+        assert msgs[0]["role"] == "system"
+        assert msgs[0]["content"] == "You are the director..."
 
-    def test_set_round1_raises_if_already_set(self):
+    def test_set_system_prompt_raises_if_already_set(self):
         cm = ContextManager()
-        cm.set_round1("prompt", "output")
-        with pytest.raises(RuntimeError, match="Round 1 already set"):
-            cm.set_round1("prompt2", "output2")
+        cm.set_system_prompt("prompt")
+        with pytest.raises(RuntimeError, match="System prompt already set"):
+            cm.set_system_prompt("prompt2")
 
-    def test_round1_messages_are_never_compressed(self):
+    def test_system_prompt_is_never_compressed(self):
         cm = ContextManager()
-        cm.set_round1("prompt", "output")
+        cm.set_system_prompt("permanent system prompt")
         for _ in range(10):
-            cm.add_round("ctx", "<story><bridge/><seg>t</seg></story>")
+            cm.add_round(
+                "ctx",
+                "<story><bridge/><seg>t</seg></story>",
+            )
         msgs = cm.get_messages()
-        assert msgs[0]["content"] == "prompt"
-        assert msgs[1]["content"] == "output"
+        assert msgs[0]["role"] == "system"
+        assert msgs[0]["content"] == "permanent system prompt"
 
 
 class TestAddRound:
     def test_add_round_increments_count(self):
         cm = ContextManager()
-        cm.set_round1("prompt", "output")
+        cm.set_system_prompt("sys")
+        cm.add_round("Round 1 context", "<story><bridge/><seg>t</seg></story>")
+        assert cm.round_count == 1
         cm.add_round("Round 2 context", "<story><bridge/><seg>t</seg></story>")
         assert cm.round_count == 2
 
     def test_add_round_appends_user_message(self):
         cm = ContextManager()
-        cm.set_round1("prompt", "output")
-        cm.add_round("Round 2 context", "<story><bridge/><seg>t</seg></story>")
+        cm.set_system_prompt("sys")
+        cm.add_round("Round 1 context", "<story><bridge/><seg>t</seg></story>")
         msgs = cm.get_messages()
         user_messages = [m for m in msgs if m["role"] == "user"]
-        assert any("Round 2 context" in m["content"] for m in user_messages)
+        assert any("Round 1 context" in m["content"] for m in user_messages)
 
-    def test_add_round_raises_without_round1(self):
+    def test_add_round_raises_without_system_prompt(self):
         cm = ContextManager()
-        with pytest.raises(RuntimeError, match="Round 1 not set"):
+        with pytest.raises(RuntimeError, match="System prompt not set"):
             cm.add_round("ctx", "<story><bridge/><seg>t</seg></story>")
 
 
 class TestSlidingWindow:
     def test_no_compression_before_threshold(self):
         cm = ContextManager()
-        cm.set_round1("p", "o")
+        cm.set_system_prompt("sys")
+        cm.add_round("r1", "<story><bridge/><seg>t</seg></story>")
         cm.add_round("r2", "<story><bridge/><seg>t</seg></story>")
         cm.add_round("r3", "<story><bridge/><seg>t</seg></story>")
         cm.add_round("r4", "<story><bridge/><seg>t</seg></story>")
@@ -81,20 +88,28 @@ class TestSlidingWindow:
 
     def test_compression_starts_at_round_5(self):
         cm = ContextManager()
-        cm.set_round1("p", "o")
-        cm.add_round("r2", '<story><checkpoint node="ch2" summary="接头"/><bridge/><seg>t</seg></story>')
-        cm.add_round("r3", '<story><checkpoint node="ch3" summary="交易"/><bridge/><seg>t</seg></story>')
+        cm.set_system_prompt("sys")
+        cm.add_round(
+            "r1",
+            '<story><checkpoint node="ch1" summary="开局"/><bridge/><seg>t</seg></story>',
+        )
+        cm.add_round(
+            "r2",
+            '<story><checkpoint node="ch2" summary="接头"/><bridge/><seg>t</seg></story>',
+        )
+        cm.add_round("r3", '<story><bridge/><seg>t</seg></story>')
         cm.add_round("r4", '<story><bridge/><seg>t</seg></story>')
         cm.add_round("r5", '<story><bridge/><seg>t</seg></story>')
         compressed = cm.get_compressed_rounds()
+        # 5 rounds total — keep WINDOW_SIZE=3, compress the first 2
         assert len(compressed) >= 1
 
 
 class TestWindowRounds:
     def test_window_contains_last_n_rounds(self):
         cm = ContextManager()
-        cm.set_round1("p", "o")
-        for i in range(2, 8):
+        cm.set_system_prompt("sys")
+        for i in range(1, 8):
             cm.add_round(f"r{i}", "<story><bridge/><seg>t</seg></story>")
         window = cm.get_window_rounds()
         assert len(window) <= WINDOW_SIZE
@@ -134,11 +149,14 @@ class TestCompressionFormat:
 class TestGetMessagesForRound:
     def test_returns_messages_array_for_api_call(self):
         cm = ContextManager()
-        cm.set_round1("Round 1 prompt", "<story>...</story>")
-        cm.add_round("r2 ctx", '<story><checkpoint node="c2" summary="接头"/><bridge/><seg>t</seg></story>')
+        cm.set_system_prompt("system prompt")
+        cm.add_round(
+            "Round 1 context",
+            '<story><checkpoint node="c1" summary="接头"/><bridge/><seg>t</seg></story>',
+        )
         msgs = cm.get_messages()
-        assert len(msgs) >= 2
-        assert msgs[0]["role"] == "user"
+        assert len(msgs) >= 3  # system + user + assistant
+        assert msgs[0]["role"] == "system"
 
 
 class TestBridgeText:
@@ -148,7 +166,7 @@ class TestBridgeText:
         from storyloom.core.game_loop import GameState
 
         cm = ContextManager()
-        cm.set_round1("p", "o")
+        cm.set_system_prompt("sys")
         xml = (
             '<story>\n'
             '<bridge/>\n'
@@ -164,7 +182,7 @@ class TestBridgeText:
             for event in parser.feed_line(line):
                 list(sm.process(event))
         bridge_text = sm.get_bridge_text()
-        cm.add_round("r2 context", xml, bridge_text=bridge_text)
+        cm.add_round("r1 context", xml, bridge_text=bridge_text)
         bridge = cm.get_last_bridge_text()
         assert "你对耗子点了点头" in bridge
         assert "耗子: 跟我来" in bridge
