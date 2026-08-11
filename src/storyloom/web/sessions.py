@@ -75,6 +75,7 @@ def remove_game(game_id: str) -> None:
     _game_loops.pop(game_id, None)
     _game_stream_loops.pop(game_id, None)
     pop_game_stream(game_id)
+    pop_co_create_prebuild_stream(game_id)
 
 
 # ── Game stream state ──────────────────────────────────────────────
@@ -226,6 +227,63 @@ def wait_for_choice(game_id: str, timeout: float = 300.0) -> str:
     if not signaled:
         return "1"
     return _game_choices.pop(game_id, "1")
+
+
+# ── Co-create prebuild stream state ──────────────────────────────────
+# Per-game queues + stop events for the prebuild SSE stream (§7.8c).
+# Keyed by game_id (game exists by this stage).  Mirrors the game
+# stream pattern (§L80–L228) but simpler — no choice-pause, no
+# GameLoop ref (the daemon thread owns the generator directly).
+
+_co_create_prebuild_q: dict[str, asyncio.Queue] = {}
+_co_create_prebuild_stops: dict[str, threading.Event] = {}
+
+
+def store_co_create_prebuild_stream(
+    game_id: str,
+) -> tuple[asyncio.Queue, threading.Event]:
+    """Create and store an event queue and stop signal for a prebuild SSE stream.
+
+    Returns ``(queue, stop_event)``.  The caller MUST use the local
+    ``stop_event`` reference — never re-read from the global dict.
+    """
+    q: asyncio.Queue = asyncio.Queue()
+    evt = threading.Event()
+    _co_create_prebuild_q[game_id] = q
+    _co_create_prebuild_stops[game_id] = evt
+    return q, evt
+
+
+def request_stop_co_create_prebuild(game_id: str) -> None:
+    """Signal the prebuild daemon thread to stop.  Idempotent."""
+    evt = _co_create_prebuild_stops.get(game_id)
+    if evt is not None:
+        evt.set()
+
+
+def is_co_create_prebuild_stopped(game_id: str) -> bool:
+    """True if the prebuild stream has been signalled to stop."""
+    evt = _co_create_prebuild_stops.get(game_id)
+    return evt.is_set() if evt is not None else True
+
+
+def pop_co_create_prebuild_stream(
+    game_id: str,
+    q: asyncio.Queue | None = None,
+) -> asyncio.Queue | None:
+    """Clean up prebuild stream state.
+
+    When *q* is given, only removes the stored queue if it ``is`` *q*
+    (identity check) — prevents an old daemon thread's ``finally`` from
+    deleting a new stream's state.  When *q* is ``None`` (forced cleanup
+    from ``remove_game``), removes unconditionally.
+    """
+    if q is not None:
+        current = _co_create_prebuild_q.get(game_id)
+        if current is not q:
+            return None
+    _co_create_prebuild_stops.pop(game_id, None)
+    return _co_create_prebuild_q.pop(game_id, None)
 
 
 # ── Auto-update store ──────────────────────────────────────────────

@@ -1,9 +1,10 @@
 """Tests for co-create validator and flow."""
 import pytest
 from storyloom.core.co_create import (
-    CoCreateValidator, CoCreateFlow, CoCreateError,
+    CoCreateValidator, CoCreateFlow, CoCreateError, CoCreateCancelled,
     _SectionStreamer, _GENERATE_SECTION_ORDER,
 )
+import threading
 from storyloom.io.api_client import ApiError
 from storyloom.i18n import init_i18n
 init_i18n("en")  # Use English for deterministic test output
@@ -1065,5 +1066,99 @@ class TestGenerateStream:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# _SectionStreamer tests
+# Cancel tests
 # ══════════════════════════════════════════════════════════════════════════
+
+
+class TestCoCreateFlowCancel:
+    """Tests for cooperative cancellation of CoCreateFlow."""
+
+    def test_cancel_sets_is_cancelled(self):
+        flow = CoCreateFlow(MockApiClient())
+        assert not flow.is_cancelled
+        flow.cancel()
+        assert flow.is_cancelled
+
+    def test_cancel_is_idempotent(self):
+        flow = CoCreateFlow(MockApiClient())
+        flow.cancel()
+        flow.cancel()  # no-op, no exception
+        assert flow.is_cancelled
+
+    def test_abort_also_cancels(self):
+        flow = CoCreateFlow(MockApiClient())
+        flow.abort()
+        assert flow.is_cancelled
+        assert flow.phase == "aborted"
+
+    def test_send_raises_cancelled_when_cancelled(self):
+        api = MockApiClient()
+        flow = CoCreateFlow(api)
+        flow._phase = "awaiting_idea"
+        flow.cancel()
+        with pytest.raises(CoCreateCancelled):
+            flow.send("test idea")
+
+    def test_generate_raises_cancelled_when_cancelled(self):
+        api = MockApiClient()
+        flow = CoCreateFlow(api)
+        flow._phase = "awaiting_answer"
+        flow.cancel()
+        with pytest.raises(CoCreateCancelled):
+            flow.generate()
+
+    def test_generate_stream_raises_cancelled_before_api_call(self):
+        api = MockApiClient()
+        flow = CoCreateFlow(api)
+        flow._phase = "awaiting_answer"
+        flow.cancel()
+        with pytest.raises(CoCreateCancelled):
+            list(flow.generate_stream())
+
+    def test_generate_stream_cancelled_mid_stream(self):
+        """Cancel during streaming — streamer exits at chunk boundary."""
+        json_text = (
+            '{"story_config":{"title":"S","tier":"short","language":"en","premise":"A premise."},'
+            '"characters":[{"name":"A","role":"protagonist","description":"A char.","appearance":"Tall."}],'
+            '"locations":[{"id":"l","name":"L","description":"A location."}],'
+            '"variables":[{"name":"v","type":"number","initial":10}],'
+            '"outline":[{"id":"ch1","title":"T","goal":"G","routes":[]}]}'
+        )
+        # Use chunks so the streamer yields section_complete events
+        chunks = [{"delta": json_text[i:i + 10]} for i in range(0, len(json_text), 10)]
+        api = MockApiClient(responses=[chunks])
+        flow = CoCreateFlow(api)
+        flow._messages = [
+            {"role": "system", "content": "test"},
+            {"role": "user", "content": "idea"},
+            {"role": "assistant", "content": "q"},
+        ]
+        flow._phase = "awaiting_answer"
+
+        gen = flow.generate_stream()
+        # Drain first event (should be section_complete)
+        first = next(gen)
+        assert first["type"] == "section_complete"
+        # Cancel now — the next chunk boundary will detect it
+        flow.cancel()
+        with pytest.raises(CoCreateCancelled):
+            list(gen)
+
+    def test_cancel_flag_stops_section_streamer(self):
+        """_SectionStreamer returns early when cancel event is set."""
+        cancel_evt = threading.Event()
+        chunks = [{"delta": "data"} for _ in range(10)]
+        streamer = _SectionStreamer(iter(chunks), cancel_event=cancel_evt)
+
+        cancel_evt.set()
+        events = list(streamer)
+        # No events — streamer returned early before processing any chunks
+        assert len(events) == 0
+
+    def test_section_streamer_without_cancel_event_works(self):
+        """_SectionStreamer without cancel_event behaves normally."""
+        chunks = [{"delta": "test"}]
+        streamer = _SectionStreamer(iter(chunks))
+        events = list(streamer)
+        assert len(events) == 1
+        assert events[0]["type"] == "generate_done"

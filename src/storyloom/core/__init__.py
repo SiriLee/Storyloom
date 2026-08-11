@@ -1,7 +1,7 @@
 """Core game logic — game loop, co-creation, context management, prompt building."""
 
 from storyloom.core.game_loop import GameLoop, GameState, RoundResult, RoundRecord
-from storyloom.core.co_create import CoCreateFlow, CoCreateError, CoCreateValidator
+from storyloom.core.co_create import CoCreateFlow, CoCreateError, CoCreateCancelled, CoCreateValidator
 from storyloom.core.context_manager import ContextManager
 from storyloom.core.prompt_builder import PromptBuilder
 from storyloom.core.session import GameSession
@@ -19,6 +19,7 @@ from storyloom.core.update_manager import (
 __all__ = [
     "CoCreateFlow",
     "CoCreateError",
+    "CoCreateCancelled",
     "CoCreateValidator",
     "ContextManager",
     "EntitySpec",

@@ -1,6 +1,7 @@
 """Co-creation phase: user input → Q&A loop → story setup generation."""
 import json
 import re
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from string import Template
@@ -706,6 +707,15 @@ class CoCreateError(Exception):
     message: str
 
 
+class CoCreateCancelled(Exception):
+    """Raised when story-setup generation is cancelled by user or on
+    client disconnect.
+
+    Distinguished from ``CoCreateError`` so the SSE daemon thread can
+    silently end the stream (no error event) and skip save creation.
+    """
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # Streaming section detection
 # ══════════════════════════════════════════════════════════════════════════
@@ -721,8 +731,9 @@ class _SectionStreamer:
     the name).
     """
 
-    def __init__(self, token_iter):
+    def __init__(self, token_iter, cancel_event=None):
         self._iter = token_iter
+        self._cancel = cancel_event  # threading.Event | None
         self._buffer = ""
         self._next_idx = 0
 
@@ -731,6 +742,12 @@ class _SectionStreamer:
 
     def _process(self):
         for chunk in self._iter:
+            # Cooperative cancel check — when the cancel event is set,
+            # stop iterating immediately.  This exits the ``with`` block
+            # in ``stream_chat_iter()``, closing the httpx connection.
+            if self._cancel is not None and self._cancel.is_set():
+                return
+
             if chunk.get("done"):
                 break
 
@@ -857,6 +874,9 @@ class CoCreateFlow:
         self._result: dict | None = None
         self._retry_state: tuple[str, str] | None = None
         # ("send", user_input) | ("generate_api", "") | ("generate_parse", error_desc)
+        # Cooperative cancellation — set by cancel() (from any thread).
+        # Checked by generate_stream() / _SectionStreamer at chunk boundaries.
+        self._cancel = threading.Event()
 
     @property
     def messages(self) -> list[dict]:
@@ -903,9 +923,29 @@ class CoCreateFlow:
         }
 
     def abort(self) -> None:
-        """Abort co-creation immediately."""
+        """Abort co-creation immediately.
+
+        Sets the cancel event so any in-flight ``generate_stream()``
+        stops at the next chunk boundary, then resets phase + retry state.
+        """
+        self._cancel.set()
         self._phase = "aborted"
         self._retry_state = None
+
+    def cancel(self) -> None:
+        """Signal cooperative cancellation of an in-flight ``generate_stream()``.
+
+        The background daemon thread observes the flag at the next token
+        chunk boundary (typically <1s).  Safe to call from any thread;
+        idempotent.  Does NOT change ``_phase`` — use ``abort()`` for
+        that (which also calls cancel).
+        """
+        self._cancel.set()
+
+    @property
+    def is_cancelled(self) -> bool:
+        """True if ``cancel()`` or ``abort()`` has been called."""
+        return self._cancel.is_set()
 
     def send(self, user_input: str) -> str:
         """Send user input to LLM, return reply text.
@@ -931,6 +971,9 @@ class CoCreateFlow:
             raise RuntimeError("call start() first before send()")
         if self._phase == "aborted":
             raise RuntimeError("co-creation was aborted")
+
+        if self._cancel.is_set():
+            raise CoCreateCancelled("Co-creation cancelled by user")
 
         stripped = user_input.strip()
         if not stripped:
@@ -1016,6 +1059,9 @@ class CoCreateFlow:
                 f"Cannot generate in phase: {self._phase}"
             )
 
+        if self._cancel.is_set():
+            raise CoCreateCancelled("Co-creation cancelled by user")
+
         # Append generation prompt as user message
         gen_prompt = self._build_generation_prompt()
         self._messages.append({"role": "user", "content": gen_prompt})
@@ -1070,6 +1116,9 @@ class CoCreateFlow:
                 f"Cannot generate in phase: {self._phase}"
             )
 
+        if self._cancel.is_set():
+            raise CoCreateCancelled("Co-creation cancelled by user")
+
         # Append generation prompt as user message
         gen_prompt = self._build_generation_prompt()
         self._messages.append({"role": "user", "content": gen_prompt})
@@ -1086,7 +1135,7 @@ class CoCreateFlow:
                 message=f"Generation API call failed: {e}",
             ) from e
 
-        streamer = _SectionStreamer(token_iter)
+        streamer = _SectionStreamer(token_iter, self._cancel)
         full_content = ""
 
         for event in streamer:
@@ -1095,7 +1144,18 @@ class CoCreateFlow:
             elif event["type"] == "generate_done":
                 full_content = event["content"]
 
+        # Cancel check after streamer exits — distinguishes user cancel
+        # (no content, cancel flag set) from empty response (no content,
+        # cancel flag NOT set).
+        if self._cancel.is_set():
+            raise CoCreateCancelled("Co-creation cancelled by user")
+
         if not full_content:
+            self._retry_state = ("generate_api", "")
+            raise CoCreateError(
+                phase="generate_api",
+                message="Generation returned empty response.",
+            )
             self._retry_state = ("generate_api", "")
             raise CoCreateError(
                 phase="generate_api",

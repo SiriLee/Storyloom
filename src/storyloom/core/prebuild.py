@@ -10,6 +10,7 @@ Replaces the §7.6 stub ``_init_stub_roster()``.
 from __future__ import annotations
 
 import json as _json
+import threading
 from dataclasses import dataclass, field
 
 from storyloom.assets import AssetLibrary, AssetType, GameAssetRoster
@@ -575,6 +576,7 @@ class Prebuilder:
         library: AssetLibrary,
         img_generation_enabled: bool = True,
         max_workers: int = PREBUILD_MAX_WORKERS,
+        cancel_event: threading.Event | None = None,
     ):
         self._api = api_client
         self._img_clients = {
@@ -584,6 +586,20 @@ class Prebuilder:
         self._library = library
         self._img_gen_enabled = img_generation_enabled
         self._max_workers = max_workers
+        # Cooperative cancellation — set by the SSE event_generator's
+        # finally block on client disconnect.  Checked at pipeline step
+        # boundaries and in _generate_one (roster guard).
+        self._cancel = cancel_event if cancel_event is not None else threading.Event()
+
+    def cancel(self) -> None:
+        """Signal cooperative cancellation of ``build()``.
+
+        The daemon thread observes the flag at pipeline step boundaries
+        and in the ``as_completed`` loop.  In-flight LLM/image API calls
+        cannot be interrupted and run to completion in their worker
+        threads.  Idempotent; safe from any thread.
+        """
+        self._cancel.set()
 
     # ── Public API ──────────────────────────────────────────────────
 
@@ -652,14 +668,29 @@ class Prebuilder:
             t for t in (AssetType.CHAR_PORTRAIT, AssetType.BACKGROUND)
             if t in by_type
         ]
-        with ThreadPoolExecutor(max_workers=min(len(selection_types), 2)) as ex:
+        ex = ThreadPoolExecutor(max_workers=min(len(selection_types), 2))
+        try:
             futures = {ex.submit(_select_one, t): t for t in selection_types}
             for future in as_completed(futures):
+                if self._cancel.is_set():
+                    ex.shutdown(wait=False, cancel_futures=True)
+                    yield {"type": "prebuild_cancelled"}
+                    return
                 results, err = future.result()
                 if err:
                     selection_errors.append(err)
                 if results:
                     all_results.extend(results)
+        except Exception:
+            ex.shutdown(wait=False, cancel_futures=True)
+            raise
+        else:
+            ex.shutdown(wait=True)
+
+        # ── Cancel check after batch selection ───────────────────────
+        if self._cancel.is_set():
+            yield {"type": "prebuild_cancelled"}
+            return
 
         # Yield selection progress
         type_results: dict[AssetType, dict] = {}
@@ -738,7 +769,11 @@ class Prebuilder:
             total = len(unmatched)
             completed = [0]  # mutable counter shared across threads
 
-            def _generate_one(entity: EntitySpec) -> PrebuildResult:
+            def _generate_one(entity: EntitySpec) -> PrebuildResult | None:
+                # Cancel guard — if cancel was set before this worker
+                # started, skip the expensive API call.
+                if self._cancel.is_set():
+                    return None
                 img_client = self._img_clients[entity.asset_type]
                 refs = self._collect_library_refs(entity.asset_type, img_client.model)
                 desc = _entity_description(entity)
@@ -749,7 +784,10 @@ class Prebuilder:
                     reference_image_urls=refs or None,
                 )
 
-                if asset_id is not None:
+                # Roster guard — if cancel was set while this worker was
+                # generating the image, do NOT mutate the roster.  The
+                # main thread may have already cleared it for a retry.
+                if asset_id is not None and not self._cancel.is_set():
                     roster.set_target(entity.asset_type, entity.name, asset_id)
 
                 return PrebuildResult(
@@ -759,14 +797,21 @@ class Prebuilder:
                     asset_id=asset_id,
                 )
 
-            with ThreadPoolExecutor(
+            ex = ThreadPoolExecutor(
                 max_workers=min(self._max_workers, max(total, 1))
-            ) as ex:
+            )
+            try:
                 futures = {
                     ex.submit(_generate_one, e): e for e in unmatched
                 }
                 for future in as_completed(futures):
+                    if self._cancel.is_set():
+                        ex.shutdown(wait=False, cancel_futures=True)
+                        yield {"type": "prebuild_cancelled"}
+                        return
                     result = future.result()
+                    if result is None:
+                        continue  # cancelled before starting
                     completed[0] += 1
                     yield {
                         "type": "prebuild_progress",
@@ -777,11 +822,22 @@ class Prebuilder:
                         "completed": completed[0],
                         "total": total,
                     }
+            except Exception:
+                ex.shutdown(wait=False, cancel_futures=True)
+                raise
+            else:
+                ex.shutdown(wait=True)
 
         # ── Step 4: Verify + force-select fallback ─────────────────
+        if self._cancel.is_set():
+            yield {"type": "prebuild_cancelled"}
+            return
+
         from storyloom.tasks import select_forced
 
         for entity in entities:
+            if self._cancel.is_set():
+                break
             item = roster.lookup(entity.asset_type, entity.name)
             if item is None:
                 errors.append(
@@ -821,7 +877,21 @@ class Prebuilder:
                     "status": "fallback_failed",
                 }
 
+        # ── Post-verification cancel check ───────────────────────────
+        # If we broke out of the verification loop due to cancel, yield
+        # cancelled instead of falling through to library.save().
+        if self._cancel.is_set():
+            yield {"type": "prebuild_cancelled"}
+            return
+
         # ── Persist library (single save — thread-safe, all mutations done) ─
+        # Cancel check: if cancelled, skip persistence.  The library was
+        # not modified (only _generate_one's register+save-to-disk, which
+        # are soft state).  Roster is in-memory only.
+        if self._cancel.is_set():
+            yield {"type": "prebuild_cancelled"}
+            return
+
         self._library.save()
 
         # ── Final: yield result ────────────────────────────────────
@@ -868,6 +938,8 @@ class Prebuilder:
 
         results: list[SelectionResult] = []
         for entity in entities:
+            if self._cancel.is_set():
+                break
             desc = _entity_description(entity)
             try:
                 asset_id = select_forced(

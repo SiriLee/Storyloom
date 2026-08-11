@@ -1084,3 +1084,124 @@ class TestPrebuildIntegration:
     def test_roster_empty_before_prebuild(self, roster):
         """Roster starts empty — pre-build is the first write."""
         assert len(roster) == 0
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Cancel tests
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TestPrebuilderCancel:
+    """Tests for cooperative cancellation of Prebuilder.build()."""
+
+    @pytest.fixture
+    def lib(self):
+        with tempfile.TemporaryDirectory() as d:
+            yield AssetLibrary(d)
+
+    @pytest.fixture
+    def roster(self, lib):
+        yield GameAssetRoster("test_game", lib)
+
+    def test_cancel_before_build_yields_cancelled(self, lib, roster):
+        import threading
+        from storyloom.core.prebuild import Prebuilder
+
+        api = MagicMock()
+        img = MagicMock()
+
+        cancel_evt = threading.Event()
+        cancel_evt.set()
+        prebuilder = Prebuilder(api, img, img, lib,
+                                img_generation_enabled=True,
+                                cancel_event=cancel_evt)
+
+        events = list(prebuilder.build(
+            [{"name": "Kael", "role": "protagonist",
+              "description": "d", "appearance": "a"}],
+            [], roster,
+        ))
+        # First event should be prebuild_cancelled
+        evt_types = [e["type"] for e in events]
+        assert "prebuild_cancelled" in evt_types
+        assert "prebuild_complete" not in evt_types
+
+    def test_cancel_after_parse_yields_cancelled(self, lib, roster):
+        """Cancel after entity parsing before batch selection."""
+        import threading
+        from storyloom.core.prebuild import Prebuilder
+
+        cancel_evt = threading.Event()
+
+        api = MagicMock()
+        # Make batch selection trigger cancel after being called
+        def _select_and_cancel(*args, **kwargs):
+            cancel_evt.set()
+            return [], None
+
+        run_batch_selection_mock = MagicMock(side_effect=_select_and_cancel)
+
+        img = MagicMock()
+        prebuilder = Prebuilder(api, img, img, lib,
+                                img_generation_enabled=True,
+                                cancel_event=cancel_evt)
+
+        with patch("storyloom.core.prebuild.run_batch_selection",
+                   run_batch_selection_mock):
+            events = list(prebuilder.build(
+                [{"name": "Kael", "role": "protagonist",
+                  "description": "d", "appearance": "a"}],
+                [], roster,
+            ))
+        evt_types = [e["type"] for e in events]
+        assert "prebuild_cancelled" in evt_types
+
+    def test_cancel_skips_library_save(self, lib, roster):
+        """Cancelled prebuild must not persist library changes."""
+        import threading
+        from storyloom.core.prebuild import Prebuilder
+
+        # Spy on library.save
+        lib.save = MagicMock()
+
+        cancel_evt = threading.Event()
+        cancel_evt.set()
+        api = MagicMock()
+        img = MagicMock()
+
+        prebuilder = Prebuilder(api, img, img, lib,
+                                img_generation_enabled=True,
+                                cancel_event=cancel_evt)
+
+        list(prebuilder.build(
+            [{"name": "Kael", "role": "protagonist",
+              "description": "d", "appearance": "a"}],
+            [], roster,
+        ))
+        lib.save.assert_not_called()
+
+    def test_cancel_without_cancel_event_creates_private_event(self, lib, roster):
+        """Prebuilder without explicit cancel_event still supports cancel()."""
+        from storyloom.core.prebuild import Prebuilder
+
+        api = MagicMock()
+        img = MagicMock()
+
+        prebuilder = Prebuilder(api, img, img, lib)
+        prebuilder.cancel()  # should not raise
+
+        events = list(prebuilder.build(
+            [{"name": "Kael", "role": "protagonist",
+              "description": "d", "appearance": "a"}],
+            [], roster,
+        ))
+        assert "prebuild_cancelled" in [e["type"] for e in events]
+
+    def test_cancel_is_idempotent(self, lib):
+        from storyloom.core.prebuild import Prebuilder
+
+        api = MagicMock()
+        img = MagicMock()
+        prebuilder = Prebuilder(api, img, img, lib)
+        prebuilder.cancel()
+        prebuilder.cancel()  # no-op, no exception

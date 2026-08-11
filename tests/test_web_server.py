@@ -443,7 +443,7 @@ class TestCoCreatePrebuild:
         # sessions.get_game() call succeeds (added in P2 fix).
         sessions.store_game("test-game-123", MagicMock())
 
-        def _fake_prebuild(game_id, game_loop=None):
+        def _fake_prebuild(game_id, game_loop=None, cancel_event=None):
             yield {
                 "type": "prebuild_progress",
                 "phase": "parse",
@@ -903,3 +903,43 @@ class TestUpdateAPI:
                 lines = [l for l in s.iter_lines() if l]
                 events = [l for l in lines if l.startswith("event:")]
                 assert "event: error" in events
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Cancel / stop endpoint tests
+# ═══════════════════════════════════════════════════════════════════
+
+
+class TestCancelEndpoints:
+    """Tests for co-create and prebuild cancellation endpoints."""
+
+    def test_abort_calls_flow_cancel(self, client_with_session):
+        """POST /api/co-create/abort cancels the flow and removes it."""
+        from storyloom.web import sessions
+        flow = sessions.get_co_create()
+        assert flow is not None
+        # abort should succeed
+        res = client_with_session.post("/api/co-create/abort")
+        assert res.status_code == 200
+        assert res.json()["status"] == "ok"
+        # After abort, flow should be removed
+        assert flow.is_cancelled
+        assert sessions.get_co_create() is None
+
+    def test_prebuild_stop_sets_stop_event(self, client):
+        """POST /api/co-create/prebuild/{gid}/stop sets the stop event."""
+        from storyloom.web import sessions
+        # Pre-store a prebuild stream
+        q, evt = sessions.store_co_create_prebuild_stream("test-gid")
+        assert not evt.is_set()
+
+        res = client.post("/api/co-create/prebuild/test-gid/stop")
+        assert res.status_code == 200
+        assert res.json()["status"] == "ok"
+        assert evt.is_set()
+
+    def test_prebuild_stop_no_stream_is_noop(self, client):
+        """Stop endpoint is idempotent when no stream exists."""
+        res = client.post("/api/co-create/prebuild/nonexistent/stop")
+        assert res.status_code == 200
+        assert res.json()["status"] == "ok"

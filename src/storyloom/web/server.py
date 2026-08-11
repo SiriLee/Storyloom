@@ -509,6 +509,8 @@ async def co_create_generate_stream():
     """
     import asyncio
 
+    from storyloom.core.co_create import CoCreateCancelled
+
     flow = sessions.get_co_create()
     if flow is None:
         raise HTTPException(400, "No active co-creation session.  Call start first.")
@@ -544,6 +546,10 @@ async def co_create_generate_stream():
                         }
                     )
                     return
+        except CoCreateCancelled:
+            # User cancelled or client disconnected — end stream quietly.
+            # Do NOT create save file or store game.
+            pass
         except CoCreateError as exc:
             loop.call_soon_threadsafe(
                 q.put_nowait, {
@@ -570,21 +576,30 @@ async def co_create_generate_stream():
     thread.start()
 
     async def event_generator():
+        _KEEPALIVE_INTERVAL = 15.0  # well under typical 60 s proxy timeout
         try:
             while True:
-                event = await q.get()
+                try:
+                    event = await asyncio.wait_for(
+                        q.get(), timeout=_KEEPALIVE_INTERVAL
+                    )
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+                    continue
+
                 if event is None:
                     break
                 etype = event.get("type", "")
                 data = json.dumps(event, ensure_ascii=False)
                 yield f"event: {etype}\ndata: {data}\n\n"
                 if etype in ("generate_done", "generate_error"):
-                    if etype == "generate_done":
-                        # Small delay so client can process the final event
-                        pass
                     break
         finally:
-            pass
+            # Client disconnected (or stream ended naturally) —
+            # signal the daemon thread to stop at the next chunk
+            # boundary.  flow.cancel() is idempotent — harmless if
+            # the stream already completed.
+            flow.cancel()
 
     return StreamingResponse(
         event_generator(),
@@ -606,26 +621,29 @@ async def co_create_prebuild_stream(game_id: str):
     ``call_soon_threadsafe`` and the async generator drains it with
     ``await q.get()``.
 
-    The stream ends naturally after ``prebuild_complete`` (success or
-    failure).  No choice-pause, no keepalive (prebuild completes within
-    30 s).
+    On client disconnect, the ``event_generator`` ``finally`` block sets
+    the stop event, which propagates through to ``Prebuilder.build()``
+    via the ``cancel_event`` parameter — the pipeline stops at the next
+    checkpoint.
     """
     import asyncio
-
-    q: asyncio.Queue = asyncio.Queue()
-    loop = asyncio.get_running_loop()
 
     # ── Reuse the stored GameLoop (from co_create_generate) instead
     # of loading a throwaway copy — its roster is the one the game
     # will use after prebuild completes.
     gl = sessions.get_game(game_id)
 
+    q, stop_evt = sessions.store_co_create_prebuild_stream(game_id)
+    loop = asyncio.get_running_loop()
+
     # ── Background thread: run prebuild pipeline ────────────────────
     def run_prebuild() -> None:
         try:
-            for event in _game_session.prebuild_assets(game_id, game_loop=gl):
+            for event in _game_session.prebuild_assets(
+                game_id, game_loop=gl, cancel_event=stop_evt,
+            ):
                 loop.call_soon_threadsafe(q.put_nowait, event)
-                if event["type"] == "prebuild_complete":
+                if event["type"] in ("prebuild_complete", "prebuild_cancelled"):
                     return
         except Exception as exc:
             loop.call_soon_threadsafe(
@@ -642,15 +660,25 @@ async def co_create_prebuild_stream(game_id: str):
                 loop.call_soon_threadsafe(q.put_nowait, None)
             except RuntimeError:
                 pass
+            # Identity-checked cleanup — only removes state if no
+            # new stream has replaced it (re-connect guard).
+            sessions.pop_co_create_prebuild_stream(game_id, q)
 
     thread = threading.Thread(target=run_prebuild, daemon=True)
     thread.start()
 
     # ── Async SSE generator ─────────────────────────────────────────
     async def event_generator():
+        _KEEPALIVE_INTERVAL = 15.0  # well under typical 60 s proxy timeout
         try:
             while True:
-                event = await q.get()
+                try:
+                    event = await asyncio.wait_for(
+                        q.get(), timeout=_KEEPALIVE_INTERVAL
+                    )
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+                    continue
 
                 # None sentinel — producer thread has exited.
                 if event is None:
@@ -660,10 +688,14 @@ async def co_create_prebuild_stream(game_id: str):
                 data = json.dumps(event, ensure_ascii=False)
                 yield f"event: {etype}\ndata: {data}\n\n"
 
-                if etype == "prebuild_complete":
+                if etype in ("prebuild_complete", "prebuild_cancelled"):
                     break
         finally:
-            pass  # daemon thread exits on its own
+            # Client disconnected (or stream ended naturally) —
+            # signal the daemon thread to stop at the next pipeline
+            # checkpoint.  Setting the stop event propagates through
+            # prebuild_assets → Prebuilder.build().
+            stop_evt.set()
 
     return StreamingResponse(
         event_generator(),
@@ -678,11 +710,29 @@ async def co_create_prebuild_stream(game_id: str):
 
 @app.post("/api/co-create/abort")
 async def co_create_abort():
-    """Abort the co-creation session and discard all state."""
+    """Abort the co-creation session and discard all state.
+
+    Calls ``flow.cancel()`` first to stop any in-flight
+    ``generate_stream()``, then ``flow.abort()`` to reset phase +
+    retry state, then removes the co-create session.
+    """
     flow = sessions.get_co_create()
     if flow is not None:
+        flow.cancel()
         flow.abort()
     sessions.remove_co_create()
+    return {"status": "ok"}
+
+
+@app.post("/api/co-create/prebuild/{game_id}/stop")
+async def co_create_prebuild_stop(game_id: str):
+    """Cancel an in-flight prebuild stream for a game.
+
+    Sets the stop event so the prebuild daemon thread exits at the
+    next pipeline checkpoint.  Idempotent — safe to call multiple
+    times or when no stream is active.
+    """
+    sessions.request_stop_co_create_prebuild(game_id)
     return {"status": "ok"}
 
 

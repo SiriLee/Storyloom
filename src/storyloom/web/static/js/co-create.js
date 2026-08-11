@@ -24,7 +24,10 @@
 const CoCreateView = (function () {
     /* ── Internal state ──────────────────────────────────────────── */
     let _container = null;
-    let _phase = "loading";   // loading | chatting | done
+    let _phase = "loading";   // loading | chatting | generating | done
+    let _genAbort = null;     // AbortController for generate SSE fetch
+    let _pbAbort = null;      // AbortController for prebuild SSE fetch
+    let _activeGameId = null; // game_id captured for prebuild stop call
 
     /* ── DOM helpers ─────────────────────────────────────────────── */
 
@@ -152,6 +155,43 @@ const CoCreateView = (function () {
         Router.navigate("menu");
     }
 
+    /* ── Generate / prebuild cancel handlers ────────────────────── */
+
+    function _handleGenBack() {
+        if (_phase !== "generating") return;
+        // Abort the SSE fetch (triggers server event_generator finally)
+        if (_genAbort) _genAbort.abort();
+        // Fire-and-forget stop — idempotent, matches game.js _handleExit
+        API.post("/api/co-create/abort").catch(function () {});
+        _phase = "done";
+        Router.navigate("menu");
+    }
+
+    function _handlePrebuildBack() {
+        if (_phase !== "generating") return;
+        if (_pbAbort) _pbAbort.abort();
+        if (_activeGameId) {
+            API.post("/api/co-create/prebuild/" + encodeURIComponent(_activeGameId) + "/stop").catch(function () {});
+        }
+        _phase = "done";
+        Router.navigate("menu");
+    }
+
+    /** Called by Router on every hash change — cancels any in-flight
+     *  generate/prebuild stream before the new view renders. */
+    function cleanup() {
+        if (_phase === "generating") {
+            if (_genAbort) _genAbort.abort();
+            if (_pbAbort) _pbAbort.abort();
+            if (_activeGameId) {
+                API.post("/api/co-create/prebuild/" + encodeURIComponent(_activeGameId) + "/stop").catch(function () {});
+            } else {
+                API.post("/api/co-create/abort").catch(function () {});
+            }
+            _phase = "done";
+        }
+    }
+
     /* ── Start button — Phase 1: generate story setup ────────────── */
 
     /* ── Generate task list (§7.8c SSE) ─────────────────────────────── */
@@ -194,7 +234,7 @@ const CoCreateView = (function () {
         _container.innerHTML =
             '<div class="gen-view">' +
                 '<div class="gen-header">' +
-                    '<button class="cc-back-btn" id="gen-back-btn" disabled title="' + esc(_("Back to Menu")) + '">' + Icons.arrowLeft() + '</button>' +
+                    '<button class="cc-back-btn" id="gen-back-btn" title="' + esc(_("Back to Menu")) + '">' + Icons.arrowLeft() + '</button>' +
                     '<span class="gen-title">' + esc(_("Creating Your Story")) + '</span>' +
                     '<span class="cc-spacer"></span>' +
                     '<button class="theme-toggle-btn" id="gen-theme-btn" title="' + esc(_("Toggle Theme")) + '"></button>' +
@@ -225,6 +265,12 @@ const CoCreateView = (function () {
                 saveConfig();
                 window._updateAllThemeButtons();
             });
+        }
+
+        // Back button — cancel generation and return to menu
+        var genBackBtn = document.getElementById("gen-back-btn");
+        if (genBackBtn) {
+            genBackBtn.addEventListener("click", _handleGenBack);
         }
 
         return { tasks: tasks, progressEl: document.getElementById('gen-progress') };
@@ -289,10 +335,18 @@ const CoCreateView = (function () {
     async function _connectGenerateStream(tasks, progressEl) {
         var url = '/api/co-create/generate/stream';
 
+        _genAbort = new AbortController();
         var response;
-        try { response = await fetch(url); } catch (err) { return { event: null, error: String(err) }; }
+        try {
+            response = await fetch(url, { signal: _genAbort.signal });
+        } catch (err) {
+            _genAbort = null;
+            if (err.name === "AbortError") return { event: null, cancelled: true };
+            return { event: null, error: String(err) };
+        }
 
         if (!response.ok) {
+            _genAbort = null;
             var detail = '';
             try { var ed = await response.json(); detail = ed.detail || ''; } catch (_) {}
             return { event: null, error: detail || ('HTTP ' + response.status) };
@@ -305,7 +359,13 @@ const CoCreateView = (function () {
 
         try {
             while (true) {
-                var chunk = await reader.read();
+                var chunk;
+                try {
+                    chunk = await reader.read();
+                } catch (err) {
+                    if (err.name === "AbortError") return { event: null, cancelled: true };
+                    throw err;
+                }
                 if (chunk.done) break;
                 buf += decoder.decode(chunk.value, { stream: true });
                 var parts = buf.split('\n\n');
@@ -326,7 +386,10 @@ const CoCreateView = (function () {
                     });
                 });
             }
-        } finally { try { reader.cancel(); } catch (_) {} }
+        } finally {
+            try { reader.cancel(); } catch (_) {}
+            _genAbort = null;
+        }
 
         return { event: doneEvent, error: null };
     }
@@ -371,7 +434,7 @@ const CoCreateView = (function () {
         _container.innerHTML =
             '<div class="pb-view">' +
                 '<div class="pb-header">' +
-                    '<button class="cc-back-btn" id="pb-back-btn" disabled title="' + esc(_("Back to Menu")) + '">' + Icons.arrowLeft() + '</button>' +
+                    '<button class="cc-back-btn" id="pb-back-btn" title="' + esc(_("Back to Menu")) + '">' + Icons.arrowLeft() + '</button>' +
                     '<span class="pb-title">' + esc(_("Building Your World")) + '</span>' +
                     '<span class="cc-spacer"></span>' +
                     '<button class="theme-toggle-btn" id="pb-theme-btn" title="' + esc(_("Toggle Theme")) + '"></button>' +
@@ -410,6 +473,12 @@ const CoCreateView = (function () {
                 saveConfig();
                 window._updateAllThemeButtons();
             });
+        }
+
+        // Back button — cancel prebuild and return to menu
+        var pbBackBtn = document.getElementById("pb-back-btn");
+        if (pbBackBtn) {
+            pbBackBtn.addEventListener("click", _handlePrebuildBack);
         }
 
         return { cards: cards, progressEl: progressEl };
@@ -527,20 +596,27 @@ const CoCreateView = (function () {
     }
 
     /** Connect to the prebuild SSE stream and drive the card UI.
-     *  Returns ``{event, error}`` — *event* is the ``prebuild_complete``
-     *  data on success; *error* is a string on connection / HTTP failure. */
+     *  Returns ``{event, error, cancelled}`` — *event* is the
+     *  ``prebuild_complete`` data on success; *error* is a string on
+     *  connection / HTTP failure; *cancelled* is true when the user
+     *  aborted via the back button. */
     async function _connectPrebuildStream(gameId, cards, progressEl) {
         var url = '/api/co-create/prebuild/' + encodeURIComponent(gameId) + '/stream';
         var completeEvent = null;
+        var cancelled = false;
 
+        _pbAbort = new AbortController();
         var response;
         try {
-            response = await fetch(url);
+            response = await fetch(url, { signal: _pbAbort.signal });
         } catch (err) {
+            _pbAbort = null;
+            if (err.name === "AbortError") return { event: null, cancelled: true };
             return { event: null, error: String(err) };
         }
 
         if (!response.ok) {
+            _pbAbort = null;
             var detail = '';
             try {
                 var errData = await response.json();
@@ -555,7 +631,13 @@ const CoCreateView = (function () {
 
         try {
             while (true) {
-                var chunk = await reader.read();
+                var chunk;
+                try {
+                    chunk = await reader.read();
+                } catch (err) {
+                    if (err.name === "AbortError") return { event: null, cancelled: true };
+                    throw err;
+                }
                 if (chunk.done) break;
 
                 buffer += decoder.decode(chunk.value, { stream: true });
@@ -579,6 +661,9 @@ const CoCreateView = (function () {
                                 if (eventType === 'prebuild_complete' || data.type === 'prebuild_complete') {
                                     completeEvent = data;
                                 }
+                                if (eventType === 'prebuild_cancelled' || data.type === 'prebuild_cancelled') {
+                                    cancelled = true;
+                                }
                             } catch (_) { /* malformed JSON — skip */ }
                         }
                     });
@@ -586,9 +671,10 @@ const CoCreateView = (function () {
             }
         } finally {
             try { reader.cancel(); } catch (_) { /* ok */ }
+            _pbAbort = null;
         }
 
-        return { event: completeEvent, error: null };
+        return { event: completeEvent, error: null, cancelled: cancelled };
     }
 
     /** Render a prebuild error with Retry + Back to Menu buttons.
@@ -633,6 +719,9 @@ const CoCreateView = (function () {
                 genState.tasks, genState.progressEl
             );
 
+            // User cancelled via back button — exit quietly.
+            if (genResult.cancelled) return;
+
             if (genResult.error) {
                 _renderGenError(genResult.error, _retryGenerate);
                 return;
@@ -647,6 +736,7 @@ const CoCreateView = (function () {
             GameState.gameId = doneEvent.game_id;
             GameState.gameMode = doneEvent.game_mode || "text";  // §7.7
             GameState.storyConfig = doneEvent.story_config;
+            _activeGameId = doneEvent.game_id;  // for prebuild stop call
 
             // ── Phase 2: Material pre-build (§7.8c SSE) ──────────
             if (doneEvent.game_mode === "graph") {
@@ -659,6 +749,9 @@ const CoCreateView = (function () {
                     var pbResult = await _connectPrebuildStream(
                         doneEvent.game_id, pbState.cards, pbState.progressEl
                     );
+
+                    // User cancelled via back button — exit quietly.
+                    if (pbResult.cancelled) return;
 
                     if (pbResult.error) {
                         _renderPrebuildError(pbResult.error, _retryGenerate);
@@ -682,6 +775,7 @@ const CoCreateView = (function () {
 
             // ── Navigate ────────────────────────────────────────────
             _phase = "done";
+            _activeGameId = null;
             Router.navigate("game-preview");
         } catch (err) {
             _renderGenError(err.message, _retryGenerate);
@@ -702,6 +796,7 @@ const CoCreateView = (function () {
             GameState.gameId = genData.game_id;
             GameState.gameMode = genData.game_mode || "text";  // §7.7
             GameState.storyConfig = genData.story_config;
+            _activeGameId = genData.game_id;  // for prebuild stop call
 
             // ── Phase 2: Material pre-build (§7.8c SSE) ──────────
             if (genData.game_mode === "graph") {
@@ -714,6 +809,9 @@ const CoCreateView = (function () {
                     var pbResult = await _connectPrebuildStream(
                         genData.game_id, pbState.cards, pbState.progressEl
                     );
+
+                    // User cancelled via back button — exit quietly.
+                    if (pbResult.cancelled) return;
 
                     if (pbResult.error) {
                         _renderPrebuildError(pbResult.error, _retryGenerate);
@@ -734,6 +832,7 @@ const CoCreateView = (function () {
 
             // ── Navigate ────────────────────────────────────────────
             _phase = "done";
+            _activeGameId = null;
             Router.navigate("game-preview");
         } catch (err) {
             if (err.status === 502) {
@@ -992,5 +1091,5 @@ const CoCreateView = (function () {
     }
 
     /* ── Export ──────────────────────────────────────────────────── */
-    return { render };
+    return { render, cleanup };
 })();

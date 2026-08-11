@@ -78,7 +78,8 @@ class GameSession:
         gl = self.load_game(game_id, "_init.json")
         return gl, game_id
 
-    def prebuild_assets(self, game_id: str, game_loop=None):
+    def prebuild_assets(self, game_id: str, game_loop=None,
+                        cancel_event=None):
         """Run AI material pre-build for a graph-mode game.  (§7.8c)
 
         Loads the game (triggers ``mount_graph_pipeline``), then runs the
@@ -94,10 +95,14 @@ class GameSession:
                 provided, skips ``load_game()`` and uses this instance's
                 roster + library.  When ``None`` (default), loads from
                 disk (backward-compatible for tests).
+            cancel_event: Optional ``threading.Event`` for cooperative
+                cancellation.  Passed through to ``Prebuilder`` so the
+                SSE event_generator can stop the pipeline on disconnect.
 
         Yields:
             ``{"type": "prebuild_progress", "phase": str, ...}``
             ``{"type": "prebuild_complete", "success": bool, ...}``
+            ``{"type": "prebuild_cancelled"}``
         """
         sm = SaveManager(os.path.join(self._saves_root, game_id))
         data = sm.load("_init.json")
@@ -139,6 +144,7 @@ class GameSession:
             ),
             library=gl._roster.library,
             img_generation_enabled=img_enabled,
+            cancel_event=cancel_event,
         )
 
         roster_path = os.path.join(self._saves_root, game_id, "_asset_roster.json")
@@ -153,6 +159,8 @@ class GameSession:
             # any code after the yield would never execute.
             if event["type"] == "prebuild_complete" and event["success"]:
                 gl._roster.save(roster_path)
+            # prebuild_cancelled — skip roster save, skip library save
+            # (handled inside Prebuilder.build()), just forward the event.
             yield event
 
     def load_game(self, game_id: str, filename: str) -> GameLoop:

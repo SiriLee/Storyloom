@@ -349,6 +349,13 @@
        ═══════════════════════════════════════════════════════════════ */
 
     function renderCoCreate() {
+        /* Register cleanup so navigating away mid-generate/prebuild
+           cancels any in-flight SSE stream (mirrors adventure-log). */
+        _currentViewCleanup = function () {
+            if (typeof CoCreateView !== "undefined" && CoCreateView.cleanup) {
+                CoCreateView.cleanup();
+            }
+        };
         CoCreateView.render(app);
     }
 
