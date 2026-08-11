@@ -361,9 +361,6 @@ msgstr "確定刪除此素材？"
 msgid "Asset deleted."
 msgstr "素材已刪除"
 
-msgid "No assets found"
-msgstr "暫無素材"
-
 msgid "Character Portrait"
 msgstr "角色立繪"
 

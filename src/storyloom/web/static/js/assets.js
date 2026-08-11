@@ -101,8 +101,7 @@ const AssetManagerView = (function () {
             var typeKeys = Object.keys(_assets);
             if (!typeKeys.length) {
                 document.getElementById("am-sidebar").innerHTML = "";
-                document.getElementById("am-list").innerHTML =
-                    '<p class="am-empty">' + esc(_("No assets found")) + '</p>';
+                document.getElementById("am-list").innerHTML = "";
                 return;
             }
             if (!_activeType || !_assets[_activeType]) {
@@ -174,7 +173,7 @@ const AssetManagerView = (function () {
         var ids = Object.keys(items);
 
         if (!ids.length) {
-            listEl.innerHTML = '<p class="am-empty">' + esc(_("No assets found")) + '</p>';
+            listEl.innerHTML = "";
             return;
         }
 
