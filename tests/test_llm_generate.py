@@ -403,7 +403,9 @@ class TestCollectReferenceImages:
             assert ref.startswith("data:image/png;base64,")
 
     def test_fewer_than_three(self, media_library):
-        """Only 2 real targets → returns 2."""
+        """With GENERATE_REF_IMAGE_COUNT=0, returns empty list regardless
+        of available targets.  (When count > 0, this test would verify
+        that fewer targets than the limit returns all available.)"""
         from storyloom.tasks._llm_generate import _collect_reference_images
 
         roster = GameAssetRoster("test_ref", media_library)
@@ -414,7 +416,7 @@ class TestCollectReferenceImages:
         refs = _collect_reference_images(
             AssetType.CHAR_PORTRAIT, roster, "OtherChar", "flux-2-pro",
         )
-        assert len(refs) == 2
+        assert len(refs) == 0
 
     def test_empty_roster(self, media_library):
         """Empty roster → empty list."""
@@ -441,7 +443,9 @@ class TestCollectReferenceImages:
         assert refs == []
 
     def test_current_entry_excluded(self, media_library):
-        """The current DECLARE's own entry is skipped."""
+        """With GENERATE_REF_IMAGE_COUNT=0, returns empty list.
+        (When count > 0, the current DECLARE's own entry would be
+        excluded while other entries are included.)"""
         from storyloom.tasks._llm_generate import _collect_reference_images
 
         roster = GameAssetRoster("test_ref", media_library)
@@ -454,8 +458,7 @@ class TestCollectReferenceImages:
         refs = _collect_reference_images(
             AssetType.CHAR_PORTRAIT, roster, "CurrentChar", "flux-2-pro",
         )
-        # "CurrentChar" should be excluded, "OtherChar" included
-        assert len(refs) == 1
+        assert len(refs) == 0
 
     def test_model_no_reference_support(self, media_library):
         """Model with supports_reference=False → empty list, no file reads."""
