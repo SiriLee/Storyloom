@@ -154,6 +154,198 @@ const CoCreateView = (function () {
 
     /* ── Start button — Phase 1: generate story setup ────────────── */
 
+    /* ── Generate task list (§7.8c SSE) ─────────────────────────────── */
+    /* Replaces the old sync POST + static transition.  Renders a task
+       list that lights up as each JSON section is completed by the LLM. */
+
+    /** Task list items — ordered to match ``_GENERATE_SECTION_ORDER``. */
+    var _GEN_TASKS = [
+        { key: "_thinking",    label: "Thinking",        icon: Icons.cpu },
+        { key: "story_config", label: "Story Setting",   icon: Icons.book },
+        { key: "characters",   label: "Characters",      icon: Icons.users },
+        { key: "locations",    label: "Scenes",          icon: Icons.image },
+        { key: "variables",    label: "Variables",       icon: Icons.gear },
+        { key: "outline",      label: "Story Structure", icon: Icons.branch },
+    ];
+
+    /** Mark the "Thinking" task as active immediately on render. */
+    function _startThinkingTask(tasks) {
+        var t = tasks["_thinking"];
+        if (t) t.className = 'gen-task active';
+    }
+
+    /** Render the task list view.  Returns {tasks, progressEl}. */
+    function _renderGenerateView() {
+        var itemsHtml = '';
+        for (var i = 0; i < _GEN_TASKS.length; i++) {
+            var t = _GEN_TASKS[i];
+            var delay = (i * 0.06).toFixed(2);
+            var iconSvg = t.icon ? t.icon() : '';
+            itemsHtml +=
+                '<div class="gen-task pending" data-gen-section="' + esc(t.key) + '"' +
+                '     style="animation-delay:' + delay + 's">' +
+                    '<span class="gen-task-icon">' + iconSvg + '</span>' +
+                    '<span class="gen-task-dot"></span>' +
+                    '<span class="gen-task-label">' + esc(_(t.label)) + '</span>' +
+                    '<span class="gen-task-status">' + Icons.checkmark() + '</span>' +
+                '</div>';
+        }
+
+        _container.innerHTML =
+            '<div class="gen-view">' +
+                '<div class="gen-header">' +
+                    '<button class="cc-back-btn" id="gen-back-btn" disabled title="' + esc(_("Back to Menu")) + '">' + Icons.arrowLeft() + '</button>' +
+                    '<span class="gen-title">' + esc(_("Creating Your Story")) + '</span>' +
+                    '<span class="cc-spacer"></span>' +
+                    '<button class="theme-toggle-btn" id="gen-theme-btn" title="' + esc(_("Toggle Theme")) + '"></button>' +
+                '</div>' +
+                '<div class="gen-tasks">' +
+                    itemsHtml +
+                '</div>' +
+                '<div class="gen-progress" id="gen-progress">' +
+                    '<span>' + esc(_("Thinking")) + '</span>' +
+                    '<span class="cc-dots"><span>.</span><span>.</span><span>.</span></span>' +
+                '</div>' +
+            '</div>';
+
+        var tasks = {};
+        var allTasks = _container.querySelectorAll('.gen-task');
+        allTasks.forEach(function (el) {
+            tasks[el.getAttribute('data-gen-section')] = el;
+        });
+        // Thinking task starts active immediately (TTFT is the longest phase)
+        _startThinkingTask(tasks);
+
+        // Theme toggle button
+        var genThemeBtn = document.getElementById("gen-theme-btn");
+        if (genThemeBtn) {
+            window._updateThemeButton(genThemeBtn);
+            genThemeBtn.addEventListener("click", function () {
+                ThemeState.toggle();
+                saveConfig();
+                window._updateAllThemeButtons();
+            });
+        }
+
+        return { tasks: tasks, progressEl: document.getElementById('gen-progress') };
+    }
+
+    function _updateGenProgress(el, text, showDots) {
+        if (showDots === undefined) showDots = true;
+        el.innerHTML =
+            '<span>' + esc(text) + '</span>' +
+            (showDots ? '<span class="cc-dots"><span>.</span><span>.</span><span>.</span></span>' : '');
+    }
+
+    /** Handle one SSE event — light up tasks as they arrive.
+     *  When a section arrives: preceding items get checkmarks,
+     *  the current item lights up (active), later items stay pending.
+     *  The "_thinking" task completes when the first real section arrives. */
+    function _handleGenEvent(data, tasks, progressEl) {
+        if (data.type === 'section_complete') {
+            var task = tasks[data.section];
+            if (!task) return;
+
+            // First real section → thinking is done
+            var thinkingTask = tasks["_thinking"];
+            if (thinkingTask && thinkingTask.classList.contains('active')) {
+                thinkingTask.className = 'gen-task complete';
+            }
+
+            var found = false;
+            for (var i = 0; i < _GEN_TASKS.length; i++) {
+                var t = tasks[_GEN_TASKS[i].key];
+                if (!t) continue;
+                if (_GEN_TASKS[i].key === data.section) {
+                    // Current section: accent color (being generated)
+                    t.className = 'gen-task active';
+                    found = true;
+                } else if (!found) {
+                    // Preceding sections: green checkmark (done)
+                    t.className = 'gen-task complete';
+                }
+                // Later sections stay pending (no change)
+            }
+
+            var label = '';
+            for (var j = 0; j < _GEN_TASKS.length; j++) {
+                if (_GEN_TASKS[j].key === data.section) {
+                    label = _(_GEN_TASKS[j].label);
+                    break;
+                }
+            }
+            _updateGenProgress(progressEl, _("Building") + ' ' + (label || data.section));
+        } else if (data.type === 'generate_done') {
+            // All sections done — mark everything complete
+            for (var i = 0; i < _GEN_TASKS.length; i++) {
+                var t = tasks[_GEN_TASKS[i].key];
+                if (t) t.className = 'gen-task complete';
+            }
+            _updateGenProgress(progressEl, _("Done"), false);
+        }
+    }
+
+    /** Connect to the SSE stream and drive the task list. */
+    async function _connectGenerateStream(tasks, progressEl) {
+        var url = '/api/co-create/generate/stream';
+
+        var response;
+        try { response = await fetch(url); } catch (err) { return { event: null, error: String(err) }; }
+
+        if (!response.ok) {
+            var detail = '';
+            try { var ed = await response.json(); detail = ed.detail || ''; } catch (_) {}
+            return { event: null, error: detail || ('HTTP ' + response.status) };
+        }
+
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buf = '';
+        var doneEvent = null;
+
+        try {
+            while (true) {
+                var chunk = await reader.read();
+                if (chunk.done) break;
+                buf += decoder.decode(chunk.value, { stream: true });
+                var parts = buf.split('\n\n');
+                buf = parts.pop() || '';
+                parts.forEach(function (frame) {
+                    if (!frame.trim()) return;
+                    var etype = '';
+                    var lines = frame.split('\n');
+                    lines.forEach(function (line) {
+                        if (line.startsWith('event: ')) etype = line.slice(7).trim();
+                        else if (line.startsWith('data: ')) {
+                            try {
+                                var d = JSON.parse(line.slice(6));
+                                _handleGenEvent(d, tasks, progressEl);
+                                if (etype === 'generate_done' || d.type === 'generate_done') doneEvent = d;
+                            } catch (_) {}
+                        }
+                    });
+                });
+            }
+        } finally { try { reader.cancel(); } catch (_) {} }
+
+        return { event: doneEvent, error: null };
+    }
+
+    function _renderGenError(message, retryHandler) {
+        _container.innerHTML =
+            '<div class="gen-view">' +
+                '<div class="cc-transition-text" style="font-size:1.4rem; color:var(--text-error); margin-bottom:1.5rem;">' +
+                    esc(message) +
+                '</div>' +
+                '<div style="display:flex; gap:0.8rem; justify-content:center;">' +
+                    '<button class="menu-btn" id="gen-retry">' + esc(_("Retry")) + '</button>' +
+                    '<button class="menu-btn" id="gen-back">' + esc(_("Back to Menu")) + '</button>' +
+                '</div>' +
+            '</div>';
+        document.getElementById('gen-retry').addEventListener('click', retryHandler);
+        document.getElementById('gen-back').addEventListener('click', function () { Router.navigate('menu'); });
+    }
+
     /* ── Prebuild phase (§7.8c SSE) ────────────────────────────────── */
     /* Replaces the old sync POST + static transition screen.  Renders a
        card grid from story_config, then streams per-entity status updates
@@ -179,7 +371,10 @@ const CoCreateView = (function () {
         _container.innerHTML =
             '<div class="pb-view">' +
                 '<div class="pb-header">' +
+                    '<button class="cc-back-btn" id="pb-back-btn" disabled title="' + esc(_("Back to Menu")) + '">' + Icons.arrowLeft() + '</button>' +
                     '<span class="pb-title">' + esc(_("Building Your World")) + '</span>' +
+                    '<span class="cc-spacer"></span>' +
+                    '<button class="theme-toggle-btn" id="pb-theme-btn" title="' + esc(_("Toggle Theme")) + '"></button>' +
                 '</div>' +
                 '<div class="pb-grid">' +
                     '<div>' +
@@ -205,6 +400,17 @@ const CoCreateView = (function () {
         });
 
         var progressEl = document.getElementById('pb-progress');
+
+        // Theme toggle button
+        var pbThemeBtn = document.getElementById("pb-theme-btn");
+        if (pbThemeBtn) {
+            window._updateThemeButton(pbThemeBtn);
+            pbThemeBtn.addEventListener("click", function () {
+                ThemeState.toggle();
+                saveConfig();
+                window._updateAllThemeButtons();
+            });
+        }
 
         return { cards: cards, progressEl: progressEl };
     }
@@ -421,23 +627,37 @@ const CoCreateView = (function () {
         _setInputEnabled(false);
 
         try {
-            // ── Phase 1: Story generation ──────────────────────────
-            _renderTransition(_("Generating settings"));
-            const genData = await API.post("/api/co-create/generate");
-            GameState.gameId = genData.game_id;
-            GameState.gameMode = genData.game_mode || "text";  // §7.7
-            GameState.storyConfig = genData.story_config;
+            // ── Phase 1: Story generation (streaming SSE) ──────────
+            var genState = _renderGenerateView();
+            var genResult = await _connectGenerateStream(
+                genState.tasks, genState.progressEl
+            );
+
+            if (genResult.error) {
+                _renderGenError(genResult.error, _retryGenerate);
+                return;
+            }
+
+            var doneEvent = genResult.event;
+            if (!doneEvent || !doneEvent.game_id) {
+                _renderGenError(_("Something went wrong"), _retryGenerate);
+                return;
+            }
+
+            GameState.gameId = doneEvent.game_id;
+            GameState.gameMode = doneEvent.game_mode || "text";  // §7.7
+            GameState.storyConfig = doneEvent.story_config;
 
             // ── Phase 2: Material pre-build (§7.8c SSE) ──────────
-            if (genData.game_mode === "graph") {
-                var characters = genData.characters || [];
-                var locations = genData.locations || [];
+            if (doneEvent.game_mode === "graph") {
+                var characters = doneEvent.characters || [];
+                var locations = doneEvent.locations || [];
                 var hasEntities = characters.length > 0 || locations.length > 0;
 
                 if (hasEntities) {
                     var pbState = _renderPrebuildView(characters, locations);
                     var pbResult = await _connectPrebuildStream(
-                        genData.game_id, pbState.cards, pbState.progressEl
+                        doneEvent.game_id, pbState.cards, pbState.progressEl
                     );
 
                     if (pbResult.error) {
@@ -457,26 +677,27 @@ const CoCreateView = (function () {
                 }
             }
 
+            /* Brief pause so the user can see all gen cards complete. */
+            await new Promise(function (r) { setTimeout(r, 600); });
+
             // ── Navigate ────────────────────────────────────────────
             _phase = "done";
             Router.navigate("game-preview");
         } catch (err) {
-            if (err.status === 502) {
-                // CoCreateError — retriable (generate or generate_parse failure)
-                _renderTransitionError(err.message, _retryGenerate);
-            } else {
-                _renderTransitionFatal(err.message);
-            }
+            _renderGenError(err.message, _retryGenerate);
         }
     }
 
-    /** Retry generation after a CoCreateError. */
+    /** Retry generation after a CoCreateError.  Uses the sync retry
+     *  endpoint (faster for single retries — LLM already has context). */
     async function _retryGenerate() {
         _phase = "generating";
 
         try {
             // ── Phase 1: Retry story generation ────────────────────
-            _renderTransition(_("Generating settings"));
+            var genState = _renderGenerateView();
+            _updateGenProgress(genState.progressEl, _("Retry") + '...');
+
             const genData = await API.post("/api/co-create/retry-generate");
             GameState.gameId = genData.game_id;
             GameState.gameMode = genData.game_mode || "text";  // §7.7
@@ -516,9 +737,11 @@ const CoCreateView = (function () {
             Router.navigate("game-preview");
         } catch (err) {
             if (err.status === 502) {
-                _renderTransitionError(err.message, _retryGenerate);
+                _renderGenError(err.message, _retryGenerate);
             } else {
-                _renderTransitionFatal(err.message);
+                _renderGenError(err.message, function () {
+                    Router.navigate('menu');
+                });
             }
         }
     }
