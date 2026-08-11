@@ -11,18 +11,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
-VERSION=$($PYTHON -c "from storyloom import __version__; print(__version__)")
+# Extract version from __init__.py without importing (avoids dependency deadlock).
+VERSION=$($PYTHON -c "import re; print(re.search(r'__version__\s*=\s*\"(.+?)\"', open('src/storyloom/__init__.py', encoding='utf-8').read()).group(1))")
 PYI_FLAGS=""
 BIN_NAME="storyloom-web"
 LAUNCHER_NAME="Storyloom"
 OUTPUT_DIR="dist/storyloom-v${VERSION}"
 
-# Platform-specific binary extension
+# ── Platform detection (once) ────────────────────────────────────────
 case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*)  BIN_NAME="storyloom-web.exe"
-                            LAUNCHER_NAME="Storyloom.exe" ;;
-    Darwin)                ;;  # macOS: no extension
-    Linux)                 ;;  # Linux: no extension
+                            LAUNCHER_NAME="Storyloom.exe"
+                            ADD_SEP=";"
+                            PLATFORM="Windows" ;;
+    Darwin)                 ADD_SEP=":"
+                            PLATFORM="macOS" ;;
+    Linux)                  ADD_SEP=":"
+                            PLATFORM="Linux" ;;
 esac
 
 echo "=== Storyloom Web UI Build v${VERSION} ==="
@@ -81,12 +86,6 @@ else
     echo "--- System media: not found (run scripts/pack_system_media.sh first) ---"
 fi
 
-# PyInstaller --add-data separator: ':' on Linux/macOS, ';' on Windows.
-case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*) ADD_SEP=";" ;;
-    *)                     ADD_SEP=":" ;;
-esac
-
 # 3. PyInstaller single-file executable
 echo "--- Building standalone executable ---"
 $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
@@ -131,36 +130,32 @@ else
     echo "WARNING: no system_media zip — release will lack built-in media"
 fi
 
-# 5. Create release zips
-# Map platform to friendly name for release assets
-case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*) PLATFORM="Windows" ;;
-    Darwin)                PLATFORM="macOS" ;;
-    Linux)                 PLATFORM="Linux" ;;
-    *)                     PLATFORM="$(uname -s)" ;;
-esac
-
+# 5. Create release zips — full (with system_media) + app-only (for updates).
 # 5a. Full zip — for first-time users.  Includes system_media/.
 echo "--- Creating full release archive ---"
 FULL_ZIP="storyloom-v${VERSION}-${PLATFORM}"
 $PYTHON -c "import shutil; shutil.make_archive('dist/$FULL_ZIP', 'zip', 'dist/storyloom-v${VERSION}')"
 
-# 5b. App-only zip — for in-app updates.  No system_media/ (can be 250+ MB).
+# 5b. App-only zip — for in-app updates.  Skips system_media/ to avoid
+#     re-downloading 250+ MB of assets on every version bump.
 echo "--- Creating app-only release archive ---"
 APP_ZIP="storyloom-app-v${VERSION}-${PLATFORM}"
-# Zip Storyloom + app/ but NOT system_media/
 $PYTHON -c "
-import shutil, os, tempfile
+import os, zipfile
 root = 'dist/storyloom-v${VERSION}'
-tmp = tempfile.mkdtemp()
-staging = os.path.join(tmp, 'staging')
-shutil.copytree(root, staging, ignore=shutil.ignore_patterns('system_media'))
-# also skip system_media-v*.zip if present
-for f in os.listdir(staging):
-    if f.startswith('system_media-v') and f.endswith('.zip'):
-        os.remove(os.path.join(staging, f))
-shutil.make_archive('dist/$APP_ZIP', 'zip', staging)
-shutil.rmtree(tmp)
+with zipfile.ZipFile('dist/$APP_ZIP.zip', 'w', zipfile.ZIP_DEFLATED) as zf:
+    for dirpath, dirnames, filenames in os.walk(root):
+        # Skip system_media/ entirely.
+        rel = os.path.relpath(dirpath, root)
+        if rel == 'system_media' or rel.startswith('system_media' + os.sep):
+            dirnames[:] = []  # don't descend
+            continue
+        for fn in filenames:
+            full = os.path.join(dirpath, fn)
+            arc = os.path.relpath(full, root)
+            zf.write(full, arc)
+            print(f'  + {arc}')
+print(f'Wrote dist/$APP_ZIP.zip  ({os.path.getsize(\"dist/$APP_ZIP.zip\") / 1024 / 1024:.0f} MiB)')
 "
 
 echo ""
