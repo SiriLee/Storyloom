@@ -6,7 +6,7 @@
   "api_key": "your-api-key-here",
   "api_base_url": "https://api.deepseek.com",
   "api_model": "deepseek-v4-pro",
-  "game_mode": "text",
+  "game_mode": "graph",
   "img_api_key": "",
   "img_api_base_url": "https://api.apiyi.com/v1",
   "img_api_model": "flux-2-pro",

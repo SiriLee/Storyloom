@@ -505,7 +505,7 @@
 
     function _renderGeneralSection(container) {
         var lang = getSetting("lang") || GameState.lang || "zh-CN";
-        var gameMode = getSetting("game_mode") || "text";
+        var gameMode = getSetting("game_mode") || "graph";
         /* activeLang: when lang_mode is "system", the "System" button is
            highlighted regardless of the resolved concrete language.  When
            "manual", the specific language button is highlighted. */
