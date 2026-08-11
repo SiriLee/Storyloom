@@ -312,6 +312,9 @@ async function initConfig() {
             localStorage.setItem(SETTINGS_STORE + "img_generation_enabled",
                 data.img_generation_enabled ? "true" : "false");
         }
+        if (data.proxy_url !== undefined) {
+            localStorage.setItem(SETTINGS_STORE + "proxy_url", data.proxy_url);
+        }
         if (data.game_mode) {
             localStorage.setItem(SETTINGS_STORE + "game_mode", data.game_mode);
         }
