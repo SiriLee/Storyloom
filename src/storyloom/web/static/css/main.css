@@ -2424,7 +2424,7 @@ button.accent:hover, .btn-accent:hover {
 /* ── Log text — base styles shared by Markdown + raw fallback ───── */
 
 .al-text {
-    max-width: 680px;
+    max-width: var(--content-text);
     margin: 0 auto;
     font-family: var(--font-sans);
     font-size: 1.25rem;
