@@ -512,6 +512,12 @@ msgstr "完成"
 msgid "failed"
 msgstr "失败"
 
+msgid "fallback failed"
+msgstr "备选失败"
+
+msgid "fallback selected"
+msgstr "备选匹配"
+
 msgid "generated"
 msgstr "已生成"
 
