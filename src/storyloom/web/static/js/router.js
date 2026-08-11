@@ -379,7 +379,7 @@
             { id: "api",        icon: "key",     label: _("API") },
             { id: "image",      icon: "image",   label: _("Image") },
             { id: "appearance", icon: "palette", label: _("Appearance") },
-            { id: "updates",    icon: "download", label: _("Updates") },
+            { id: "updates",    icon: "server",  label: _("Network") },
         ];
         var secondarySections = [
             { id: "guide",      icon: "book",    label: _("API Guide") },
@@ -653,7 +653,7 @@
 
     function _renderUpdatesSection(container) {
         container.innerHTML =
-            _sectionHeading(Icons.download, _("Updates"), "updates")
+            _sectionHeading(Icons.server, _("Network"), "updates")
             + '<div class="settings-card">'
             + '<div class="settings-card-title">' + Icons.server() + esc(_("Network Proxy")) + '</div>'
             + _settingText("proxy_url", _("Proxy URL"), _("e.g. http://127.0.0.1:7890"))

@@ -378,6 +378,9 @@ msgstr "贡献者"
 msgid "App Core"
 msgstr "程序核心"
 
+msgid "Network"
+msgstr "网络"
+
 msgid "Network Proxy"
 msgstr "网络代理"
 
