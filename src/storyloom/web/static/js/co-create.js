@@ -238,6 +238,10 @@ const CoCreateView = (function () {
     /** Update the bottom progress line. */
     function _updatePrebuildProgress(el, text, showDots) {
         if (showDots === undefined) showDots = true;
+        /* Strip trailing dots from static text — animated cc-dots provide the ellipsis. */
+        if (showDots) {
+            text = text.replace(/\.{2,}$/, '');
+        }
         el.innerHTML =
             '<span>' + esc(text) + '</span>' +
             (showDots ? '<span class="cc-dots"><span>.</span><span>.</span><span>.</span></span>' : '');
