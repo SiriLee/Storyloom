@@ -60,6 +60,12 @@ def _apply_app_update():
         raise
     shutil.rmtree(APP_OLD, ignore_errors=True)
 
+    # Ensure the main executable is runnable.  Zip extraction may strip
+    # the execute bit, causing os.execv to fail with EACCES.
+    new_exe = os.path.join(APP, MAIN_EXE)
+    if os.path.isfile(new_exe) and sys.platform != "win32":
+        os.chmod(new_exe, 0o755)
+
 
 def _apply_launcher_update():
     """Self-replace the Launcher binary."""
@@ -99,7 +105,11 @@ def main():
         print(f"Error: {target} not found", file=sys.stderr)
         sys.exit(1)
 
-    os.execv(target, [target] + sys.argv[1:])
+    try:
+        os.execv(target, [target] + sys.argv[1:])
+    except OSError as exc:
+        print(f"Error: failed to start {target}: {exc}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

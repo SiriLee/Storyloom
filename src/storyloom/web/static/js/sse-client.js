@@ -82,6 +82,10 @@ const SSEClient = {
             });
 
             this._es.addEventListener("error", (e) => {
+                // Guard: native EventSource transport errors (e.g.
+                // reconnect 404) have no data property.  Only dispatch
+                // server-sent application errors that carry e.data.
+                if (!e.data) return;
                 const data = JSON.parse(e.data);
                 if (this._handlers.error) this._handlers.error(data);
             });
@@ -158,10 +162,22 @@ const SSEClient = {
             // Register listeners for every handler key
             Object.keys(handlers).forEach((eventType) => {
                 this._es.addEventListener(eventType, (e) => {
+                    // Guard: native EventSource "error" events (transport
+                    // failures, e.g. 404 on reconnect) have no data property.
+                    // Only server-sent SSE events carry e.data.
+                    if (!e.data) return;
+
                     let data = {};
                     try { data = JSON.parse(e.data); } catch (_) { /* raw string */ }
                     if (this._handlers[eventType]) {
                         this._handlers[eventType](data);
+                    }
+                    // Prevent EventSource auto-reconnect after terminal events.
+                    // Without this, EventSource reconnects to the now-expired
+                    // stream URL, gets a 404, and the native error event
+                    // overwrites the success message with "Update failed".
+                    if (eventType === "done" || eventType === "error") {
+                        this._es.close();
                     }
                 });
             });
