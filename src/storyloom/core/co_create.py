@@ -1021,6 +1021,8 @@ class CoCreateFlow:
                 "No failed send to retry — the last send() completed "
                 "successfully or retry_send() was already called successfully."
             )
+        if self._cancel.is_set():
+            raise CoCreateCancelled("Co-creation cancelled by user")
         try:
             response = self._api.chat(
                 self._messages,
@@ -1300,6 +1302,9 @@ class CoCreateFlow:
                 "completed successfully, or retry_generate() was already "
                 "called successfully."
             )
+
+        if self._cancel.is_set():
+            raise CoCreateCancelled("Co-creation cancelled by user")
 
         phase, error_desc = self._retry_state
 
