@@ -495,6 +495,108 @@ def co_create_retry_generate():
     }
 
 
+@app.get("/api/co-create/generate/stream")
+async def co_create_generate_stream():
+    """SSE endpoint for streaming story setup generation.
+
+    Replaces the blocking ``POST /api/co-create/generate`` with a
+    streaming flow: the LLM generates JSON token-by-token, and the
+    server emits ``section_complete`` events as each top-level key
+    (story_config, characters, etc.) is fully received.
+
+    On success, creates the save file and emits a final
+    ``generate_done`` event with ``game_id`` and ``story_config``.
+    """
+    import asyncio
+
+    flow = sessions.get_co_create()
+    if flow is None:
+        raise HTTPException(400, "No active co-creation session.  Call start first.")
+
+    q: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
+    def run_generate() -> None:
+        try:
+            for event in flow.generate_stream():
+                etype = event.get("type", "")
+                if etype == "section_complete":
+                    loop.call_soon_threadsafe(q.put_nowait, event)
+                elif etype == "generate_done" and "result" in event:
+                    # Internal done event with parsed result — create save,
+                    # emit a single client-facing generate_done with game_id.
+                    result = event["result"]
+                    gl, game_id = _game_session.start_game(
+                        result, game_mode=cfg.game_mode
+                    )
+                    sessions.store_game(game_id, gl)
+                    sessions.remove_co_create()
+
+                    loop.call_soon_threadsafe(
+                        q.put_nowait, {
+                            "type": "generate_done",
+                            "game_id": game_id,
+                            "game_mode": cfg.game_mode,
+                            "story_config": result["story_config"],
+                            "characters": result["characters"],
+                            "locations": result["locations"],
+                            "outline_text": result.get("outline_text", ""),
+                        }
+                    )
+                    return
+        except CoCreateError as exc:
+            loop.call_soon_threadsafe(
+                q.put_nowait, {
+                    "type": "generate_error",
+                    "phase": exc.phase,
+                    "message": exc.message,
+                }
+            )
+        except Exception as exc:
+            loop.call_soon_threadsafe(
+                q.put_nowait, {
+                    "type": "generate_error",
+                    "phase": "generate_api",
+                    "message": str(exc),
+                }
+            )
+        finally:
+            try:
+                loop.call_soon_threadsafe(q.put_nowait, None)
+            except RuntimeError:
+                pass
+
+    thread = threading.Thread(target=run_generate, daemon=True)
+    thread.start()
+
+    async def event_generator():
+        try:
+            while True:
+                event = await q.get()
+                if event is None:
+                    break
+                etype = event.get("type", "")
+                data = json.dumps(event, ensure_ascii=False)
+                yield f"event: {etype}\ndata: {data}\n\n"
+                if etype in ("generate_done", "generate_error"):
+                    if etype == "generate_done":
+                        # Small delay so client can process the final event
+                        pass
+                    break
+        finally:
+            pass
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @app.get("/api/co-create/prebuild/{game_id}/stream")
 async def co_create_prebuild_stream(game_id: str):
     """SSE endpoint for material pre-build progress.  (§7.8c)
