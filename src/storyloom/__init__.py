@@ -1,6 +1,6 @@
 """Storyloom — AI-powered interactive text fiction game engine."""
 
-__version__ = "2.0.1"
+__version__ = "2.1.0"
 
 from storyloom.io.api_client import ApiClient, ApiError, ApiResult
 from storyloom.config import WINDOW_SIZE, DEFAULT_MODEL
