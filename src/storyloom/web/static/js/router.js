@@ -664,10 +664,10 @@
             + Icons.refresh() + esc(_("Check for Updates")) + '</button>'
             + '</div>';
 
-        /* Lazy-load current version */
-        API.get("/api/update/check?force=false").then(function (result) {
+        /* Show current version instantly (no network call). */
+        API.get("/api/version").then(function (result) {
             var el = document.getElementById("update-current-ver");
-            if (el) el.textContent = result.app.current;
+            if (el) el.textContent = result.version;
         }).catch(function () {
             var el = document.getElementById("update-current-ver");
             if (el) el.textContent = "?";
@@ -1005,11 +1005,11 @@
         var currentVer = document.getElementById("update-current-ver");
         if (!currentVer) return;
 
-        // Lazy-load current version
-        API.get("/api/update/check?force=false").then(function (result) {
-            currentVer.textContent = result.app.current;
+        // Show current version instantly (no network call).
+        API.get("/api/version").then(function (result) {
+            if (currentVer) currentVer.textContent = result.version;
         }).catch(function () {
-            currentVer.textContent = "?";
+            if (currentVer) currentVer.textContent = "?";
         });
 
         var btnCheck = document.getElementById("btn-check-update");

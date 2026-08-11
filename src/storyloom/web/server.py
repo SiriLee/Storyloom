@@ -1114,6 +1114,12 @@ def _get_system_media_version() -> str:
         return ""
 
 
+@app.get("/api/version")
+async def app_version():
+    """Return the current app version — no network call, instant response."""
+    return {"version": __version__}
+
+
 @app.get("/api/update/check")
 async def update_check(force: bool = False):
     """Check GitHub Releases for available updates."""
