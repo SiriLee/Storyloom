@@ -16,10 +16,10 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 001| <story>
 002| <seg char="Alex">The subway platform was empty at this hour. Just the way Mira liked it.</seg>
 003| <seg>Fluorescent lights flickered overhead, buzzing like trapped flies. Somewhere down the tunnel, a train horn echoed and died.</seg>
-004| <seg char="Mira">Mira: You're late.</seg>
-005| <seg char="Alex">Alex: Your intel was bad. The courier had a tail.</seg>
+004| <seg char="Mira">Mira| You're late.</seg>
+005| <seg char="Alex">Alex| Your intel was bad. The courier had a tail.</seg>
 006| <seg char="Mira">Mira leaned against a pillar, arms crossed. Her eyes never stopped scanning the exits.</seg>
-007| <seg char="Mira">Mira: They all have tails. Did you lose them?</seg>
+007| <seg char="Mira">Mira| They all have tails. Did you lose them?</seg>
 008| <choice id="trust_check">
 009|   <opt key="1">Tell her everything. She needs to know.</opt>
 010|   <opt key="2">Keep it vague. Mira talks too much.</opt>
@@ -32,21 +32,21 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 017| <seg>A figure stepped out from behind a maintenance door.</seg>
 018| <declare kind="CHAR" name="agent">Lean man in a grey trench coat, sharp cheekbones, cold unblinking eyes. Earpiece visible under the collar.</declare>
 019| <seg>The man didn't hurry. He didn't have to.</seg>
-020| <seg char="agent">Agent: Alex Voss. You have something that belongs to my employer.</seg>
+020| <seg char="agent">Agent| Alex Voss. You have something that belongs to my employer.</seg>
 021| <seg char="Alex">Alex didn't ask how he knew the name. In this line of work, the answer was never good.</seg>
-022| <seg char="Mira.angry">Mira: Alex. Go. Now.</seg>
-023| <seg char="agent">Agent: I wouldn't.</seg>
+022| <seg char="Mira.angry">Mira| Alex. Go. Now.</seg>
+023| <seg char="agent">Agent| I wouldn't.</seg>
 024| <set var="SCENE" val="grand_hotel_lobby"/>
 025| <set var="BRANCH" val="mira_helps" if="Mira.trust>=50"/>
 026| <set var="BRANCH" val="alone" if="Mira.trust<50"/>
 027| <branch name="mira_helps">
 028| <seg char="Alex">A text buzzed on Alex's phone.</seg>
-029| <seg char="Mira">Mira: "Corporate security. I stalled him — you have twenty minutes."</seg>
+029| <seg char="Mira">Mira| "Corporate security. I stalled him — you have twenty minutes."</seg>
 030| <seg>Twenty minutes was enough. It had to be.</seg>
 031| </branch>
 032| <branch name="alone">
 033| <seg>The phone stayed dark. Mira had her own problems — or she'd decided Alex wasn't one of them.</seg>
-034| <seg char="Alex">Alex: Fine. I've done more with less.</seg>
+034| <seg char="Alex">Alex| Fine. I've done more with less.</seg>
 035| </branch>
 036| <bridge/>
 037| <seg>The hotel lobby was everything the subway wasn't.</seg>
@@ -71,19 +71,19 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 001| <story>
 002| <seg char="Yara">Dr. Yara Voss had spent twelve years curating the Archive. She knew every vault, every corridor, every record.</seg>
 003| <seg>What she didn't know was how long someone had been erasing them.</seg>
-004| <seg char="Yara">Yara: The deletion logs go back eighteen months. Someone's been scrubbing Sector 7 since before the last audit.</seg>
+004| <seg char="Yara">Yara| The deletion logs go back eighteen months. Someone's been scrubbing Sector 7 since before the last audit.</seg>
 005| <seg>Server towers hummed around her, stretching into darkness overhead. The air was cold enough to see her breath.</seg>
 006| <seg char="Kai">Overseer Kai emerged from between two towers, hands clasped behind his back. He didn't look surprised.</seg>
-007| <seg char="Kai">Kai: You were always too thorough for your own good, Doctor.</seg>
+007| <seg char="Kai">Kai| You were always too thorough for your own good, Doctor.</seg>
 008| <choice id="confront_style">
 009|   <opt key="1">Demand answers. He owes you that much.</opt>
 010|   <opt key="2">Play it cool. Let him think you know less than you do.</opt>
 011| </choice>
 012| <seg>The servers hummed, indifferent to the standoff. Somewhere deeper in the stacks, a cooling fan rattled.</seg>
-013| <seg char="Yara">Yara: What was in Sector 7, Kai? What was worth erasing eighteen months of history?</seg>
+013| <seg char="Yara">Yara| What was in Sector 7, Kai? What was worth erasing eighteen months of history?</seg>
 014| <seg char="Kai">Kai stepped closer. For the first time Yara saw something beneath the authority — something closer to fear.</seg>
-015| <seg char="Kai">Kai: The kind of history that doesn't belong in an archive. But you're not going to let this go, are you?</seg>
-016| <seg char="Kai">Kai: So I have a proposition.</seg>
+015| <seg char="Kai">Kai| The kind of history that doesn't belong in an archive. But you're not going to let this go, are you?</seg>
+016| <seg char="Kai">Kai| So I have a proposition.</seg>
 017| <choice id="deal_choice">
 018|   <opt key="1" branch="ally">Hear him out. He knows things you don't.</opt>
 019|   <opt key="2" branch="expose">Refuse. The truth belongs to everyone.</opt>
@@ -98,14 +98,14 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 028| <bridge/>
 029| <branch name="ally">
 030| <seg char="Kai">Kai nodded slowly, as if he'd expected this answer all along.</seg>
-031| <seg char="Kai">Kai: Then follow me, Doctor. What's in Sector 7 will change everything you think you know about this place.</seg>
+031| <seg char="Kai">Kai| Then follow me, Doctor. What's in Sector 7 will change everything you think you know about this place.</seg>
 032| <seg char="Yara">Yara followed him deeper into the stacks. The cooling fans grew louder — or maybe that was her heartbeat.</seg>
 033| <seg>She'd agreed to work with a man she couldn't trust. But some truths were worth the risk.</seg>
 034| </branch>
 035| <branch name="expose">
 036| <seg char="Yara.angry">Yara shook her head. Whatever Kai was hiding, she wouldn't become complicit.</seg>
 037| <seg char="Kai">Kai's expression hardened. The fear vanished, replaced by something colder.</seg>
-038| <seg char="Kai.smile">Kai: I was hoping you'd say that. It makes what comes next so much simpler.</seg>
+038| <seg char="Kai.smile">Kai| I was hoping you'd say that. It makes what comes next so much simpler.</seg>
 039| <seg>He turned and walked back into the stacks. The lights in Yara's sector flickered once, then went out.</seg>
 040| <seg>The Archive had always been her sanctuary. Tonight it felt like a tomb.</seg>
 041| <seg>Yara stood alone in the dark, the hum of the servers her only company. Somewhere above, a door sealed with a heavy clang.</seg>
@@ -126,13 +126,13 @@ You are the director for a real-time visual novel game. Generate exactly one sto
 | `char` | no | Character name for portrait display. Omit to show no portrait |
 
 **Requirements**:
-- Each `<seg>` is either narration or dialogue. Narration: 1-2 sentences. Dialogue: `Name: text` format
+- Each `<seg>` is either narration or dialogue. Narration: 1-2 sentences. Dialogue: `Name| text` format
 - `char` value must match a character or a prior `<declare>`. Expression variants allowed: `char="Anna.smile"`
 
 **Snippet**:
 ```
 <seg>Rain hammers the awning.</seg>
-<seg char="Kael">Kael: You know the Guild's reputation.</seg>
+<seg char="Kael">Kael| You know the Guild's reputation.</seg>
 <seg char="Greta.angry">Greta set a mug down harder than necessary.</seg>
 ```
 

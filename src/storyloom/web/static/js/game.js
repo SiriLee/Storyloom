@@ -436,11 +436,11 @@ const GameView = (function () {
                         );
                     }
                 }
-                /* Speaker name always comes from "Name: text" split.
+                /* Speaker name always comes from "Name| text" split.
                    event.char is only for sprite/portrait matching. */
                 var charName = null;
                 var displayText = event.text;
-                var m = displayText.match(/^([^:：]+)[：:]\s*/);
+                var m = displayText.match(/^([^|]+)\|\s*/);
                 if (m) {
                     charName = m[1].trim();
                     displayText = displayText.slice(m[0].length);
