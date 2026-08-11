@@ -28,6 +28,8 @@ case "$(uname -s)" in
                             PLATFORM="macOS" ;;
     Linux)                  ADD_SEP=":"
                             PLATFORM="Linux" ;;
+    *)                      ADD_SEP=":"
+                            PLATFORM="$(uname -s)" ;;
 esac
 
 echo "=== Storyloom Web UI Build v${VERSION} ==="
