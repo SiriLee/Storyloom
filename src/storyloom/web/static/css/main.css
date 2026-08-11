@@ -276,7 +276,7 @@ button.accent:hover, .btn-accent:hover {
     font-size: 0.9rem;
     color: var(--text-primary);
     min-width: 220px;
-    text-align: right;
+    text-align: left;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2877,7 +2877,7 @@ button.accent:hover, .btn-accent:hover {
     font-family: var(--font-mono);
     font-size: 0.87rem;
     color: var(--text-primary);
-    text-align: right;
+    text-align: left;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2903,7 +2903,7 @@ button.accent:hover, .btn-accent:hover {
     font-size: 0.87rem;
     outline: none;
     box-sizing: border-box;
-    text-align: right;
+    text-align: left;
 }
 
 .settings-row-select {
