@@ -39,6 +39,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 import threading
 from pathlib import Path
@@ -70,6 +71,11 @@ from storyloom import __version__
 # ── App setup ──────────────────────────────────────────────────────
 
 _STATIC = Path(__file__).resolve().parent / "static"
+
+# Long-form content documents live under locale/{lang}/content/{doc}.md and
+# are addressed as /content/{lang}/{doc}.  A document name is a plain slug —
+# no dots/slashes — so it can never escape the content directory.
+_DOC_SLUG_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 # App directory — where config.json / locale / saves / media / system_media live.
 # Dev: repo root (server.py → web → storyloom → src → repo root).
@@ -207,6 +213,32 @@ async def serve_media(asset_type: str, asset_id: str, thumb: str = "0"):
 @app.get("/")
 async def index():
     return FileResponse(str(_STATIC / "index.html"))
+
+
+@app.get("/content/{lang}/{doc}")
+async def serve_content(lang: str, doc: str):
+    """Serve a localized long-form content document (Markdown).
+
+    Source of truth lives in ``locale/{lang}/content/{doc}.md`` — inside each
+    language package alongside ``LC_MESSAGES``, so translators work in a
+    single ``locale/`` tree.  ``lang`` is whitelisted against
+    ``SUPPORTED_LANGUAGES`` and ``doc`` must be a plain slug, so neither path
+    component can escape the content directory.  A missing document yields
+    404 and the frontend falls back to English.  Generic — any document
+    (guide, changelog, …) is served by dropping a ``{lang}/content/{doc}.md``
+    file in, with no per-document route or loader.
+    """
+    if lang not in SUPPORTED_LANGUAGES:
+        raise HTTPException(404, f"Unknown language: {lang}")
+    if not _DOC_SLUG_RE.fullmatch(doc):
+        raise HTTPException(404, f"Unknown document: {doc}")
+    # Directories use POSIX locale names (zh_CN); the URL/app use BCP-47
+    # (zh-CN).  Mirror i18n.py's language.replace("-", "_").
+    lang_dir = lang.replace("-", "_")
+    path = Path(_locale_dir) / lang_dir / "content" / f"{doc}.md"
+    if not path.is_file():
+        raise HTTPException(404, f"Content not found: {lang}/{doc}")
+    return FileResponse(str(path), media_type="text/markdown")
 
 
 @app.get("/health")

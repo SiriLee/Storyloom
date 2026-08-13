@@ -391,3 +391,51 @@ function isPywebview() {
     return typeof window.pywebview !== "undefined"
         && typeof window.pywebview.api !== "undefined";
 }
+
+/**
+ * Mark external (http/https) links inside *root* to open in a new tab.
+ *
+ * In pywebview a plain `<a href="https://…">` navigates the webview window
+ * itself — stranding the user with no way back to the app.  Only links
+ * carrying `target="_blank"` are routed to the system default browser
+ * (pywebview's OPEN_EXTERNAL_LINKS_IN_BROWSER, on by default).  marked.js
+ * does not add the attribute, so Markdown-rendered content (API guide,
+ * adventure log) needs it applied after rendering.
+ *
+ * @param {Element} root — container whose descendant links to inspect
+ */
+function markExternalLinks(root) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll("a[href]").forEach(function (a) {
+        var href = a.getAttribute("href") || "";
+        if (/^https?:\/\//i.test(href)) {
+            a.setAttribute("target", "_blank");
+            a.setAttribute("rel", "noopener");
+        }
+    });
+}
+
+/**
+ * Fetch a localized long-form content document (Markdown) from the server.
+ *
+ * Documents live under locale/{lang}/content/{doc}.md and are served at
+ * /content/{lang}/{doc}.  The active language is tried first, then English
+ * as a fallback — so a missing translation never breaks the document.
+ *
+ * @param {string} doc — document name, e.g. "guide" (must be a slug)
+ * @returns {Promise<string|null>} raw Markdown, or null if unavailable
+ */
+async function loadLocalizedContent(doc) {
+    var lang = (typeof GameState !== "undefined" && GameState.lang)
+        ? GameState.lang : "en";
+    var candidates = lang === "en" ? ["en"] : [lang, "en"];
+    for (var i = 0; i < candidates.length; i++) {
+        try {
+            var res = await fetch("/content/" + candidates[i] + "/" + doc);
+            if (res.ok) return await res.text();
+        } catch (e) {
+            /* fetch failed — try the next candidate */
+        }
+    }
+    return null;
+}

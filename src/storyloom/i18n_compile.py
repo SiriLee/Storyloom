@@ -5,6 +5,19 @@ gettext translations — users never need to install ``msgfmt`` or run
 anything by hand.
 
 Reference: GNU gettext .mo binary format (little-endian).
+
+Known limitations (technical debt, not a bug): this hand-rolled compiler
+and the ``generate_js_dict`` frontend dictionary intentionally cover only
+the current scope (3 languages, singular strings, no context).  They do NOT
+support:
+  • plurals — ``msgid_plural`` / ``msgstr[n]`` and the ``Plural-Forms`` header
+  • ``msgctxt`` — contextual disambiguation of identical source strings
+  • fuzzy filtering — a ``#, fuzzy`` entry is emitted as-is (not skipped)
+  • interpolation / ICU placeholders in the frontend ``T`` dict
+
+Upgrade trigger: switch the .mo path to ``babel``/``polib`` and the frontend
+to ``i18next`` (or FormatJS) the moment any of the above is required — e.g.
+adding a language with plural rules, or needing context/interpolation.
 """
 
 import struct

@@ -724,12 +724,6 @@
         }
     }
 
-    function _getApiGuideMd() {
-        if (typeof getApiGuideMd !== "function") return null;
-        var lang = (typeof GameState !== "undefined") ? GameState.lang : "en";
-        return getApiGuideMd(lang);
-    }
-
     function _renderApiGuideSection(container) {
         container.innerHTML =
             '<div class="settings-card">'
@@ -737,30 +731,40 @@
             + '<p class="settings-empty-card">' + esc(_("Loading...")) + '</p>'
             + '</div>'
             + '</div>';
+        _populateApiGuide();
+    }
 
-        if (typeof marked !== "undefined") {
-            var guideMd = _getApiGuideMd();
-            if (!guideMd) {
-                document.getElementById("guide-content").innerHTML =
-                    '<div class="settings-error-card">'
-                    + '<p>' + esc(_("API guide unavailable. Please check your installation.")) + '</p>'
-                    + '</div>';
-                return;
-            }
-            try {
-                var html = marked.parse(guideMd);
-                document.getElementById("guide-content").innerHTML = html;
-            } catch (e) {
-                document.getElementById("guide-content").innerHTML =
-                    '<div class="settings-error-card">'
-                    + '<div class="settings-error-icon">!</div>'
-                    + '<p>' + esc(_("Failed to render API guide.")) + '</p>'
-                    + '</div>';
-            }
-        } else {
-            document.getElementById("guide-content").innerHTML =
+    /** Async body of the API guide renderer — loads Markdown then renders. */
+    async function _populateApiGuide() {
+        var guideEl = document.getElementById("guide-content");
+        if (!guideEl) return;
+
+        if (typeof marked === "undefined") {
+            guideEl.innerHTML =
                 '<div class="settings-error-card">'
                 + '<p>' + esc(_("API guide unavailable. Please check your installation.")) + '</p>'
+                + '</div>';
+            return;
+        }
+
+        var guideMd = await loadLocalizedContent("guide");
+        if (!guideEl.isConnected) return;  // navigated away mid-fetch
+        if (!guideMd) {
+            guideEl.innerHTML =
+                '<div class="settings-error-card">'
+                + '<p>' + esc(_("API guide unavailable. Please check your installation.")) + '</p>'
+                + '</div>';
+            return;
+        }
+
+        try {
+            guideEl.innerHTML = marked.parse(guideMd);
+            markExternalLinks(guideEl);
+        } catch (e) {
+            guideEl.innerHTML =
+                '<div class="settings-error-card">'
+                + '<div class="settings-error-icon">!</div>'
+                + '<p>' + esc(_("Failed to render API guide.")) + '</p>'
                 + '</div>';
         }
     }

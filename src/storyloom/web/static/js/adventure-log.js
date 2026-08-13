@@ -138,6 +138,7 @@ const AdventureLogView = (function () {
                 if (typeof marked !== "undefined") {
                     const html = marked.parse(data.text);
                     content.innerHTML = `<div class="al-text">${html}</div>`;
+                    markExternalLinks(content);
                 } else {
                     content.innerHTML = `<div class="al-text al-text--raw">${escHtml(data.text)}</div>`;
                 }

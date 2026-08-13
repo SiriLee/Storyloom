@@ -1,1 +1,2 @@
 graft src/storyloom/web/static
+graft locale

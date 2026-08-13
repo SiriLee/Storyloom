@@ -87,6 +87,52 @@ class TestStaticEndpoints:
         assert res.json() == {"status": "ok"}
 
 
+class TestContentRoute:
+    """Tests for GET /content/{lang}/{doc} — localized long-form content."""
+
+    @staticmethod
+    def _write_content(app_dir, lang, doc, text):
+        # URL lang is BCP-47 (zh-CN); the directory is POSIX (zh_CN).
+        lang_dir = lang.replace("-", "_")
+        d = app_dir / "locale" / lang_dir / "content"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f"{doc}.md").write_text(text, encoding="utf-8")
+
+    def test_serve_guide_en(self, client, app_dir):
+        self._write_content(app_dir, "en", "guide", "# API Setup Guide\n\nHello")
+        import storyloom.web.server as server_mod
+        with patch.object(server_mod, "_locale_dir", str(app_dir / "locale")):
+            res = client.get("/content/en/guide")
+        assert res.status_code == 200
+        assert "text/markdown" in res.headers["content-type"]
+        assert res.text.startswith("# API Setup Guide")
+
+    def test_serve_guide_zh_cn_maps_underscore_dir(self, client, app_dir):
+        self._write_content(app_dir, "zh-CN", "guide", "# API 设置指南")
+        import storyloom.web.server as server_mod
+        with patch.object(server_mod, "_locale_dir", str(app_dir / "locale")):
+            res = client.get("/content/zh-CN/guide")
+        assert res.status_code == 200
+        assert "API 设置指南" in res.text
+
+    def test_unknown_language_404(self, client):
+        res = client.get("/content/fr/guide")
+        assert res.status_code == 404
+
+    def test_missing_document_404(self, client, app_dir):
+        import storyloom.web.server as server_mod
+        # Valid language but no content dir → file missing → 404.
+        with patch.object(server_mod, "_locale_dir", str(app_dir / "locale")):
+            res = client.get("/content/en/nonexistent")
+        assert res.status_code == 404
+
+    def test_document_slug_rejects_dot(self, client):
+        # doc must match [A-Za-z0-9_-]+ — a dot/slash payload is rejected
+        # before touching the filesystem (path-traversal guard).
+        res = client.get("/content/en/foo.bar")
+        assert res.status_code == 404
+
+
 # ═══════════════════════════════════════════════════════════════════
 # Config
 # ═══════════════════════════════════════════════════════════════════
