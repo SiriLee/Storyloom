@@ -420,13 +420,9 @@ class StreamParser:
 
             # SCENE interception (Phase 2): <set var="SCENE" val="...">
             # is a separate event type — scene switch, not state change.
+            # Allowed after <bridge/>: a scene switch is a visual/narrative
+            # element, not an interactive one (no user-input dependency).
             if var == SCENE_VAR_NAME:
-                if self._post_bridge:
-                    self._format_errors.append(
-                        f"<set var=\"SCENE\"> found after <bridge/>"
-                        f" (line {self._line_count})"
-                    )
-                    return []
                 event = Event(
                     type=EventType.SCENE,
                     line=self._line_count,

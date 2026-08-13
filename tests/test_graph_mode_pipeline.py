@@ -243,7 +243,7 @@ class TestExample1Pipeline:
             EventType.CHOICE_BEGIN, EventType.CHOICE_END,
             EventType.OPT, EventType.SET, EventType.CHECKPOINT,
             EventType.CHECKPOINT_END, EventType.ROUTE,
-            EventType.SCENE, EventType.DECLARE,
+            EventType.DECLARE,
         }
         post = events[bridge_idx + 1:]
         violations = [(e.line, e.type.name) for e in post if e.type in prohibited]

@@ -380,12 +380,14 @@ class TestSceneParsing:
         evt = _parse_one(parser, '<set var="SCENE" val="tavern"/>')
         assert evt.payload["branch"] is None
 
-    def test_scene_after_bridge_suppressed(self, parser):
+    def test_scene_after_bridge_allowed(self, parser):
         parser.feed_line("<story>")
         parser.feed_line("<bridge/>")
         events = parser.feed_line('<set var="SCENE" val="tavern"/>')
-        assert events == []
-        assert any("SCENE" in e for e in parser.format_errors)
+        assert len(events) == 1
+        assert events[0].type == EventType.SCENE
+        assert events[0].payload["position"] == "post"
+        assert parser.format_errors == []
 
     def test_scene_in_branch_has_branch_name(self, parser):
         parser.feed_line("<story>")
@@ -569,13 +571,14 @@ class TestStreamParserTaskGenTrigger:
 
     # ── Post-bridge suppression (§3.1, §4.1) ─────────────────────
 
-    def test_scene_after_bridge_does_not_trigger_enqueue(self):
-        """Post-bridge SCENE → format error, enqueue NOT called."""
+    def test_scene_after_bridge_triggers_enqueue(self):
+        """Post-bridge SCENE → allowed (visual element, not interactive)."""
         parser, mock = self._parser_with_mock()
         parser.feed_line("<bridge/>")
         events = parser.feed_line('<set var="SCENE" val="tavern"/>')
-        assert events == []
-        mock.enqueue.assert_not_called()
+        assert len(events) == 1
+        assert events[0].type == EventType.SCENE
+        mock.enqueue.assert_called_once()
 
     def test_declare_after_bridge_does_not_trigger_enqueue(self):
         """Post-bridge DECLARE → format error, enqueue NOT called."""
