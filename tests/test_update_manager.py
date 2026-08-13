@@ -127,6 +127,21 @@ def test_find_asset_url_not_found():
     assert ver is None
 
 
+def test_find_asset_url_picks_highest_version():
+    """A persistent tag accumulates versions — return the highest, not first."""
+    assets = [
+        {"name": "system_media-v1.1.0.zip",
+         "browser_download_url": "https://example.com/sm-old.zip"},
+        {"name": "system_media-v1.3.0.zip",
+         "browser_download_url": "https://example.com/sm-new.zip"},
+        {"name": "system_media-v1.2.0.zip",
+         "browser_download_url": "https://example.com/sm-mid.zip"},
+    ]
+    url, ver = _find_asset_url(assets, "system_media-v", platform_specific=False)
+    assert ver == "1.3.0"
+    assert url == "https://example.com/sm-new.zip"
+
+
 # ── Version check tests ───────────────────────────────────────────
 
 
@@ -160,16 +175,32 @@ def _make_sm_release(assets=None):
     }
 
 
-def _patch_updates(mock_get, *, app_release, sm_release):
-    """Set up the dual-release mock.
+def _make_launcher_release(assets=None):
+    """Build a mock response for the launcher release tag."""
+    if assets is None:
+        assets = []
+    return {
+        "tag_name": "launcher",
+        "body": "",
+        "assets": assets,
+    }
+
+
+def _patch_updates(mock_get, *, app_release, sm_release, launcher_release=None):
+    """Set up the three-release mock.
 
     ``_http_get_json`` is called three times per ``check_for_updates()`` —
-    twice for ``releases/latest`` (app + launcher) and once for
-    ``releases/tags/system-media``.  Route by URL substring.
+    once each for ``releases/latest`` (app), ``releases/tags/system-media``,
+    and ``releases/tags/launcher``.  Route by URL substring.
     """
+    if launcher_release is None:
+        launcher_release = _make_launcher_release()
+
     def _dispatch(url):
         if "/tags/system-media" in url:
             return sm_release
+        if "/tags/launcher" in url:
+            return launcher_release
         return app_release
 
     mock_get.side_effect = _dispatch
@@ -262,10 +293,12 @@ def test_check_launcher_update(mock_get):
         app_release=_make_app_release(tag="v1.4.0", assets=[
             {"name": f"storyloom-app-v1.4.0-{plat}.zip",
              "browser_download_url": "https://example.com/app.zip"},
+        ]),
+        sm_release=_make_sm_release(assets=[]),
+        launcher_release=_make_launcher_release(assets=[
             {"name": f"storyloom-launcher-v1.1.0-{plat}.zip",
              "browser_download_url": "https://example.com/launcher.zip"},
         ]),
-        sm_release=_make_sm_release(assets=[]),
     )
     result = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
     assert result.launcher.has_update is True
@@ -280,10 +313,14 @@ def test_check_launcher_no_update(mock_get):
     _patch_updates(
         mock_get,
         app_release=_make_app_release(tag="v1.4.0", assets=[
+            {"name": f"storyloom-app-v1.4.0-{plat}.zip",
+             "browser_download_url": "https://example.com/app.zip"},
+        ]),
+        sm_release=_make_sm_release(assets=[]),
+        launcher_release=_make_launcher_release(assets=[
             {"name": f"storyloom-launcher-v1.0.0-{plat}.zip",
              "browser_download_url": "https://example.com/launcher.zip"},
         ]),
-        sm_release=_make_sm_release(assets=[]),
     )
     result = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
     assert result.launcher.has_update is False

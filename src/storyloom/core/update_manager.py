@@ -19,6 +19,7 @@ from urllib.request import Request, ProxyHandler, build_opener
 _GITHUB_API_BASE = "https://api.github.com/repos/SiriLee/Storyloom/releases"
 _GITHUB_API_LATEST = f"{_GITHUB_API_BASE}/latest"
 _GITHUB_API_SYSTEM_MEDIA = f"{_GITHUB_API_BASE}/tags/system-media"
+_GITHUB_API_LAUNCHER = f"{_GITHUB_API_BASE}/tags/launcher"
 CACHE_SECONDS = 900  # 15 minutes
 
 # Per spec §4.3
@@ -100,18 +101,21 @@ class UpdateProgress:
 # ── Semver helpers ────────────────────────────────────────────────
 
 
+def _version_tuple(v: str) -> tuple:
+    """Parse a semver string into a comparable tuple.
+
+    Strips an optional ``v`` prefix and any pre-release suffix
+    (``1.2.3-rc1`` → ``(1, 2, 3)``).  Returns an empty tuple for
+    unparseable input.
+    """
+    v = v.lstrip("v")
+    parts = v.split("-")[0].split(".")
+    return tuple(int(p) for p in parts if p.isdigit())
+
+
 def _version_gt(a: str, b: str) -> bool:
     """Compare two semver strings.  Returns True if *a* > *b*."""
-
-    def parse(v: str) -> tuple:
-        v = v.lstrip("v")
-        parts = v.split("-")[0].split(".")
-        return tuple(int(p) for p in parts if p.isdigit())
-
-    try:
-        return parse(a) > parse(b)
-    except (ValueError, IndexError):
-        return False
+    return _version_tuple(a) > _version_tuple(b)
 
 
 # ── GitHub API helpers ────────────────────────────────────────────
@@ -144,24 +148,24 @@ def _find_asset_url(
 ) -> tuple[str | None, str | None]:
     """Find an asset by name pattern.  Returns (url, version) or (None, None).
 
-    If *platform_specific*, matches ``{pattern}*{_PLATFORM}*`` first.
-    Falls back to matching ``{pattern}*`` without platform.
+    If *platform_specific*, only matches ``{pattern}*{_PLATFORM}*`` —
+    never falls through to a wrong platform.
+
+    A persistent release tag (system-media, launcher) may accumulate
+    multiple versions, so return the highest version rather than the
+    first match.
     """
-    # First pass: with platform (for platform-specific assets)
-    if platform_specific:
-        for a in assets:
-            name = a.get("name", "")
-            if pattern in name and _PLATFORM in name:
-                ver = _parse_version_from_asset_name(name, pattern)
-                return a.get("browser_download_url"), ver
-        return None, None  # never fall through to wrong platform
-    # Platform-agnostic pass
+    best: tuple[str | None, str | None] | None = None
     for a in assets:
         name = a.get("name", "")
-        if pattern in name:
-            ver = _parse_version_from_asset_name(name, pattern)
-            return a.get("browser_download_url"), ver
-    return None, None
+        if pattern not in name:
+            continue
+        if platform_specific and _PLATFORM not in name:
+            continue
+        ver = _parse_version_from_asset_name(name, pattern)
+        if best is None or _version_gt(ver or "", best[1] or ""):
+            best = (a.get("browser_download_url"), ver)
+    return best if best is not None else (None, None)
 
 
 # ── Download ──────────────────────────────────────────────────────
@@ -245,7 +249,7 @@ def _check_system_media_update(system_media_version: str) -> VersionInfo:
 
 
 def _check_launcher_update(launcher_version: str) -> VersionInfo:
-    """Query ``releases/latest`` for the launcher layer.
+    """Query ``releases/tags/launcher`` for the launcher layer.
 
     The launcher is versioned independently of the app (its asset is
     ``storyloom-launcher-v{ver}-{platform}.zip``) and is only bumped when
@@ -254,7 +258,7 @@ def _check_launcher_update(launcher_version: str) -> VersionInfo:
     Returns a ``VersionInfo`` with ``latest=""`` on any error.
     """
     try:
-        release = _http_get_json(_GITHUB_API_LATEST)
+        release = _http_get_json(_GITHUB_API_LAUNCHER)
     except Exception:
         return VersionInfo(current=launcher_version, latest="")
 
@@ -279,9 +283,10 @@ def check_for_updates(
 ) -> UpdateCheckResult:
     """Check GitHub Releases for available updates.
 
-    Queries two independent releases for three update layers:
-      - ``releases/latest`` for the app and launcher layers.
+    Queries three independent releases for three update layers:
+      - ``releases/latest`` for the app layer.
       - ``releases/tags/system-media`` for the system_media layer.
+      - ``releases/tags/launcher`` for the launcher layer.
 
     Each layer fails independently — a network error on one never
     prevents the other from reporting results.
