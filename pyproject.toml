@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "storyloom"
 version = "2.1.0"
-description = "AI-powered interactive text fiction game engine"
-license = {text = "MIT"}
+description = "AI-powered real-time visual novel engine"
+license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
     "httpx>=0.28.0",

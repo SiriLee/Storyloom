@@ -1,4 +1,4 @@
-"""Storyloom — AI-powered interactive text fiction game engine."""
+"""Storyloom — AI-powered real-time visual novel engine."""
 
 __version__ = "2.1.0"
 

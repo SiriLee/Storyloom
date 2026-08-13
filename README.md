@@ -4,7 +4,7 @@
 
 # Storyloom
 
-> An LLM-powered interactive fiction engine with a visual novel mode.
+> An AI-powered real-time visual novel engine.
 
 [![Python](https://img.shields.io/badge/python-%3E%3D10-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
