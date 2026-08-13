@@ -91,7 +91,7 @@ class UpdateCheckResult:
 class UpdateProgress:
     """Progress event for a single-layer update operation."""
 
-    layer: str   # "app" | "system_media"
+    layer: str   # "app" | "launcher" | "system_media"
     stage: str   # "downloading" | "extracting" | "done" | "error"
     received: int = 0
     total: int | None = None
@@ -136,9 +136,11 @@ def _parse_version_from_tag(tag: str) -> str:
 def _parse_version_from_asset_name(name: str, prefix: str) -> str | None:
     """Extract version from asset filename.
 
-    E.g. 'system_media-v1.2.0.zip', prefix='system_media-v' → '1.2.0'
+    E.g. 'system_media-v1.2.0.zip', prefix='system_media-v' → '1.2.0'.
+    Accepts one or more dot-separated numeric components (``1``, ``1.2``,
+    ``1.2.3``), stopping at the first non-numeric delimiter.
     """
-    pattern = re.escape(prefix) + r"(\d+\.\d+\.\d+)"
+    pattern = re.escape(prefix) + r"(\d+(?:\.\d+)*)"
     m = re.search(pattern, name)
     return m.group(1) if m else None
 

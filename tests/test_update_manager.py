@@ -90,6 +90,19 @@ def test_parse_version_from_asset_name():
     )
 
 
+def test_parse_version_from_asset_name_variable_length():
+    """Version may have 1..N components; extract all of them."""
+    assert _parse_version_from_asset_name(
+        "storyloom-launcher-v1.0-Linux.zip", "storyloom-launcher-v"
+    ) == "1.0"
+    assert _parse_version_from_asset_name(
+        "storyloom-launcher-v1-Linux.zip", "storyloom-launcher-v"
+    ) == "1"
+    assert _parse_version_from_asset_name(
+        "storyloom-launcher-v1.0.0.1-Linux.zip", "storyloom-launcher-v"
+    ) == "1.0.0.1"
+
+
 def test_find_asset_url_platform_specific():
     assets = [
         {
