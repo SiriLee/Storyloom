@@ -16,6 +16,7 @@ VERSION=$($PYTHON -c "import re; print(re.search(r'__version__\s*=\s*\"(.+?)\"',
 PYI_FLAGS=""
 BIN_NAME="storyloom-web"
 LAUNCHER_NAME="Storyloom"
+ICON="assets/icons/icon.ico"
 OUTPUT_DIR="dist/storyloom-v${VERSION}"
 
 # ── Platform detection (once) ────────────────────────────────────────
@@ -92,6 +93,7 @@ fi
 echo "--- Building standalone executable ---"
 $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
     --name "$BIN_NAME" \
+    --icon "$ICON" \
     --add-data "locale${ADD_SEP}locale" \
     --add-data "src/storyloom/web/static${ADD_SEP}storyloom/web/static" \
     --add-data "src/storyloom/core/lang_meta${ADD_SEP}storyloom/core/lang_meta" \
@@ -107,6 +109,7 @@ $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
 echo "--- Building Launcher ---"
 $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
     --name "$LAUNCHER_NAME" \
+    --icon "$ICON" \
     --clean \
     src/storyloom/launcher.py
 

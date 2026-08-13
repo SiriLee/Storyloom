@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/branding/logo-lockup.png" alt="Storyloom logo" width="300">
+  <img src="assets/icons/logo-lockup.png" alt="Storyloom logo" width="300">
 </p>
 
 # Storyloom
