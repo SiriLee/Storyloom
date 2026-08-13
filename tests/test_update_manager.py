@@ -262,7 +262,7 @@ def test_check_launcher_update(mock_get):
         app_release=_make_app_release(tag="v1.4.0", assets=[
             {"name": f"storyloom-app-v1.4.0-{plat}.zip",
              "browser_download_url": "https://example.com/app.zip"},
-            {"name": f"Storyloom-v1.1.0-{plat}.zip",
+            {"name": f"storyloom-launcher-v1.1.0-{plat}.zip",
              "browser_download_url": "https://example.com/launcher.zip"},
         ]),
         sm_release=_make_sm_release(assets=[]),
@@ -280,7 +280,7 @@ def test_check_launcher_no_update(mock_get):
     _patch_updates(
         mock_get,
         app_release=_make_app_release(tag="v1.4.0", assets=[
-            {"name": f"Storyloom-v1.0.0-{plat}.zip",
+            {"name": f"storyloom-launcher-v1.0.0-{plat}.zip",
              "browser_download_url": "https://example.com/launcher.zip"},
         ]),
         sm_release=_make_sm_release(assets=[]),

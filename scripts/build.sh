@@ -43,7 +43,7 @@ echo "=== Storyloom Web UI Build v${VERSION} ==="
 
 # 0. Clean previous build artifacts (dist + PyInstaller build cache only).
 echo "--- Cleaning previous builds ---"
-rm -rf build/ dist/*.whl dist/*.tar.gz dist/storyloom-v* dist/storyloom-web* dist/Storyloom-v*
+rm -rf build/ dist/*.whl dist/*.tar.gz dist/storyloom-v* dist/storyloom-web* dist/storyloom-launcher-v*
 
 # 0b. Ensure background-removal model is available (u2netp.onnx, ~4.4 MB).
 #     Bundled via --add-data into the main exe.  Downloaded once and cached.
@@ -125,7 +125,7 @@ echo "--- Packaging launcher asset ---"
 mkdir -p build/launcher_asset
 cp "dist/$LAUNCHER_NAME" build/launcher_asset/
 cp launcher.version build/launcher_asset/
-$PYTHON -c "import shutil; shutil.make_archive('dist/Storyloom-v${LAUNCHER_VER}-${PLATFORM}', 'zip', 'build/launcher_asset')"
+$PYTHON -c "import shutil; shutil.make_archive('dist/storyloom-launcher-v${LAUNCHER_VER}-${PLATFORM}', 'zip', 'build/launcher_asset')"
 
 # 4. Assemble release directory — ready-to-run structure for first install
 #    app/ holds versioned files replaced on update: binary + locale.
@@ -181,5 +181,5 @@ echo "=== Done ==="
 echo "Release dir:  $OUTPUT_DIR"
 echo "Full zip:     dist/${FULL_ZIP}.zip"
 echo "App zip:      dist/${APP_ZIP}.zip"
-echo "Launcher:     dist/Storyloom-v${LAUNCHER_VER}-${PLATFORM}.zip"
+echo "Launcher:     dist/storyloom-launcher-v${LAUNCHER_VER}-${PLATFORM}.zip"
 ls -lh "$OUTPUT_DIR/"

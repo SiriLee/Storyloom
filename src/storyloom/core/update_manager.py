@@ -248,7 +248,7 @@ def _check_launcher_update(launcher_version: str) -> VersionInfo:
     """Query ``releases/latest`` for the launcher layer.
 
     The launcher is versioned independently of the app (its asset is
-    ``Storyloom-v{ver}-{platform}.zip``) and is only bumped when
+    ``storyloom-launcher-v{ver}-{platform}.zip``) and is only bumped when
     ``launcher.py`` itself changes.
 
     Returns a ``VersionInfo`` with ``latest=""`` on any error.
@@ -260,7 +260,7 @@ def _check_launcher_update(launcher_version: str) -> VersionInfo:
 
     assets = release.get("assets", [])
     url, ver = _find_asset_url(
-        assets, "Storyloom-v", platform_specific=True
+        assets, "storyloom-launcher-v", platform_specific=True
     )
 
     return VersionInfo(
