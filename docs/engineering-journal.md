@@ -6,6 +6,159 @@
 
 ---
 
+## 2026-08-11（周一）— v2.1.0：协作取消、生成流、网络代理
+
+> **概述**：v2.0.0 发布后的第一个工作日，完成了 6 大功能模块的迭代。核心工作是**协作取消机制**（用户可在生成/预构建中途安全退出）和**生成视图流式任务列表**（实时展示 6 阶段进度）。此外：全栈网络代理支持、Round 1 prefix 重构为 system message、对话分隔符从冒号改为竖线、素材生成性能调优、API 指南国际化、设置页 "About" 模块。全天 **46 commits**，**49 files**，**+3,082/-594 lines**，测试从 1,081 增至 **1,103**（+22）。
+
+### 协作取消机制 — CoCreateFlow + Prebuilder + retry 全链路
+
+**背景**：用户在故事生成（co-create generate）和素材预构建（prebuild）阶段点击返回按钮或关闭标签页时，后端线程继续运行直到自然结束——浪费 API 调用且用户体验差。需要一种"在下一个安全检查点停止"的协作式取消机制（不强制杀死线程，避免资源泄漏）。
+
+**决策**（commits `2d3e132` → `1eeccd2` → `d8762c7` → `67c38c3`，4 commits）：
+
+1. **核心取消原语**（`2d3e132`）：`CoCreateFlow` 和 `Prebuilder` 新增 `threading.Event` 取消标志——`_cancel_flag`。在每次 LLM chunk 到达、每个 pipeline 步骤开始前检查 `_cancel_flag.is_set()`。取消时停止提交新工作，但正在执行的 API 调用会自然完成（文本 ~几秒，图像 ~15s）。SSE 端点采用与 game stream 相同的模式：`finally` 块中清理资源 + keepalive 定时器防止连接超时。
+2. **前端 AbortController**（`2d3e132`）：co-create.js 返回按钮启用 `AbortController`——用户点击返回时 abort 信号发送到服务器 `/api/cancel` 端点。Router cleanup 处理标签页关闭场景。`sessions.py` 新增 `cancel_generate()` / `cancel_prebuild()` 方法管理取消状态。
+3. **retry 层取消检查**（`d8762c7`）：`retry_send()` 和 `retry_generate()` 在每次重试循环开始前检查取消标志——防止阻塞 POST 请求完成后仍在重试。
+4. **prebuild cancel 后清理**（`1eeccd2`）：取消后清理已创建的 game 对象，retry 阶段在阻塞 POST 完成后检查取消标志不再提交新任务。
+5. **SSE 重连修复**（`67c38c3`）：`sse-client.js` 在终端事件（done/error）后关闭 EventSource——防止对过期流 URL 的自动重连触发 404 并覆盖成功消息为 "Update failed"。错误处理器防御 `e.data` 为空的原生 transport 事件。
+
+**依据**：`core/co_create.py`；`core/prebuild.py`；`web/server.py`（cancel 端点）；`web/sessions.py`；`web/static/js/co-create.js`；`web/static/js/sse-client.js`；`tests/test_co_create.py`（+99 行）；`tests/test_prebuild.py`（+121 行）；`tests/test_web_server.py`（+42 行）。
+
+### 线程安全 — httpx.Client + ONNX session
+
+**背景**：v2.0.0 引入 prebuild 后台线程后，`ApiClient` 的单例 `httpx.Client` 在主事件循环和 prebuild daemon 线程间共享——`httpx.Client` 非线程安全，导致未定义行为。ONNX 模型懒初始化也可能在并发首次加载时竞态。
+
+**决策**（commits `b215bd3` + `67d2390`，2 commits）：
+
+1. **线程本地 httpx.Client**（`b215bd3`）：`ApiClient._get_client()` 使用 `threading.local()` 为每个线程创建独立 `httpx.Client` 实例——与 `ImgApiClient`（§7.8b）的成熟模式一致。更新 `test_api_client` 的 mock 注入适配线程本地存储。
+2. **ONNX 双重检查锁**（`b215bd3`）：`_get_session()` 使用 double-checked locking——第一个 `if session is None` 无锁快速路径，`with _lock:` 内再次检查防止并发首次加载竞态。
+3. **文档澄清**（`67d2390`）：`design.md` 明确标注 Thread 4（素材生成）为多线程——共享对象必须线程安全。
+
+**依据**：`io/api_client.py`；`io/img_utils.py`；`docs/graph-mode-spec/design.md`；`tests/test_api_client.py`。
+
+### 生成视图流式任务列表 — 替代静态过渡屏
+
+**背景**：co-create generate 阶段原来显示静态 "Generating settings..." 文字，用户不知道后端在做什么、还要等多久。prebuild 阶段也缺少实时反馈。需要流式进度展示。
+
+**决策**（commits `49db3bc` → `aaae3d1` → `0701008` → `263b43c` → `b96449c` → `3f9ee57` → `4aff3b4`，7 commits）：
+
+1. **流式分段检测**（`49db3bc`）：新增 `_SectionStreamer` 类——通过子串匹配检测 JSON section 边界（替代之前的 summarizer 方案，后者需要额外 LLM 调用）。定义 `_GENERATE_SECTION_ORDER` 常量（Thinking + 5 个 JSON section）。`generate_stream()` generator 方法 yield SSE 事件。
+2. **SSE 端点**（`aaae3d1`）：新增 `GET /api/generate/stream` 端点——独立的 SSE 流，`generate_done` 事件通过 `asyncio.Event` 防重复发送。
+3. **MXU 风格任务列表 UI**（`0701008`、`263b43c`）：6 个任务项（Thinking + World Setting + Story Background + Character Setting + Opening + Review）依次点亮。活跃项显示脉冲状态点（pulsing dot），完成项显示绿色对勾（checkmark）。gen-view 和 prebuild-view 页头新增返回按钮和主题切换按钮。
+4. **图标扩展**（`b96449c`）：`icons.js` 新增 `Icons.branch()` 和 `Icons.cpu()` Feather 风格 SVG。
+5. **i18n**（`3f9ee57`）：zh-CN/zh-TW 补充 generate view 翻译。
+
+**依据**：`core/co_create.py`（`_SectionStreamer`、`generate_stream()`）；`web/server.py`；`web/static/js/co-create.js`；`web/static/js/icons.js`；`web/static/css/main.css`；`locale/zh_CN/LC_MESSAGES/storyloom.po`。
+
+### 全文网络代理支持
+
+**背景**：中国大陆用户访问 OpenAI API 需要代理。之前代理仅通过环境变量 `LLM_API_BASE` 间接支持，用户无法在 UI 中配置、代理变更后 httpx.Client 缓存不失效、更新检查也不走代理。
+
+**决策**（commits `76bd165` → `0bb668b` → `f26e87f` → `68a68a7` → `4913f47`，5 commits）：
+
+1. **UserConfig.proxy_url**（`76bd165`）：新增 `proxy_url` 配置项，持久化到 `config.json`。设置页 "Network Proxy" 卡片（在 System 分区顶部）使用 `_settingText` 模式（铅笔编辑按钮），含 HTTP/SOCKS5 提示。
+2. **全栈注入**（`76bd165`）：代理 URL 注入三层网络——`UpdateManager`（urllib `ProxyHandler`）、`ApiClient`（httpx `proxy=`）、`ImgApiClient`（httpx `proxy=`）。
+3. **缓存失效**（`0bb668b`）：代理 URL 变更时使 httpx.Client 线程本地缓存失效——下次 `_get_client()` 创建新 Client。
+4. **前端同步**（`f26e87f`）：`initConfig()` 启动时将 `proxy_url` 同步到 `localStorage`——确保前端感知最新代理配置。
+
+**依据**：`user_config.py`；`io/api_client.py`；`io/img_api_client.py`；`core/update_manager.py`；`web/static/js/state.js`。
+
+### Prompt Engineering — Round 1 重构 + 分隔符修复
+
+**背景**：三个独立的 prompt 问题积累到需要修复：(1) Round 1 的 prefix 作为 user message 放置在 context window 中，会被滑动窗口压缩掉；(2) 图模式对话分隔符使用冒号，但中文叙述中冒号频繁出现（"他犹豫了一下：该不该去呢？"）导致前端错误地将叙述识别为对话；(3) adventure log 文本宽度使用硬编码值。
+
+**决策**（commits `5ff7192` + `2f8c15c` + `70e043c` + `b24c41a` + `9673688`，5 commits）：
+
+1. **Round 1 prefix → system message**（`5ff7192`）：`GRAPH_ROUND1_PREFIX` / `ROUND1_PREFIX` 从 user message 拆分为独立 system message。系统提示（角色、格式、示例、Story Setting）作为 `role: "system"` 永久锚定在位置 0——永不压缩、永不从 context 移除。User messages（`ROUND_TEMPLATE` / `GRAPH_ROUND_TEMPLATE`）仅携带回合级状态（outline、变量、feedback、bridge text）。`ContextManager` 移除 `_round1_user` / `_round1_assistant` 特殊字段——所有回合统一走 `_rounds[]` 数组和 window/compression 周期。`PromptBuilder` 新增 `build_text_system_prompt()` / `build_graph_system_prompt()`。
+2. **对话分隔符 : → |**（`2f8c15c`）：图模式 prompt 和前端正则中将冒号替换为竖线——竖线几乎不在叙述文本中出现，LLM 可靠处理。
+3. **adventure log 宽度**（`70e043c`）：使用 `--content-text` CSS 变量替代硬编码值。
+4. **空字符串初始值**（`b24c41a`）：co-creation 字符串变量允许空字符串初始值——之前拒绝空字符串导致某些配置场景无法表达。
+5. **背景图负面约束**（`9673688`）：背景图 prompt 新增 "no text, no words, no letters, no subtitles" 约束——FLUX 模型有时会在背景图中生成文字框。
+
+**依据**：`core/prompt_builder.py`；`core/context_manager.py`；`docs/graph-mode-spec/prompt-design.md`；`io/img_prompts.py`；`tests/test_prompt_builder.py`；`tests/test_context_manager.py`。
+
+### 性能调优 — max_workers + 参考图基准测试
+
+**背景**：prebuild 素材生成速度慢——用户等待时间长。需要基准测试定位瓶颈并调优并发参数。
+
+**决策**（commits `9f224a7` + `88b9ef4` + `e0bd739`，3 commits）：
+
+1. **max_workers 提升**（`9f224a7`）：`TASK_POOL_MAX_WORKERS` 4→6（LLM match/select/generate），`PREBUILD_MAX_WORKERS` 新增=6（Prebuilder 并发图像）。压力测试（workers=6）：8 张图 24s，单次调用 ~13s，零错误。
+2. **参考图性能瓶颈定位**（`88b9ef4`、`9f224a7`）：`scripts/bench_ref_images.py` 基准测试脚本——FLUX.2 Pro on apiyi：0 refs = 15s，3 refs = 64s（**4.4x 减速**）。确认参考图（reference images）是 prebuild 慢的根因，不是并发度。`GENERATE_REF_IMAGE_COUNT` 从 3 → 0——所有参考图基础设施保留，未来模型处理参考图更快时恢复。
+3. **清理保留数**（`e0bd739`）：`CLEANUP_KEEP_COUNT` 50→80——给用户更多历史生成记录。
+
+**依据**：`config.py`；`core/prebuild.py`；`scripts/bench_ref_images.py`；`scripts/stress_test_image_api.py`。
+
+### Prebuild 体验打磨 — force-select 通知 + 省略号修复
+
+**背景**：prebuild force-select 场景（批量选择中某素材无 LLM 匹配结果，fallback 随机选）缺少前端通知——用户不知道 fallback 发生了。另外进度文本末尾带静态省略号 ". . ."，前端的 animated dots 动画会导致重复。
+
+**决策**（commits `738a329` + `9f49eda` + `c09b3a0` + `abf9308`，4 commits）：
+
+1. **force-select fallback 通知**（`738a329`）：SSE 事件 `prebuild_force_selected` / `prebuild_force_failed` 推送 fallback 结果到前端。
+2. **i18n**（`9f49eda`）：zh-CN/zh-TW 补充 fallback selected/failed 翻译。
+3. **省略号去重**（`c09b3a0`）：删除进度文本末尾的静态省略号——前端 CSS 动画自动添加 animated dots。
+4. **轻量 thinking**（`abf9308`）：prebuild 批量选择使用 light thinking（`thinking_mode="light"`）——匹配场景不需要深度推理。
+
+**依据**：`core/prebuild.py`；`web/server.py`；`web/static/js/co-create.js`；`locale/zh_CN/LC_MESSAGES/storyloom.po`。
+
+### API 指南国际化 — 三语 locale dict
+
+**背景**：v2.0.0 的 API 指南为英文单语言 Markdown，且包含过时的定价/credits 声明。需要针对不同语言用户提供本地化版本——中国用户需要 APIYI 优先、支付宝/微信支付信息；国际用户需要 OpenRouter 优先。
+
+**决策**（commits `7dd4bd1` + `8bb438b` + `3701d22`，3 commits）：
+
+1. **locale dict 结构**（`7dd4bd1`）：`API_GUIDE_MD` 改为 `{en, zh-CN, zh-TW}` dict，`getApiGuideMd(lang)` 辅助函数——调用者传语言代码，不需要知道可用 locale。未知语言 fallback 到英文。
+2. **内容差异化**：英文版简洁、国际受众（OpenRouter-first）；zh-CN 中国用户（APIYI-first，支付宝/微信）；zh-TW 繁体中文（与 zh-CN 结构相同，用词适配）。
+3. **事实校验**（`7dd4bd1`）：对照代码验证——anime-only 画风、Seedream 4.x 无 thinking 延迟、image key fallback 链在 `img_api_client.py` 中确认。
+4. **清理过时内容**（`8bb438b`）：删除过时的定价/credits 声明。
+5. **表格标题补充**（`3701d22`）：补充缺失的表格标题。
+
+**依据**：`web/static/js/api-guide.js`；`io/img_api_client.py`；`io/thinking.py`。
+
+### 设置页迭代 — About 模块 + System 重命名
+
+**背景**：v2.0.0 设置页的 "Credits" 区域缺乏项目和社区信息。"Updates" 侧边栏命名不准确——实际包含代理和更新。编辑输入框文字左对齐不统一。
+
+**决策**（commits `f254067` + `8ba433f` + `df301c2` + `68a68a7` + `cdf4b41`，5 commits）：
+
+1. **About 模块替代 Credits**（`f254067`）：新增 "Project & Community" 卡片——GitHub 仓库链接、开源许可证信息、社区资源。
+2. **System 重命名**（`8ba433f`、`df301c2`）：侧边栏 "Updates"→"Network"→"System"——使用 `Icons.monitor()` 图标，涵盖代理配置 + 自动更新。
+3. **代理卡片图标修复**（`68a68a7`）：Network Proxy 卡片使用 `Icons.server()` 替代通用图标。
+4. **左对齐统一**（`cdf4b41`）：设置页编辑输入框文字左对齐。
+
+**依据**：`web/static/js/settings.js`；`web/static/js/icons.js`；`web/static/js/credits.js`；`web/static/css/main.css`。
+
+### 构建管线 — app-only zip + 平台检测 + 版本号
+
+**背景**：v2.0.0 的发布 zip 包含完整 `app/` 目录（Python 包 + `system_media/`），文件很大（~80MB）。对于已有 `system_media/` 的现有用户，重复下载浪费带宽。需要提供仅含 `app/` Python 包的轻量 zip。同时 `build.sh` 的平台检测和版本提取需要健壮化。
+
+**决策**（commits `2fabce6` → `6f931f3` → `a8de24d` → `7805e39` → `c722fc3`，5 commits）：
+
+1. **双 zip 发布**（`2fabce6`）：release 包含 full zip（`app/` + `system_media/`，新用户）和 app-only zip（仅 `app/` Python 包，升级用户）。启动器检测本地是否有 `system_media/` 决定下载哪个。
+2. **版本提取与平台检测**（`6f931f3`）：`build.sh` 中 `get_version()` 函数——从 `pyproject.toml` 静态提取版本号（`grep -Po`），不再依赖运行时 `python -c`。`get_platform_label()` 统一平台命名（`windows-x86_64` / `linux-x86_64` / `macos-arm64` / `macos-x86_64`）。app-only zip 简化为仅包含 `app/` 目录。
+3. **非标准平台 fallback**（`a8de24d`）：`build.sh` 添加 `uname -m` fallback——处理 `x86_64` vs `amd64`、`aarch64` vs `arm64` 等价映射。非标准平台默认使用 `uname -s`-`uname -m` 命名。
+4. **版本号**（`7805e39`、`c722fc3`）：v2.0.1（bugfix 发布，11:19）→ v2.1.0（功能发布，19:53）。`pyproject.toml` 和 `__init__.py` 同步更新。
+
+**依据**：`scripts/build.sh`；`pyproject.toml`；`src/storyloom/__init__.py`。
+
+### 桌面模式 — 原生保存对话框
+
+**背景**：pywebview 桌面模式下，下载素材时使用浏览器默认下载行为——文件进入 Downloads 目录，用户无法选择保存位置。
+
+**决策**（commit `8cec590`）：pywebview 检测到 `window.pywebview` API 时，使用 `pywebview.api.save_file_dialog()` 调用原生保存对话框——用户可选择文件路径和文件名。
+
+**依据**：`web/static/js/assets.js`；`web/server.py`。
+
+### 其他修复
+
+- **默认图模式**（`3f27852`）：新用户默认游戏模式从 text → graph——图模式是 v2 的核心体验。
+- **素材标签页滚动重置**（`8c6bd0d`）：切换素材标签页时重置滚动位置——之前列表较长时切换标签页停留在之前位置。
+- **empty-state 文本移除**（`cb6156e`）：素材管理器移除 "No assets found" 空白状态文字——与 MXU 设计不协调。
+- **版本端点**（`4913f47`）：新增 `GET /api/version` 端点——修复设置页版本号永久显示 "..." 的问题。
+
+---
+
 ## 2026-08-10（周日）— v2.0.0 发布日
 
 > **概述**：Storyloom v2.0.0 正式发布。今日完成了横跨前端、后端、打包、发布管线的巨量工作——前端全面翻新（CSS 主题系统 + 设置页重设计 + 图标系统）、自动更新系统（UpdateManager + 启动器自更新）、原生桌面窗口模式（pywebview）、素材管理器重设计（画廊网格 + 缩略图）、启动器打包与发布管线、以及大量 UI 细节打磨和 bug 修复。共 **103 commits**，**66 files**，**+13,490/-1,586 lines**，测试从 1,030 增至 **1,081**（+51）。
