@@ -140,7 +140,8 @@ echo
 echo "Done."
 echo "  $ARCHIVE_PATH"
 echo
-echo "Upload:"
-echo "  gh release create v{app_version} --title 'v{app_version} — System Assets' $ARCHIVE_NAME"
-echo "  # or for existing release:"
-echo "  gh release upload v{app_version} $ARCHIVE_NAME"
+echo "Upload (to the 'system-media' release — the app checks releases/tags/system-media):"
+echo "  # first time:"
+echo "  gh release create system-media --title 'System Media' $ARCHIVE_NAME"
+echo "  # update existing:"
+echo "  gh release upload system-media --clobber $ARCHIVE_NAME"
