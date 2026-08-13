@@ -24,6 +24,9 @@ __pycache__/
 .venv/
 venv/
 
+# Node (asset export tooling)
+node_modules/
+
 # Runtime data (generated at runtime, not source)
 saves/
 media/
