@@ -13,6 +13,12 @@ cd "$PROJECT_DIR"
 
 # Extract version from __init__.py without importing (avoids dependency deadlock).
 VERSION=$($PYTHON -c "import re; print(re.search(r'__version__\s*=\s*\"(.+?)\"', open('src/storyloom/__init__.py', encoding='utf-8').read()).group(1))")
+# Launcher has its own independent version (bumped only when launcher.py changes).
+LAUNCHER_VER=$(head -1 launcher.version 2>/dev/null | tr -d '[:space:]' || true)
+if [ -z "$LAUNCHER_VER" ]; then
+    echo "ERROR: launcher.version missing or empty" >&2
+    exit 1
+fi
 PYI_FLAGS=""
 BIN_NAME="storyloom-web"
 LAUNCHER_NAME="Storyloom"
@@ -37,7 +43,7 @@ echo "=== Storyloom Web UI Build v${VERSION} ==="
 
 # 0. Clean previous build artifacts (dist + PyInstaller build cache only).
 echo "--- Cleaning previous builds ---"
-rm -rf build/ dist/*.whl dist/*.tar.gz dist/storyloom-v* dist/storyloom-web*
+rm -rf build/ dist/*.whl dist/*.tar.gz dist/storyloom-v* dist/storyloom-web* dist/Storyloom-v*
 
 # 0b. Ensure background-removal model is available (u2netp.onnx, ~4.4 MB).
 #     Bundled via --add-data into the main exe.  Downloaded once and cached.
@@ -113,16 +119,26 @@ $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
     --clean \
     src/storyloom/launcher.py
 
+# 3c. Package Launcher as a separate update asset — downloaded only when
+#     launcher.version bumps (independent of the app version).
+echo "--- Packaging launcher asset ---"
+mkdir -p build/launcher_asset
+cp "dist/$LAUNCHER_NAME" build/launcher_asset/
+cp launcher.version build/launcher_asset/
+$PYTHON -c "import shutil; shutil.make_archive('dist/Storyloom-v${LAUNCHER_VER}-${PLATFORM}', 'zip', 'build/launcher_asset')"
+
 # 4. Assemble release directory — ready-to-run structure for first install
-#    app/ holds versioned files replaced on update: binary, locale, pip pkgs.
+#    app/ holds versioned files replaced on update: binary + locale.
 #    Shared root holds user data: config, saves, media, system_media.
 echo "--- Assembling release directory ---"
 mkdir -p "$OUTPUT_DIR/app"
 cp "dist/$BIN_NAME" "$OUTPUT_DIR/app/"
 cp "dist/$LAUNCHER_NAME" "$OUTPUT_DIR/$LAUNCHER_NAME"
+cp launcher.version "$OUTPUT_DIR/"
 cp -r locale "$OUTPUT_DIR/app/"
 cp config.example.json "$OUTPUT_DIR/app/"
-cp "dist/storyloom-${VERSION}-"*.whl "dist/storyloom-${VERSION}.tar.gz" "$OUTPUT_DIR/app/"
+# wheel + sdist stay in dist/ as separate PyPI-channel assets — never inside
+# the binary payload (binary users don't need them; they bloat every update).
 
 # System media — extract from filtered zip into release directory.
 # Uses the same zip produced by pack_system_media.sh (skips thumbnails).
@@ -141,23 +157,20 @@ echo "--- Creating full release archive ---"
 FULL_ZIP="storyloom-v${VERSION}-${PLATFORM}"
 $PYTHON -c "import shutil; shutil.make_archive('dist/$FULL_ZIP', 'zip', 'dist/storyloom-v${VERSION}')"
 
-# 5b. App-only zip — for in-app updates.  Skips system_media/ to avoid
-#     re-downloading 250+ MB of assets on every version bump.
+# 5b. App-only zip — for in-app updates.  Contains only app/ (the binary
+#     payload).  Excludes the launcher (separate asset), wheel/sdist (PyPI
+#     channel), and system_media/ (separate layer).
 echo "--- Creating app-only release archive ---"
 APP_ZIP="storyloom-app-v${VERSION}-${PLATFORM}"
 $PYTHON -c "
 import os, zipfile
 root = 'dist/storyloom-v${VERSION}'
+app_dir = os.path.join(root, 'app')
 with zipfile.ZipFile('dist/$APP_ZIP.zip', 'w', zipfile.ZIP_DEFLATED) as zf:
-    for dirpath, dirnames, filenames in os.walk(root):
-        # Skip system_media/ entirely.
-        rel = os.path.relpath(dirpath, root)
-        if rel == 'system_media' or rel.startswith('system_media' + os.sep):
-            dirnames[:] = []  # don't descend
-            continue
+    for dirpath, dirnames, filenames in os.walk(app_dir):
         for fn in filenames:
             full = os.path.join(dirpath, fn)
-            arc = os.path.relpath(full, root)
+            arc = os.path.relpath(full, root)  # 'app/...'
             zf.write(full, arc)
             print(f'  + {arc}')
 print(f'Wrote dist/$APP_ZIP.zip  ({os.path.getsize(\"dist/$APP_ZIP.zip\") / 1024 / 1024:.0f} MiB)')
@@ -168,4 +181,5 @@ echo "=== Done ==="
 echo "Release dir:  $OUTPUT_DIR"
 echo "Full zip:     dist/${FULL_ZIP}.zip"
 echo "App zip:      dist/${APP_ZIP}.zip"
+echo "Launcher:     dist/Storyloom-v${LAUNCHER_VER}-${PLATFORM}.zip"
 ls -lh "$OUTPUT_DIR/"

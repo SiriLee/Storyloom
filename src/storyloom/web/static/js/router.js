@@ -710,7 +710,8 @@
                     var el = document.getElementById("update-current-ver");
                     if (el) el.textContent = result.app.current;
 
-                    if (!result.app.has_update && !result.system_media.has_update) {
+                    if (!result.app.has_update && !result.system_media.has_update
+                        && !(result.launcher && result.launcher.has_update)) {
                         showToast(_("Up to date"));
                         return;
                     }
@@ -1041,44 +1042,6 @@
         }
     }
 
-    /** Bind the update check/apply flow on the settings page. */
-    function _bindUpdateCheck() {
-        var currentVer = document.getElementById("update-current-ver");
-        if (!currentVer) return;
-
-        // Show current version instantly (no network call).
-        API.get("/api/version").then(function (result) {
-            if (currentVer) currentVer.textContent = result.version;
-        }).catch(function () {
-            if (currentVer) currentVer.textContent = "?";
-        });
-
-        var btnCheck = document.getElementById("btn-check-update");
-        if (!btnCheck) return;
-
-        btnCheck.addEventListener("click", function () {
-            btnCheck.disabled = true;
-            btnCheck.textContent = "...";
-
-            API.get("/api/update/check?force=true").then(function (result) {
-                btnCheck.disabled = false;
-                btnCheck.textContent = _("Check for Updates");
-                // Update version display
-                if (currentVer) currentVer.textContent = result.app.current;
-
-                if (!result.app.has_update && !result.system_media.has_update) {
-                    showToast(_("Up to date"));
-                    return;
-                }
-                _showUpdatePopup(result);
-            }).catch(function (err) {
-                btnCheck.disabled = false;
-                btnCheck.textContent = _("Check for Updates");
-                showToast(_("Check failed") + ": " + err.message);
-            });
-        });
-    }
-
     /** Show a centered modal for update download. */
     function _showUpdatePopup(result) {
         // Remove any existing popup
@@ -1100,6 +1063,14 @@
                 + '<strong>' + esc(_("System Media")) + '</strong> &nbsp; '
                 + esc(result.system_media.current) + ' → '
                 + esc(result.system_media.latest)
+                + '</div>';
+        }
+        if (result.launcher && result.launcher.has_update) {
+            layers.push("launcher");
+            rows += '<div class="update-popup-layer">'
+                + '<strong>' + esc(_("Launcher")) + '</strong> &nbsp; '
+                + esc(result.launcher.current) + ' → '
+                + esc(result.launcher.latest)
                 + '</div>';
         }
 

@@ -83,6 +83,7 @@ class UpdateCheckResult:
 
     app: VersionInfo
     system_media: VersionInfo
+    launcher: VersionInfo
 
 
 @dataclass
@@ -243,16 +244,43 @@ def _check_system_media_update(system_media_version: str) -> VersionInfo:
     )
 
 
+def _check_launcher_update(launcher_version: str) -> VersionInfo:
+    """Query ``releases/latest`` for the launcher layer.
+
+    The launcher is versioned independently of the app (its asset is
+    ``Storyloom-v{ver}-{platform}.zip``) and is only bumped when
+    ``launcher.py`` itself changes.
+
+    Returns a ``VersionInfo`` with ``latest=""`` on any error.
+    """
+    try:
+        release = _http_get_json(_GITHUB_API_LATEST)
+    except Exception:
+        return VersionInfo(current=launcher_version, latest="")
+
+    assets = release.get("assets", [])
+    url, ver = _find_asset_url(
+        assets, "Storyloom-v", platform_specific=True
+    )
+
+    return VersionInfo(
+        current=launcher_version,
+        latest=ver or "",
+        asset_url=url or "",
+    )
+
+
 def check_for_updates(
     app_version: str,
     system_media_version: str,
+    launcher_version: str,
     *,
     force: bool = False,
 ) -> UpdateCheckResult:
     """Check GitHub Releases for available updates.
 
-    Queries two independent releases:
-      - ``releases/latest`` for the app layer.
+    Queries two independent releases for three update layers:
+      - ``releases/latest`` for the app and launcher layers.
       - ``releases/tags/system-media`` for the system_media layer.
 
     Each layer fails independently — a network error on one never
@@ -261,6 +289,7 @@ def check_for_updates(
     Args:
         app_version: Current app version (``storyloom.__version__``).
         system_media_version: Current system_media version (from ``VERSION`` file).
+        launcher_version: Current launcher version (from ``launcher.version`` file).
         force: Bypass cache.
 
     Returns:
@@ -275,6 +304,7 @@ def check_for_updates(
     result = UpdateCheckResult(
         app=_check_app_update(app_version),
         system_media=_check_system_media_update(system_media_version),
+        launcher=_check_launcher_update(launcher_version),
     )
 
     _cache = {"ts": now, "data": result}
@@ -290,14 +320,19 @@ def download_and_extract(
     """Download a release zip and extract it to *target_root*.
 
     Args:
-        layer: ``"app"`` or ``"system_media"`` — determines extraction strategy.
+        layer: ``"app"``, ``"launcher"``, or ``"system_media"`` — determines
+            the extraction strategy.
         url: Download URL.
         target_root: Root directory for extraction.
         progress_callback: ``callable(UpdateProgress)`` for progress events.
 
-    For ``layer="app"``: zip contains ``app_new/`` (and optionally
-    ``launcher.new``).  Extracts to ``<target_root>/app_new/``, deleting
-    any stale ``app_new/`` first.
+    For ``layer="app"``: zip contains ``app/``.  Extracts to
+    ``<target_root>/app_new/``, deleting any stale ``app_new/`` first.
+
+    For ``layer="launcher"``: zip contains the launcher binary
+    (``Storyloom``/``Storyloom.exe``) and ``launcher.version``.  Stages
+    them as ``<target_root>/launcher.new`` and ``launcher.version`` for
+    the launcher's self-replace on next start.
 
     For ``layer="system_media"``: zip contents extracted directly into
     *target_root*, overwriting existing files.
@@ -347,16 +382,6 @@ def download_and_extract(
                     "Update zip does not contain app/ directory"
                 )
 
-            # Launcher self-update: zip ships "Storyloom",
-            # rename to "launcher.new" for the launcher's swap logic.
-            for candidate in ("Storyloom", "Storyloom.exe"):
-                p = os.path.join(extract_tmp, candidate)
-                if os.path.isfile(p):
-                    shutil.copy2(
-                        p, os.path.join(target_root, "launcher.new")
-                    )
-                    break
-
             if not os.path.isfile(
                 os.path.join(app_new, "storyloom-web")
             ) and not os.path.isfile(
@@ -366,7 +391,35 @@ def download_and_extract(
                     "Extracted app_new/ missing storyloom-web executable"
                 )
 
-        else:  # system_media
+        elif layer == "launcher":
+            os.makedirs(target_root, exist_ok=True)
+            extract_tmp = os.path.join(tmp_dir, "extract")
+            os.makedirs(extract_tmp, exist_ok=True)
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                zf.extractall(extract_tmp)
+
+            # Stage the launcher binary + version file for the launcher's
+            # self-replace on next start (see launcher.py).
+            staged = False
+            for candidate in ("Storyloom", "Storyloom.exe"):
+                p = os.path.join(extract_tmp, candidate)
+                if os.path.isfile(p):
+                    shutil.copy2(
+                        p, os.path.join(target_root, "launcher.new")
+                    )
+                    staged = True
+                    break
+            if not staged:
+                raise ValueError("Launcher zip missing Storyloom binary")
+
+            version_src = os.path.join(extract_tmp, "launcher.version")
+            if os.path.isfile(version_src):
+                shutil.copy2(
+                    version_src,
+                    os.path.join(target_root, "launcher.version"),
+                )
+
+        elif layer == "system_media":
             os.makedirs(target_root, exist_ok=True)
             with zipfile.ZipFile(zip_path, "r") as zf:
                 for member in zf.infolist():
@@ -388,6 +441,9 @@ def download_and_extract(
                     "Extracted system_media missing VERSION file"
                 )
 
+        else:
+            raise ValueError(f"Unknown layer: {layer!r}")
+
         _emit("done")
 
     finally:
@@ -395,7 +451,7 @@ def download_and_extract(
 
 
 def regenerate_launcher(target_dir: str) -> bool:
-    """Download and extract just the Launcher binary from the latest release.
+    """Download and extract just the Launcher binary from the launcher asset.
 
     Used by ``--regenerate-launcher`` to recover a deleted ``Storyloom`` /
     ``Storyloom.exe`` without downloading the full app update.
@@ -412,11 +468,11 @@ def regenerate_launcher(target_dir: str) -> bool:
     zip_path = os.path.join(tmp_dir, "release.zip")
 
     try:
-        # Get the download URL for the latest platform-specific release.
-        info = _check_app_update("0.0.0")  # dummy version — we need the URL
+        # Get the download URL for the latest platform-specific launcher asset.
+        info = _check_launcher_update("0.0.0")  # dummy version — we need the URL
         if not info.asset_url:
             print(
-                "Error: could not find download URL for latest release",
+                "Error: could not find download URL for launcher asset",
                 file=sys.stderr,
             )
             return False
@@ -429,11 +485,11 @@ def regenerate_launcher(target_dir: str) -> bool:
         with zipfile.ZipFile(zip_path, "r") as zf:
             zf.extractall(extract_tmp)
 
-        # The release zip ships "Storyloom" / "Storyloom.exe" at root.
+        # The launcher asset zip ships "Storyloom" / "Storyloom.exe" at root.
         src = os.path.join(extract_tmp, launcher_name)
         if not os.path.isfile(src):
             print(
-                f"Error: {launcher_name} not found in release zip",
+                f"Error: {launcher_name} not found in launcher asset",
                 file=sys.stderr,
             )
             return False
@@ -442,6 +498,14 @@ def regenerate_launcher(target_dir: str) -> bool:
         shutil.copy2(src, dest)
         if sys.platform != "win32":
             os.chmod(dest, 0o755)
+
+        # Restore the version file too so future update checks compare
+        # against the correct local version.
+        version_src = os.path.join(extract_tmp, "launcher.version")
+        if os.path.isfile(version_src):
+            shutil.copy2(
+                version_src, os.path.join(target_dir, "launcher.version")
+            )
 
         print(f"Launcher restored: {dest}")
         return True

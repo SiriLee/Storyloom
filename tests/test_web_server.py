@@ -786,6 +786,7 @@ def _make_no_update():
     return UpdateCheckResult(
         app=VersionInfo(current="1.3.0", latest="1.3.0"),
         system_media=VersionInfo(current="1.1.0", latest="1.1.0"),
+        launcher=VersionInfo(current="1.0.0", latest="1.0.0"),
     )
 
 
@@ -797,6 +798,8 @@ def _make_has_update():
                         asset_url="https://example.com/app.zip"),
         system_media=VersionInfo(current="1.1.0", latest="1.2.0",
                                   asset_url="https://example.com/sm.zip"),
+        launcher=VersionInfo(current="1.0.0", latest="1.1.0",
+                             asset_url="https://example.com/launcher.zip"),
     )
 
 

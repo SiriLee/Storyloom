@@ -295,12 +295,12 @@ class ConfigUpdate(BaseModel):
 
 
 class ApplyUpdateRequest(BaseModel):
-    layers: list[str]  # each must be "app" or "system_media"
+    layers: list[str]  # each must be "app", "launcher", or "system_media"
 
     @model_validator(mode="after")
     def _validate_layers(self):
         for layer in self.layers:
-            if layer not in ("app", "system_media"):
+            if layer not in ("app", "launcher", "system_media"):
                 raise ValueError(f"Unknown layer: {layer!r}")
         if not self.layers:
             raise ValueError("layers must not be empty")
@@ -1314,6 +1314,16 @@ def _get_system_media_version() -> str:
         return ""
 
 
+def _get_launcher_version() -> str:
+    """Read launcher version from launcher.version file, or '' if missing."""
+    version_file = os.path.join(_APP_DIR, "launcher.version")
+    try:
+        with open(version_file, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except (OSError, FileNotFoundError):
+        return ""
+
+
 @app.get("/api/version")
 async def app_version():
     """Return the current app version — no network call, instant response."""
@@ -1324,9 +1334,11 @@ async def app_version():
 async def update_check(force: bool = False):
     """Check GitHub Releases for available updates."""
     sm_ver = _get_system_media_version()
+    launcher_ver = _get_launcher_version()
     result = check_for_updates(
         app_version=__version__,
         system_media_version=sm_ver,
+        launcher_version=launcher_ver,
         force=force,
     )
     return result
@@ -1364,7 +1376,10 @@ async def update_stream(stream_id: str):
             layers = params["layers"]
             results = {}
             sm_ver = _get_system_media_version()
-            check = check_for_updates(__version__, sm_ver, force=False)
+            launcher_ver = _get_launcher_version()
+            check = check_for_updates(
+                __version__, sm_ver, launcher_ver, force=False
+            )
 
             for layer in layers:
                 if layer == "app" and check.app.has_update:
@@ -1372,6 +1387,8 @@ async def update_stream(stream_id: str):
                 elif layer == "system_media" and check.system_media.has_update:
                     url = check.system_media.asset_url
                     sm_target = os.path.join(_APP_DIR, "system_media")
+                elif layer == "launcher" and check.launcher.has_update:
+                    url = check.launcher.asset_url
                 else:
                     continue
 
@@ -1405,6 +1422,8 @@ async def update_stream(stream_id: str):
                     check.app.latest
                     if layer == "app"
                     else check.system_media.latest
+                    if layer == "system_media"
+                    else check.launcher.latest
                 )
 
             loop.call_soon_threadsafe(
