@@ -7,17 +7,18 @@
 
    _(msgid, opts) — i18n lookup via i18next.  Mirrors server-side gettext
               _() convention.  Keys are English source strings (msgid);
-              translations come from the i18next resource bundle in
-              i18n-resources.js (generated from .po files).
+              translations come from JSON resources under
+              web/static/locales/{lang}.json.
 
-   i18next is the frontend translation runtime; resources are inlined in
-   i18n-resources.js (loaded before this script).  .po is the single
-   authoritative source — no more dual-write.
+   i18next is the frontend translation runtime; resources are fetched per
+   language via the http backend (vendor/i18nextHttpBackend.min.js).
+   Frontend JSON and backend .po are independent (dual-source) — no
+   dual-write.
 
    Authority:
-     src/storyloom/i18n.py (gettext _() convention)
-     src/storyloom/locale/zh_CN/LC_MESSAGES/storyloom.po (authoritative)
-     src/storyloom/i18n_compile.py §generate_i18n_resources (build-time)
+     src/storyloom/i18n.py (backend gettext _() convention)
+     src/storyloom/locale/zh_CN/LC_MESSAGES/storyloom.po (backend strings)
+     src/storyloom/web/static/locales/{lang}.json (frontend strings)
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Shared constants ─────────────────────────────────────────────── */
@@ -62,12 +63,14 @@ const GameState = {
         this.saveFile = null;
     },
 
-    /** Set language and persist to localStorage. */
+    /** Set language and persist to localStorage.  Returns the
+     *  i18next.changeLanguage promise so callers can await the resource
+     *  load before re-rendering. */
     setLang(lang) {
         this.lang = lang;
         localStorage.setItem("storyloom-lang", lang);
         document.documentElement.lang = lang;
-        i18next.changeLanguage(lang);
+        return i18next.changeLanguage(lang);
     },
 };
 
@@ -276,7 +279,7 @@ async function initConfig() {
         } else {
             effectiveLang = data.language || "en";
         }
-        GameState.setLang(effectiveLang);
+        await GameState.setLang(effectiveLang);
         localStorage.setItem(SETTINGS_STORE + "lang", effectiveLang);
         /* If system mode, push the resolved language to the server so the
            stored config stays in sync (don't wait for explicit save). */
@@ -337,17 +340,23 @@ async function initConfig() {
     ThemeState.init();
 }
 
-// i18next — frontend translation runtime.  Resources are inlined in
-// i18n-resources.js (generated from locale/*.po); en is an empty identity
-// map, so i18next falls back to the English msgid (the key) when missing.
-i18next.init({
-    lng: GameState.lang,
-    fallbackLng: "en",
-    resources: window.STORYLOOM_I18N_RESOURCES,
-    // Interpolated values (condition text, state values) are inserted via
-    // textContent, not innerHTML — disable i18next's default HTML escaping.
-    interpolation: { escapeValue: false },
-});
+// i18next — frontend translation runtime.  Translations live in
+// /static/locales/{lang}.json (separate from the backend gettext .po
+// catalogs) and are fetched via the http backend.
+i18next.use(i18nextHttpBackend);
+
+/** Load translation resources.  Await before the first render so no view
+ *  paints in the untranslated (English-key) state. */
+async function initI18n() {
+    await i18next.init({
+        lng: GameState.lang,
+        fallbackLng: "en",
+        backend: { loadPath: "/static/locales/{{lng}}.json" },
+        // Interpolated values (condition text, state values) are inserted
+        // via textContent, not innerHTML — disable default HTML escaping.
+        interpolation: { escapeValue: false },
+    });
+}
 
 /**
  * Look up a translated string.

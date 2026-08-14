@@ -13,8 +13,11 @@ from setuptools.command.editable_wheel import editable_wheel as _editable_wheel
 
 
 def _compile_mo_files() -> None:
-    """Compile all .po files under ``src/storyloom/locale/`` to .mo (Babel)
-    and generate the frontend i18next resource bundle (polib)."""
+    """Compile all .po files under ``src/storyloom/locale/`` to .mo (Babel).
+
+    Frontend translations are a separate source (i18next JSON under
+    ``web/static/locales/``) and are not derived here.
+    """
     project_root = Path(__file__).resolve().parent
     src = project_root / "src"
 
@@ -28,17 +31,11 @@ def _compile_mo_files() -> None:
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     compile_all = mod.compile_all
-    generate_i18n_resources = mod.generate_i18n_resources
 
     locale_dir = project_root / "src" / "storyloom" / "locale"
     compiled = compile_all(str(locale_dir))
     if compiled:
         print(f"[i18n] compiled {len(compiled)} .mo file(s)")
-
-    # Generate the frontend i18next resource bundle from the .po files.
-    js_out = project_root / "src" / "storyloom" / "web" / "static" / "js" / "i18n-resources.js"
-    generate_i18n_resources(str(locale_dir), str(js_out))
-    print(f"[i18n] generated {js_out}")
 
 
 def _download_model() -> None:

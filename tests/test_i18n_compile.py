@@ -1,10 +1,9 @@
-"""Tests for the i18n build tools (Babel .mo compile + polib resource gen)."""
+"""Tests for the i18n build tool (Babel .po → .mo compile)."""
 
 import gettext
-import json
 from pathlib import Path
 
-from storyloom.i18n_compile import compile_all, generate_i18n_resources
+from storyloom.i18n_compile import compile_all
 
 
 def _write_po(locale_dir: Path, lang: str) -> None:
@@ -14,11 +13,12 @@ def _write_po(locale_dir: Path, lang: str) -> None:
         'msgstr ""\n'
         '"Language: ' + lang + '\\n"\n'
         '\n'
-        'msgid "About"\n'
-        'msgstr "关于"\n'
+        'msgid "(or write your own answer)"\n'
+        'msgstr "（或输入你自己的答案）"\n'
         '\n'
-        'msgid "Requires {{cond}}"\n'
-        'msgstr "需{{cond}}"\n'
+        'msgid "Describe the story you\'d like to play.\\n'
+        'e.g. \'A cyberpunk love story\' or \'A wuxia adventure\'"\n'
+        'msgstr "请描述你想玩的故事。\\n例如：\'赛博朋克\'"\n'
     )
     d = locale_dir / lang / "LC_MESSAGES"
     d.mkdir(parents=True, exist_ok=True)
@@ -39,24 +39,4 @@ class TestCompileAll:
         trans = gettext.translation(
             "storyloom", str(tmp_path), languages=["zh_CN"], fallback=True
         )
-        assert trans.gettext("About") == "关于"
-        assert trans.gettext("Requires {{cond}}") == "需{{cond}}"
-
-
-class TestGenerateI18nResources:
-    def test_generates_i18next_bundle(self, tmp_path):
-        _write_po(tmp_path, "zh_CN")
-        out = tmp_path / "i18n-resources.js"
-        generate_i18n_resources(str(tmp_path), str(out))
-
-        text = out.read_text(encoding="utf-8")
-        assert "window.STORYLOOM_I18N_RESOURCES" in text
-
-        # Strip the JS assignment wrapper and parse the JSON payload.
-        payload = text.split("=", 1)[1].rstrip(";\n")
-        resources = json.loads(payload)
-
-        assert set(resources) == {"en", "zh-CN"}
-        assert resources["en"] == {"translation": {}}
-        assert resources["zh-CN"]["translation"]["About"] == "关于"
-        assert "Requires {{cond}}" in resources["zh-CN"]["translation"]
+        assert trans.gettext("(or write your own answer)") == "（或输入你自己的答案）"

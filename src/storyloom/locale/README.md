@@ -1,28 +1,30 @@
-# locale — gettext translation catalogs
+# locale — backend gettext catalogs
 
-`locale/` holds the gettext `.po` UI-string catalogs, one per language under
-`locale/{lang}/LC_MESSAGES/storyloom.po`.  Long-form documents (guide,
-changelog, …) live in the sibling `src/storyloom/content/` tree — see below.
+`locale/` holds the **backend** gettext `.po` catalogs — a handful of strings
+emitted by the Python engine (co-creation prompts), translated for zh-CN and
+zh-TW.  Compiled to `.mo` at build time by `i18n_compile.py` (Babel) and
+loaded via gettext.
 
-Both trees are **package data** (`[tool.setuptools.package-data]` in
-`pyproject.toml`) and resolved at runtime via `importlib.resources` — so they
-ship in the pip wheel and are bundled by PyInstaller, identically.
+**Frontend translations are a separate source** — i18next JSON files under
+`src/storyloom/web/static/locales/{lang}.json` — not derived from these `.po`
+catalogs.  This is the dual-source layout: backend gettext + frontend i18next.
 
 | Kind | Location | Format | Flow |
 |------|----------|--------|------|
-| UI strings | `src/storyloom/locale/{lang}/LC_MESSAGES/storyloom.po` | gettext `.po` | `.po` → `.mo` (Babel, server gettext) + `i18n-resources.js` (polib → i18next frontend), via `i18n_compile.py` |
+| Backend strings | `src/storyloom/locale/{lang}/LC_MESSAGES/storyloom.po` | gettext `.po` | `.po` → `.mo` (Babel) → server gettext `_()` |
+| Frontend strings | `src/storyloom/web/static/locales/{lang}.json` | i18next JSON | fetched by i18next http-backend at `GET /static/locales/{lang}.json` |
 | Long-form content | `src/storyloom/content/{lang}/{doc}.md` | Markdown | served at `GET /content/{lang}/{doc}` (`web/server.py`); loaded by `loadLocalizedContent(doc)` with fallback to `en` |
 
 Language codes: `locale/` gettext directories use POSIX locale names
-(`zh_CN`, `zh_TW`, `en`) as required by gettext; `content/` directories use
-BCP-47 (`zh-CN`, `zh-TW`, `en`) to match the app/URL language codes directly.
+(`zh_CN`, `zh_TW`, `en`) as required by gettext; `locales/` and `content/`
+directories use BCP-47 (`zh-CN`, `zh-TW`, `en`) to match the app/URL codes.
 
-`en` is the source language — it holds `content/` but no `LC_MESSAGES/`
-(English strings are the `msgid` source in the `.po` files).
+`en` is the source language — no `en` `.po` (English strings are the `msgid`
+source) and no `en` entries in the frontend JSON (i18next falls back to the
+key).  To add a backend string: add the `_()` call in Python, then the
+`msgid`/`msgstr` pair here.  To add a frontend string: add the `_()` call in
+JS, then the key/value in `web/static/locales/{lang}.json`.
 
-To add a long-form document: drop `content/{lang}/{doc}.md` for each
-language and call `loadLocalizedContent("doc")` — no server change needed.
-
-Why content isn't in `.po`: gettext `msgid`/`msgstr` targets short UI
-strings; paragraph-level Markdown is *content*, so it lives as per-locale
-files (the Docusaurus / Next.js pattern).
+Why dual-source instead of one `.po` for everything: gettext `.po` targets
+short backend strings; the frontend uses i18next natively, and a TMS
+(Crowdin/Weblate) can export both formats from one project.

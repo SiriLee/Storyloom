@@ -54,6 +54,7 @@
     // ── Bootstrap ──────────────────────────────────────────────────
 
     async function init() {
+        await initI18n();
         await initConfig();
         window.addEventListener("hashchange", dispatch);
         dispatch();
@@ -912,7 +913,7 @@
 
         /* Language button grid */
         container.querySelectorAll(".lang-btn:not([disabled])").forEach(function (btn) {
-            btn.addEventListener("click", function () {
+            btn.addEventListener("click", async function () {
                 var val = this.dataset.lang;
                 if (val === "system") {
                     setLangMode("system");
@@ -921,7 +922,7 @@
                     setLangMode("manual");
                 }
                 applySetting("lang", val);
-                GameState.setLang(val);
+                await i18next.changeLanguage(val);
                 renderSettings();
             });
         });

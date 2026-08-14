@@ -67,4 +67,4 @@ class TestI18NTranslate:
         compile_all(str(tmp_locale))
 
         init_i18n("zh-CN", locale_dir=str(tmp_locale))
-        assert _("About") == "关于"
+        assert _("(or write your own answer)") == "（或输入你自己的答案）"
