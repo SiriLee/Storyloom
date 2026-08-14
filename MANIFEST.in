@@ -1,2 +1,4 @@
 graft src/storyloom/web/static
-graft locale
+graft src/storyloom/locale
+graft src/storyloom/content
+global-exclude *.mo

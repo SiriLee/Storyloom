@@ -100,7 +100,8 @@ echo "--- Building standalone executable ---"
 $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
     --name "$BIN_NAME" \
     --icon "$ICON" \
-    --add-data "locale${ADD_SEP}locale" \
+    --add-data "src/storyloom/locale${ADD_SEP}storyloom/locale" \
+    --add-data "src/storyloom/content${ADD_SEP}storyloom/content" \
     --add-data "src/storyloom/web/static${ADD_SEP}storyloom/web/static" \
     --add-data "src/storyloom/core/lang_meta${ADD_SEP}storyloom/core/lang_meta" \
     --add-data "src/storyloom/models${ADD_SEP}storyloom/models" \
@@ -128,14 +129,14 @@ cp launcher.version build/launcher_asset/
 $PYTHON -c "import shutil; shutil.make_archive('dist/storyloom-launcher-v${LAUNCHER_VER}-${PLATFORM}', 'zip', 'build/launcher_asset')"
 
 # 4. Assemble release directory — ready-to-run structure for first install
-#    app/ holds versioned files replaced on update: binary + locale.
+#    app/ holds versioned files replaced on update: the binary (locale and
+#    content are baked into the --onefile binary as package data).
 #    Shared root holds user data: config, saves, media, system_media.
 echo "--- Assembling release directory ---"
 mkdir -p "$OUTPUT_DIR/app"
 cp "dist/$BIN_NAME" "$OUTPUT_DIR/app/"
 cp "dist/$LAUNCHER_NAME" "$OUTPUT_DIR/$LAUNCHER_NAME"
 cp launcher.version "$OUTPUT_DIR/"
-cp -r locale "$OUTPUT_DIR/app/"
 cp config.example.json "$OUTPUT_DIR/app/"
 # wheel + sdist stay in dist/ as separate PyPI-channel assets — never inside
 # the binary payload (binary users don't need them; they bloat every update).

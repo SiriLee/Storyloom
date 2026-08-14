@@ -1,8 +1,8 @@
-# Storyloom translations — Traditional Chinese (zh-TW)
+# Storyloom translations
 msgid ""
 msgstr ""
 "Project-Id-Version: Storyloom\n"
-"Language: zh_TW\n"
+"Language: zh_CN\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
@@ -12,16 +12,16 @@ msgid ""
 "Describe the story you'd like to play.\n"
 "e.g. 'A cyberpunk love story' or 'A wuxia adventure'"
 msgstr ""
-"請描述你想玩的故事。\n"
-"例如：'賽博龐克背景下的愛情故事'、'古代仙俠世界的冒險'"
+"请描述你想玩的故事。\n"
+"例如：'赛博朋克背景下的爱情故事'、'古代仙侠世界的冒险'"
 
 msgid "Please share some thoughts to begin."
-msgstr "請輸入一些想法來開始。"
+msgstr "请输入一些想法来开始。"
 
 # ── Co-creation: LLM output templates (shown to user by LLM) ──
 
 msgid "(or write your own answer)"
-msgstr "（或輸入你自己的答案）"
+msgstr "（或输入你自己的答案）"
 
 # ── Web UI: main menu ──
 
@@ -29,173 +29,173 @@ msgid "Storyloom"
 msgstr "Storyloom"
 
 msgid "AI Real-Time Visual Novel"
-msgstr "AI 即時視覺小說"
+msgstr "AI 实时视觉小说"
 
 msgid "New Game"
-msgstr "新遊戲"
+msgstr "新游戏"
 
 msgid "Continue"
-msgstr "繼續"
+msgstr "继续"
 
 msgid "Load Save"
-msgstr "讀取存檔"
+msgstr "读取存档"
 
 msgid "Settings"
-msgstr "設定"
+msgstr "设置"
 
 msgid "About"
-msgstr "關於"
+msgstr "关于"
 
 msgid "Issue Tracker"
-msgstr "問題回饋"
+msgstr "问题反馈"
 
 msgid "Project & Community"
-msgstr "專案與社群"
+msgstr "项目与社区"
 
 msgid "Source Code"
-msgstr "原始碼"
+msgstr "源代码"
 
 msgid "Credits"
-msgstr "製作人員"
+msgstr "制作人员"
 
 msgid "Exit"
 msgstr "退出"
 
 msgid "Recent Saves"
-msgstr "最近存檔"
+msgstr "最近存档"
 
 msgid "No saves found"
-msgstr "暫無存檔"
+msgstr "暂无存档"
 
 msgid "Language"
-msgstr "語言"
+msgstr "语言"
 
 msgid "API Base URL"
-msgstr "API 位址"
+msgstr "API 地址"
 
 msgid "API Key"
-msgstr "API 金鑰"
+msgstr "API 密钥"
 
 msgid "Model"
 msgstr "模型"
 
 msgid "Image API URL"
-msgstr "圖像 API 位址"
+msgstr "图像 API 地址"
 
 msgid "Image API Key"
-msgstr "圖像 API 金鑰"
+msgstr "图像 API 密钥"
 
 msgid "Image Model"
-msgstr "圖像模型"
+msgstr "图像模型"
 
 msgid "Sprite Cutout"
-msgstr "立繪去底"
+msgstr "立绘去底"
 
 msgid "Connection lost"
-msgstr "連線中斷"
+msgstr "连接断开"
 
 msgid "Download"
-msgstr "下載"
+msgstr "下载"
 
 msgid "Done"
 msgstr "完成"
 
 msgid "Auto"
-msgstr "自動"
+msgstr "自动"
 
 msgid "Always"
-msgstr "總是"
+msgstr "总是"
 
 msgid "Never"
-msgstr "從不"
+msgstr "从不"
 
 # ── Web UI: credits ──
 
 msgid "Engine & System Architecture"
-msgstr "引擎 & 系統架構"
+msgstr "引擎 & 系统架构"
 
 msgid "Web Interface"
-msgstr "Web 介面"
+msgstr "Web 界面"
 
 # ── Web UI: co-create ──
 
 msgid "Co-Create"
-msgstr "共創設定"
+msgstr "共创设定"
 
 msgid "Start"
-msgstr "開始"
+msgstr "开始"
 
 msgid "Send"
-msgstr "發送"
+msgstr "发送"
 
 msgid "Type your story idea..."
-msgstr "輸入你的故事想法..."
+msgstr "输入你的故事想法..."
 
 msgid "Type your answer..."
-msgstr "輸入你的回答..."
+msgstr "输入你的回答..."
 
 msgid "Retry"
-msgstr "重試"
+msgstr "重试"
 
 msgid "Thinking"
 msgstr "正在思考"
 
 msgid "Generating settings"
-msgstr "正在生成設定"
+msgstr "正在生成设定"
 
 msgid "Please send a message first."
-msgstr "請先發送訊息。"
+msgstr "请先发送消息。"
 
 # ── Web UI: game preview ──
 
 msgid "Begin Adventure"
-msgstr "開始冒險"
+msgstr "开始冒险"
 
 # ── Web UI: shared ──
 
 msgid "Loading..."
-msgstr "載入中..."
+msgstr "加载中..."
 
 msgid "Save"
-msgstr "存檔"
+msgstr "存档"
 
 msgid "Delete"
-msgstr "刪除"
+msgstr "删除"
 
 msgid "Load"
-msgstr "載入"
+msgstr "加载"
 
 msgid "Edit"
-msgstr "編輯"
+msgstr "编辑"
 
 msgid "Cancel"
 msgstr "取消"
 
 msgid "Back to Menu"
-msgstr "返回主選單"
+msgstr "返回主菜单"
 
 msgid "Goodbye"
-msgstr "再見"
+msgstr "再见"
 
 msgid "You may close this tab."
-msgstr "你可以關閉此分頁。"
+msgstr "你可以关闭此标签页。"
 
 msgid "Something went wrong"
-msgstr "出了點問題"
+msgstr "出了点问题"
 
 msgid "Saved"
-msgstr "存檔已更新"
+msgstr "存档已更新"
 
 # ── Web UI: save browser ──
 
 msgid "Delete this game?"
-msgstr "確定刪除此遊戲？"
+msgstr "确定删除此游戏？"
 
 msgid "Delete this save?"
-msgstr "確定刪除此存檔？"
+msgstr "确定删除此存档？"
 
 msgid "This cannot be undone."
-msgstr "此操作無法復原。"
+msgstr "此操作无法撤销。"
 
 msgid "Yes"
 msgstr "是"
@@ -204,61 +204,61 @@ msgid "No"
 msgstr "否"
 
 msgid "No saves in this game."
-msgstr "此遊戲暫無存檔。"
+msgstr "此游戏暂无存档。"
 
 msgid "Game deleted."
-msgstr "遊戲已刪除。"
+msgstr "游戏已删除。"
 
 msgid "Save deleted."
-msgstr "存檔已刪除。"
+msgstr "存档已删除。"
 
 msgid "saves"
-msgstr "個存檔"
+msgstr "个存档"
 
 msgid "Restart"
-msgstr "重新開始"
+msgstr "重新开始"
 
 # ── Web UI: adventure log ──
 
 msgid "Generating adventure log..."
-msgstr "正在生成冒險日誌..."
+msgstr "正在生成冒险日志..."
 
 msgid "Quit"
 msgstr "退出"
 
 msgid "Quit the game?"
-msgstr "確定退出遊戲？"
+msgstr "确定退出游戏？"
 
 msgid "Export"
-msgstr "匯出"
+msgstr "导出"
 
 msgid "Adventure log timed out."
-msgstr "冒險日誌生成逾時。"
+msgstr "冒险日志生成超时。"
 
 msgid "The story has ended. View adventure log."
-msgstr "故事已結束，檢視冒險日誌"
+msgstr "故事已结束，查看冒险日志"
 
 # ── Web UI: disabled options (exec-flow.md §4.6) ──
 
 msgid "unavailable"
 msgstr "不可用"
 
-msgid "Requires {cond}, current: {val}"
-msgstr "需{cond}，目前：{val}"
+msgid "Requires {{cond}}, current: {{val}}"
+msgstr "需{{cond}}，当前：{{val}}"
 
-msgid "Requires {cond}"
-msgstr "需{cond}"
+msgid "Requires {{cond}}"
+msgstr "需{{cond}}"
 
 # ── Web UI: game narrative ──
 
 msgid "Loading"
-msgstr "載入中"
+msgstr "加载中"
 
 msgid "Speed"
 msgstr "生成速度"
 
 msgid "Font Size"
-msgstr "字型大小"
+msgstr "字体大小"
 
 msgid "Small"
 msgstr "小"
@@ -270,59 +270,59 @@ msgid "Large"
 msgstr "大"
 
 msgid "Line Spacing"
-msgstr "行間距"
+msgstr "行间距"
 
 msgid "Close"
-msgstr "關閉"
+msgstr "关闭"
 
 msgid "Toggle Mode"
-msgstr "切換模式"
+msgstr "切换模式"
 
 msgid "Switch to Auto"
-msgstr "切換至自動模式"
+msgstr "切换至自动模式"
 
 msgid "Switch to Manual"
-msgstr "切換至手動模式"
+msgstr "切换至手动模式"
 
 msgid "Choice send failed: "
-msgstr "選項發送失敗: "
+msgstr "选项发送失败: "
 
 msgid "Game start failed: "
-msgstr "遊戲啟動失敗: "
+msgstr "游戏启动失败: "
 
 msgid "Retry failed: "
-msgstr "重試失敗: "
+msgstr "重试失败: "
 
 msgid "Unknown error"
-msgstr "未知錯誤"
+msgstr "未知错误"
 
 msgid "OK"
-msgstr "確定"
+msgstr "确定"
 
 msgid "Config Version Mismatch"
-msgstr "設定檔版本不符"
+msgstr "配置版本不匹配"
 
 msgid "Your configuration file is from an older version and needs to be reset. Please note down your API keys and other settings before continuing."
-msgstr "您的設定檔版本過舊，需要重置。請在繼續前記下您的 API 金鑰等重要設定。"
+msgstr "您的配置文件版本过旧，需要重置。请在继续前记下您的 API 密钥等重要设置。"
 
 msgid "Reset and Restart"
-msgstr "重置並重啟"
+msgstr "重置并重启"
 
 msgid "Configuration reset. Please restart the application."
-msgstr "設定已重置，請重新啟動程式。"
+msgstr "配置已重置，请重新启动程序。"
 
 msgid "Exit Application"
-msgstr "退出程式"
+msgstr "退出程序"
 
 msgid "Current version:"
-msgstr "目前版本："
+msgstr "当前版本："
 
 msgid "Expected version:"
 msgstr "期望版本："
 
 # §7.7: graph mode UI strings
 msgid "Display Speed"
-msgstr "顯示速度"
+msgstr "显示速度"
 
 msgid "Backlog"
 msgstr "回看"
@@ -331,16 +331,16 @@ msgid "Immersive Mode"
 msgstr "沉浸模式"
 
 msgid "Preparing your world"
-msgstr "正在準備你的世界"
+msgstr "正在准备你的世界"
 
 msgid "Game Mode"
-msgstr "遊戲模式"
+msgstr "游戏模式"
 
 msgid "Text"
-msgstr "文字"
+msgstr "文本"
 
 msgid "Graph"
-msgstr "圖像"
+msgstr "图像"
 
 msgid "Slow"
 msgstr "慢"
@@ -353,48 +353,48 @@ msgid "Asset Management"
 msgstr "素材管理"
 
 msgid "Clean Unused"
-msgstr "自動清理"
+msgstr "自动清理"
 
 msgid "In Use"
 msgstr "使用中"
 
 msgid "Asset in use, cannot delete"
-msgstr "素材使用中，無法刪除"
+msgstr "素材使用中，无法删除"
 
 msgid "Cleanup complete."
 msgstr "清理完成"
 
 msgid "Cleanup complete, but many in-use assets remain. Try deleting old saves first."
-msgstr "清理完成，但使用中素材較多，建議刪除存檔再次嘗試"
+msgstr "清理完成，但使用中素材较多，建议删除存档再次尝试"
 
 msgid "Delete this asset?"
-msgstr "確定刪除此素材？"
+msgstr "确定删除此素材？"
 
 msgid "Asset deleted."
-msgstr "素材已刪除"
+msgstr "素材已删除"
 
 msgid "Character Portrait"
-msgstr "角色立繪"
+msgstr "角色立绘"
 
 msgid "Background Image"
-msgstr "背景圖片"
+msgstr "背景图片"
 
 msgid "Developers"
-msgstr "開發者"
+msgstr "开发者"
 
 msgid "Contributors"
-msgstr "貢獻者"
+msgstr "贡献者"
 
 # ── Auto-update ──
 
 msgid "App Core"
-msgstr "程式核心"
+msgstr "程序核心"
 
 msgid "System"
-msgstr "系統"
+msgstr "系统"
 
 msgid "Network Proxy"
-msgstr "網路代理"
+msgstr "网络代理"
 
 msgid "Proxy URL"
 msgstr "代理地址"
@@ -403,49 +403,49 @@ msgid "e.g. http://127.0.0.1:7890"
 msgstr "例如：http://127.0.0.1:7890"
 
 msgid "Supports HTTP/SOCKS5. Leave empty to use system default."
-msgstr "支援 HTTP/SOCKS5，留空則不使用代理"
+msgstr "支持 HTTP/SOCKS5，留空则不使用代理"
 
 msgid "Check failed"
-msgstr "檢查失敗"
+msgstr "检查失败"
 
 msgid "Check for Updates"
-msgstr "檢查更新"
+msgstr "检查更新"
 
 msgid "Current Version"
-msgstr "目前版本"
+msgstr "当前版本"
 
 msgid "Downloading..."
-msgstr "下載中..."
+msgstr "下载中..."
 
 msgid "Extracting..."
 msgstr "提取中..."
 
 msgid "GitHub rate limit, try again later"
-msgstr "GitHub 限流，請稍後再試"
+msgstr "GitHub 限流，请稍后再试"
 
 msgid "Launcher"
-msgstr "啟動器"
+msgstr "启动器"
 
 msgid "Network error"
-msgstr "網路錯誤"
+msgstr "网络错误"
 
 msgid "Not found"
 msgstr "未找到"
 
 msgid "Please restart via Storyloom."
-msgstr "請透過 Storyloom 重新啟動。"
+msgstr "请通过 Storyloom 重新启动。"
 
 msgid "Request timed out"
-msgstr "請求逾時"
+msgstr "请求超时"
 
 msgid "Server error"
-msgstr "伺服器錯誤"
+msgstr "服务器错误"
 
 msgid "System Media"
-msgstr "系統素材"
+msgstr "系统素材"
 
 msgid "Unexpected response"
-msgstr "回應異常"
+msgstr "响应异常"
 
 msgid "Up to date"
 msgstr "已是最新"
@@ -457,75 +457,75 @@ msgid "Update Available"
 msgstr "有可用更新"
 
 msgid "Update check partial failure"
-msgstr "部分更新檢查失敗"
+msgstr "部分更新检查失败"
 
 msgid "Update failed"
-msgstr "更新失敗"
+msgstr "更新失败"
 
 msgid "Update ready"
-msgstr "更新就緒"
+msgstr "更新就绪"
 
 # ── 2026-08-10 Frontend Redesign: new strings ──
 
 msgid "General"
-msgstr "一般"
+msgstr "通用"
 
 msgid "API"
 msgstr "API"
 
 msgid "API Configuration"
-msgstr "API 設定"
+msgstr "API 配置"
 
 msgid "API Guide"
 msgstr "API 指南"
 
 msgid "Image"
-msgstr "影像"
+msgstr "图像"
 
 msgid "Image Generation"
-msgstr "影像生成"
+msgstr "图像生成"
 
 msgid "Appearance"
-msgstr "外觀"
+msgstr "外观"
 
 msgid "Theme"
-msgstr "主題"
+msgstr "主题"
 
 msgid "Theme: System"
-msgstr "主題：跟隨系統"
+msgstr "主题：跟随系统"
 
 msgid "Theme: Dark"
-msgstr "主題：深色"
+msgstr "主题：深色"
 
 msgid "Theme: Light"
-msgstr "主題：淺色"
+msgstr "主题：浅色"
 
 msgid "Toggle Theme"
-msgstr "切換主題"
+msgstr "切换主题"
 
 msgid "Dark"
 msgstr "深色"
 
 msgid "Light"
-msgstr "淺色"
+msgstr "浅色"
 
 msgid "Updates"
 msgstr "更新"
 
 msgid "API guide unavailable. Please check your installation."
-msgstr "API 指南無法使用。請檢查安裝。"
+msgstr "API 指南不可用。请检查安装。"
 
 msgid "Failed to render API guide."
-msgstr "API 指南渲染失敗。"
+msgstr "API 指南渲染失败。"
 
 msgid "Failed to save settings"
-msgstr "設定儲存失敗"
+msgstr "设置保存失败"
 
 msgid "Connection lost. Please try again."
-msgstr "連線已中斷，請重試。"
+msgstr "连接已断开，请重试。"
 
 msgid "Background removal model not available"
-msgstr "背景移除模型無法使用"
+msgstr "背景移除模型不可用"
 
 msgid "Generating"
 msgstr "生成中"
@@ -534,13 +534,13 @@ msgid "complete"
 msgstr "完成"
 
 msgid "failed"
-msgstr "失敗"
+msgstr "失败"
 
 msgid "fallback failed"
-msgstr "備選失敗"
+msgstr "备选失败"
 
 msgid "fallback selected"
-msgstr "備選配對"
+msgstr "备选匹配"
 
 msgid "generated"
 msgstr "已生成"
@@ -549,96 +549,96 @@ msgid "generating..."
 msgstr "生成中..."
 
 msgid "matched"
-msgstr "已配對"
+msgstr "已匹配"
 
 msgid "matching..."
-msgstr "配對中..."
+msgstr "匹配中..."
 
 msgid "images..."
-msgstr "影像..."
+msgstr "图像..."
 
 msgid "to generate"
 msgstr "待生成"
 
 msgid "Connecting..."
-msgstr "連線中..."
+msgstr "连接中..."
 
 msgid "Download"
-msgstr "下載"
+msgstr "下载"
 
 msgid "unavailable"
-msgstr "無法使用"
+msgstr "不可用"
 
 msgid "All assets ready"
-msgstr "所有素材就緒"
+msgstr "所有素材就绪"
 
 msgid "Building Your World"
-msgstr "構建你的世界"
+msgstr "构建你的世界"
 
 msgid "Characters"
 msgstr "角色"
 
 msgid "Generating images..."
-msgstr "生成影像中..."
+msgstr "生成图像中..."
 
 msgid "Generating settings"
-msgstr "生成設定中"
+msgstr "生成设置中"
 
 msgid "Matching entities to library assets..."
-msgstr "配對實體到素材庫..."
+msgstr "匹配实体到素材库..."
 
 msgid "Prebuild failed"
-msgstr "預構建失敗"
+msgstr "预构建失败"
 
 msgid "Scenes"
-msgstr "場景"
+msgstr "场景"
 
 msgid "Image API"
-msgstr "影像 API"
+msgstr "图像 API"
 
 msgid "Accent Color"
-msgstr "強調色"
+msgstr "强调色"
 
 msgid "Green"
-msgstr "綠色"
+msgstr "绿色"
 
 msgid "Emerald"
-msgstr "翡翠綠"
+msgstr "翡翠绿"
 
 msgid "Blue"
-msgstr "藍色"
+msgstr "蓝色"
 
 msgid "Amber"
 msgstr "琥珀色"
 
 msgid "Rose"
-msgstr "玫瑰紅"
+msgstr "玫瑰红"
 
 msgid "Violet"
-msgstr "紫羅蘭"
+msgstr "紫罗兰"
 
 msgid "Image API"
-msgstr "影像 API"
+msgstr "图像 API"
 
 # ── Generate view (streaming section cards) ──
 
 msgid "Creating Your Story"
-msgstr "創造你的故事"
+msgstr "创造你的故事"
 
 msgid "Story Setting"
-msgstr "故事設定"
+msgstr "故事设定"
 
 msgid "Story Structure"
-msgstr "故事結構"
+msgstr "故事结构"
 
 msgid "Variables"
-msgstr "變數"
+msgstr "变量"
 
 msgid "chapters"
-msgstr "個章節"
+msgstr "个章节"
 
 msgid "branches"
-msgstr "條分支"
+msgstr "条分支"
 
 msgid "protagonist"
 msgstr "主角"
@@ -650,4 +650,4 @@ msgid "antagonist"
 msgstr "反派"
 
 msgid "Building"
-msgstr "正在構建"
+msgstr "正在构建"

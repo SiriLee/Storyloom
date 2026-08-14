@@ -1,243 +1,98 @@
-"""Pure-Python .po → .mo compiler.  Zero dependencies beyond stdlib.
+"""i18n build tools — compile gettext catalogs + generate i18next resources.
 
-Used by the build step so that ``pip install`` automatically compiles
-gettext translations — users never need to install ``msgfmt`` or run
-anything by hand.
+Replaces the former hand-rolled ``.po``→``.mo`` compiler with the standard
+toolchain:
 
-Reference: GNU gettext .mo binary format (little-endian).
+- ``compile_all`` uses Babel (``babel.messages``) to compile ``.po`` → ``.mo``
+  (correct header/plural handling).
+- ``generate_i18n_resources`` uses polib to read ``.po`` and emit the i18next
+  resource bundle consumed by the frontend.
 
-Known limitations (technical debt, not a bug): this hand-rolled compiler
-and the ``generate_js_dict`` frontend dictionary intentionally cover only
-the current scope (3 languages, singular strings, no context).  They do NOT
-support:
-  • plurals — ``msgid_plural`` / ``msgstr[n]`` and the ``Plural-Forms`` header
-  • ``msgctxt`` — contextual disambiguation of identical source strings
-  • fuzzy filtering — a ``#, fuzzy`` entry is emitted as-is (not skipped)
-  • interpolation / ICU placeholders in the frontend ``T`` dict
-
-Upgrade trigger: switch the .mo path to ``babel``/``polib`` and the frontend
-to ``i18next`` (or FormatJS) the moment any of the above is required — e.g.
-adding a language with plural rules, or needing context/interpolation.
+Both run at build time (``setup.py`` command hooks) or manually via
+``python -m storyloom.i18n_compile``.  ``.mo`` files are build artifacts
+(gitignored); ``i18n-resources.js`` is committed so the frontend works in a
+fresh checkout without running a build.
 """
 
-import struct
+import json
 from pathlib import Path
 
-_MAGIC = 0x950412DE
+from babel.messages.mofile import write_mo
+from babel.messages.pofile import read_po
 
-
-def compile_po_file(po_path: str, mo_path: str) -> None:
-    """Compile a single .po file to a .mo binary catalog."""
-    entries = _parse_po(po_path)
-    _write_mo(entries, mo_path)
+import polib
 
 
 def compile_all(locale_dir: str) -> list[str]:
-    """Compile every .po under *locale_dir*.
+    """Compile every ``.po`` under *locale_dir* to a ``.mo`` using Babel.
 
-    Returns the list of .mo paths that were written.
+    Returns the list of ``.mo`` paths written.
     """
     compiled: list[str] = []
     for po_file in Path(locale_dir).rglob("*.po"):
-        mo_file = str(po_file.with_suffix(".mo"))
-        compile_po_file(str(po_file), mo_file)
-        compiled.append(mo_file)
+        mo_file = po_file.with_suffix(".mo")
+        with open(po_file, "rb") as fh:
+            catalog = read_po(fh)
+        with open(mo_file, "wb") as fh:
+            write_mo(fh, catalog)
+        compiled.append(str(mo_file))
     return compiled
 
 
-# ── .po parser ──────────────────────────────────────────────────────
+def generate_i18n_resources(locale_dir: str, output_path: str) -> None:
+    """Generate the i18next resource bundle from ``.po`` files.
 
-def _parse_po(path: str) -> list[tuple[str, str]]:
-    """Return ordered (msgid, msgstr) pairs from a .po file.
+    Reads every ``*.po`` under *locale_dir*, derives the BCP-47 language code
+    from the directory name (``zh_CN`` → ``zh-CN``), and writes
+    ``window.STORYLOOM_I18N_RESOURCES = {...}`` to *output_path*.
 
-    Includes the header entry (empty msgid → metadata) so the .mo is
-    byte-identical with what msgfmt produces.
-    """
-    entries: list[tuple[str, str]] = []
-    msgid: list[str] = []
-    msgstr: list[str] = []
-    active: str | None = None  # 'msgid' or 'msgstr'
-
-    def _flush() -> None:
-        nonlocal msgid, msgstr, active
-        entries.append(("".join(msgid), "".join(msgstr)))
-        msgid, msgstr, active = [], [], None
-
-    with open(path, "r", encoding="utf-8") as fh:
-        for raw in fh:
-            line = raw.rstrip("\n")
-            if line.startswith("msgid "):
-                if active is not None:
-                    _flush()
-                msgid.append(_unquote(line, "msgid "))
-                active = "msgid"
-            elif line.startswith("msgstr "):
-                msgstr.append(_unquote(line, "msgstr "))
-                active = "msgstr"
-            elif line.startswith('"') and active is not None:
-                buf = msgid if active == "msgid" else msgstr
-                buf.append(_unquote(line))
-
-    if active is not None:
-        _flush()
-
-    return entries
-
-
-def _unquote(line: str, prefix: str = "") -> str:
-    """Extract and unescape a quoted .po string.
-
-    .po escape sequences (``\\n``, ``\\t``, ``\\\\``, ``\\"``) are
-    converted to their literal characters.
-    """
-    if prefix:
-        line = line[len(prefix):]
-    if len(line) >= 2 and line.startswith('"') and line.endswith('"'):
-        line = line[1:-1]
-    # Unescape .po escape sequences
-    return line.replace("\\\\", "\x00").replace('\\"', '"').replace("\\n", "\n").replace("\\t", "\t").replace("\x00", "\\")
-
-
-# ── .mo writer ──────────────────────────────────────────────────────
-
-def _write_mo(entries: list[tuple[str, str]], path: str) -> None:
-    """Write a GNU .mo binary catalog.
-
-    Layout::
-        [28-byte header][orig-table][trans-table][orig-data][trans-data]
-
-    Each string is NUL-terminated in the data region, but the length
-    field in the table **excludes** the NUL (matching msgfmt).
-    """
-    N = len(entries)
-    if N == 0:
-        return
-
-    # --- encoded strings with NUL terminators ----------------------------------
-    orig_b: list[bytes] = [o.encode("utf-8") + b"\x00" for o, _ in entries]
-    trans_b: list[bytes] = [t.encode("utf-8") + b"\x00" for _, t in entries]
-
-    # --- fixed offsets ----------------------------------------------------------
-    HEADER = 28
-    ORIG_TABLE = HEADER
-    TRANS_TABLE = HEADER + N * 8
-    DATA_START = TRANS_TABLE + N * 8
-
-    total_orig = sum(len(b) for b in orig_b)
-
-    # --- build tables -----------------------------------------------------------
-    orig_table = bytearray()
-    trans_table = bytearray()
-
-    orig_pos = DATA_START
-    trans_pos = DATA_START + total_orig
-
-    for ob, tb in zip(orig_b, trans_b):
-        # length *excludes* the trailing NUL
-        orig_table += struct.pack("<II", len(ob) - 1, orig_pos)
-        orig_pos += len(ob)
-        trans_table += struct.pack("<II", len(tb) - 1, trans_pos)
-        trans_pos += len(tb)
-
-    # --- header -----------------------------------------------------------------
-    header = struct.pack(
-        "<IIIIIII",
-        _MAGIC,       # magic
-        0,            # revision
-        N,            # number of strings
-        ORIG_TABLE,   # offset of original-string table
-        TRANS_TABLE,  # offset of translated-string table
-        0,            # hash table size (0 = no hash)
-        0,            # hash table offset
-    )
-
-    # --- write ------------------------------------------------------------------
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "wb") as fh:
-        fh.write(header)
-        fh.write(orig_table)
-        fh.write(trans_table)
-        fh.write(b"".join(orig_b))
-        fh.write(b"".join(trans_b))
-
-
-# ── Frontend JS dict generator ───────────────────────────────────────
-
-def _js_escape(s: str) -> str:
-    """Escape a string for safe inclusion in a JS double-quoted literal."""
-    return (s
-            .replace("\\", "\\\\")
-            .replace('"', '\\"')
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t"))
-
-
-def generate_js_dict(locale_dir: str, output_path: str) -> None:
-    """Generate a JS file with the ``T`` translation dictionary from .po files.
-
-    Reads every ``*.po`` under *locale_dir*, extracts msgid/msgstr pairs
-    (skipping the header entry), and writes a ``const T = {...}``
-    declaration to *output_path*.  The ``en`` key is always included as
-    an empty identity map (English is the source language).
-
-    This eliminates the dual-write between .po (server gettext) and the
-    frontend ``T`` dictionary in state.js — .po is now the single
-    authoritative source for UI translations.
+    The bundle uses i18next's resource shape
+    ``{ "<lang>": { "translation": { msgid: msgstr, ... } } }``.  English is
+    emitted as an empty identity map — i18next falls back to the key (the
+    English ``msgid``) when no translation exists.
     """
     translations: dict[str, dict[str, str]] = {}
 
     for po_file in Path(locale_dir).rglob("*.po"):
-        # Derive language code from path: locale/zh_CN/LC_MESSAGES/… → zh-CN
-        lang_code = str(Path(po_file).parents[1].name).replace("_", "-")
-        entries = _parse_po(str(po_file))
+        # locale/zh_CN/LC_MESSAGES/… → "zh-CN"
+        lang_code = po_file.parent.parent.name.replace("_", "-")
+        po = polib.pofile(str(po_file))
         lang_dict: dict[str, str] = {}
-        for msgid, msgstr in entries:
-            if msgid == "":       # header entry — skip
-                continue
-            lang_dict[msgid] = msgstr
+        for entry in po:
+            if not entry.msgid:
+                continue  # header entry
+            lang_dict[entry.msgid] = entry.msgstr
         translations[lang_code] = lang_dict
 
-    # Always include English as empty identity map
-    if "en" not in translations:
-        translations["en"] = {}
-
-    # Build JS source
-    lines: list[str] = [
-        "// Auto-generated from locale/*.po — DO NOT EDIT by hand.",
-        "// Regenerate with: python -m storyloom.i18n_compile",
-        "//",
-        "// See CLAUDE.md §Tech Stack (i18n).",
-        "const T = {",
-    ]
+    resources: dict[str, dict[str, dict[str, str]]] = {
+        "en": {"translation": {}},
+    }
     for lang in sorted(translations):
-        lines.append(f'    "{lang}": {{')
-        lang_dict = translations[lang]
-        if not lang_dict:
-            lines.append("        /* identity map — source language */")
-        for msgid in sorted(lang_dict):
-            msgid_e = _js_escape(msgid)
-            msgstr_e = _js_escape(lang_dict[msgid])
-            lines.append(f'        "{msgid_e}": "{msgstr_e}",')
-        lines.append("    },")
-    lines.append("};")
+        resources[lang] = {"translation": translations[lang]}
 
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, "w", encoding="utf-8") as fh:
-        fh.write("\n".join(lines) + "\n")
+    header = (
+        "// Auto-generated from locale/*.po — DO NOT EDIT by hand.\n"
+        "// Regenerate with: python -m storyloom.i18n_compile\n"
+        "//\n"
+        "// i18next resource bundle consumed by static/js/state.js.\n"
+    )
+    body = "window.STORYLOOM_I18N_RESOURCES = " + json.dumps(
+        resources, ensure_ascii=False, indent=2, sort_keys=True
+    ) + ";\n"
+
+    out = Path(output_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(header + body, encoding="utf-8")
 
 
 if __name__ == "__main__":
-    import sys
-    from pathlib import Path as _Path
-
-    _project = _Path(__file__).resolve().parents[2]
-    _locale = _project / "locale"
+    _project = Path(__file__).resolve().parents[2]  # → repo root
+    _locale = _project / "src" / "storyloom" / "locale"
     _web_js = _project / "src" / "storyloom" / "web" / "static" / "js"
 
     compiled = compile_all(str(_locale))
     print(f"[i18n] Compiled {len(compiled)} .mo file(s)")
 
-    js_out = _web_js / "i18n-dict.js"
-    generate_js_dict(str(_locale), str(js_out))
+    js_out = _web_js / "i18n-resources.js"
+    generate_i18n_resources(str(_locale), str(js_out))
     print(f"[i18n] Generated {js_out}")

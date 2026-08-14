@@ -36,6 +36,7 @@ GameSession construction:
 """
 
 import asyncio
+import importlib.resources
 import json
 import logging
 import os
@@ -72,12 +73,12 @@ from storyloom import __version__
 
 _STATIC = Path(__file__).resolve().parent / "static"
 
-# Long-form content documents live under locale/{lang}/content/{doc}.md and
-# are addressed as /content/{lang}/{doc}.  A document name is a plain slug —
-# no dots/slashes — so it can never escape the content directory.
+# Long-form content documents live under content/{lang}/{doc}.md (package
+# data) and are addressed as /content/{lang}/{doc}.  A document name is a
+# plain slug — no dots/slashes — so it can never escape the content dir.
 _DOC_SLUG_RE = re.compile(r"[A-Za-z0-9_-]+")
 
-# App directory — where config.json / locale / saves / media / system_media live.
+# App directory — where config.json / saves / media / system_media live.
 # Dev: repo root (server.py → web → storyloom → src → repo root).
 # PyInstaller (new launcher layout): exe at <root>/app/storyloom-web → root = ../..
 # PyInstaller (old flat layout): exe at <root>/storyloom-web → root = .
@@ -101,12 +102,11 @@ set_update_proxy_url(cfg.proxy_url)
 for _dir in ("saves", "media", "system_media"):
     os.makedirs(os.path.join(_APP_DIR, _dir), exist_ok=True)
 
-# ── i18n — locale lives next to the exe (inside app/) so it gets
-#    replaced on update along with the binary.
-if getattr(sys, 'frozen', False):
-    _locale_dir = os.path.join(os.path.dirname(sys.executable), "locale")
-else:
-    _locale_dir = os.path.join(_APP_DIR, "locale")
+# ── i18n — locale & content are package data, resolved via
+#    importlib.resources (identical for dev, pip wheel, and PyInstaller
+#    --onefile).  They version with the code, not with user data.
+_locale_dir = str(importlib.resources.files("storyloom") / "locale")
+_content_dir = str(importlib.resources.files("storyloom") / "content")
 init_i18n(cfg.language, locale_dir=_locale_dir)
 
 # ── Engine wiring (mirrors dev_cli/dev_main.py) ──────────────────
@@ -219,23 +219,21 @@ async def index():
 async def serve_content(lang: str, doc: str):
     """Serve a localized long-form content document (Markdown).
 
-    Source of truth lives in ``locale/{lang}/content/{doc}.md`` — inside each
-    language package alongside ``LC_MESSAGES``, so translators work in a
-    single ``locale/`` tree.  ``lang`` is whitelisted against
-    ``SUPPORTED_LANGUAGES`` and ``doc`` must be a plain slug, so neither path
-    component can escape the content directory.  A missing document yields
-    404 and the frontend falls back to English.  Generic — any document
-    (guide, changelog, …) is served by dropping a ``{lang}/content/{doc}.md``
-    file in, with no per-document route or loader.
+    Source of truth lives in ``content/{lang}/{doc}.md`` (package data, kept
+    separate from the gettext catalogs in ``locale/``).  ``lang`` is
+    whitelisted against ``SUPPORTED_LANGUAGES`` and ``doc`` must be a plain
+    slug, so neither path component can escape the content directory.  A
+    missing document yields 404 and the frontend falls back to English.
+    Generic — any document (guide, changelog, …) is served by dropping a
+    ``{lang}/{doc}.md`` file in, with no per-document route or loader.
     """
     if lang not in SUPPORTED_LANGUAGES:
         raise HTTPException(404, f"Unknown language: {lang}")
     if not _DOC_SLUG_RE.fullmatch(doc):
         raise HTTPException(404, f"Unknown document: {doc}")
-    # Directories use POSIX locale names (zh_CN); the URL/app use BCP-47
-    # (zh-CN).  Mirror i18n.py's language.replace("-", "_").
-    lang_dir = lang.replace("-", "_")
-    path = Path(_locale_dir) / lang_dir / "content" / f"{doc}.md"
+    # Content directories use BCP-47 names (zh-CN) directly — content is a
+    # separate tree from gettext catalogs, so no POSIX underscore mapping.
+    path = Path(_content_dir) / lang / f"{doc}.md"
     if not path.is_file():
         raise HTTPException(404, f"Content not found: {lang}/{doc}")
     return FileResponse(str(path), media_type="text/markdown")

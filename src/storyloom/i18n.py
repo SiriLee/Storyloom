@@ -6,8 +6,7 @@ runtime language changes.
 """
 
 import gettext
-import sys
-from pathlib import Path
+import importlib.resources
 
 from storyloom.config import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE
 
@@ -83,21 +82,18 @@ def _(message: str) -> str:
 # ── Internal helpers ──────────────────────────────────────────────
 
 
-def _get_locale_dir() -> Path:
-    """Return the locale directory.
+def _get_locale_dir() -> str:
+    """Return the locale directory as a filesystem path string.
 
     Uses the explicitly-set directory from ``init_i18n()`` if provided;
-    otherwise detects based on runtime environment (dev / PyInstaller).
+    otherwise resolves the package-bundled ``locale/`` via
+    ``importlib.resources`` — identical for dev, pip wheel, and
+    PyInstaller ``--onefile`` (which extracts to ``sys._MEIPASS``).
     """
     global _locale_dir
     if _locale_dir is not None:
-        return Path(_locale_dir)
-    if getattr(sys, 'frozen', False):
-        # PyInstaller: locale/ next to the executable
-        return Path(sys.executable).parent / "locale"
-    else:
-        # Dev / pip: locale/ under repo root
-        return Path(__file__).resolve().parents[3] / "locale"
+        return _locale_dir
+    return str(importlib.resources.files("storyloom") / "locale")
 
 
 def _load_translator(language: str) -> None:
@@ -105,7 +101,7 @@ def _load_translator(language: str) -> None:
     locale_lang = language.replace("-", "_")
     try:
         trans = gettext.translation(
-            "storyloom", str(_get_locale_dir()),
+            "storyloom", _get_locale_dir(),
             languages=[locale_lang, "en"],
             fallback=True,
         )

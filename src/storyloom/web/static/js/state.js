@@ -5,18 +5,19 @@
      gameId, roundCount, currentNode, endingFlag,
      outlineNodes, stateVars, displayMode, speedPreset, lang.
 
-   _(msgid) — i18n lookup.  Mirrors server-side gettext _() convention.
-              Keys are English source strings (msgid); translations come
-              from the dictionary matching GameState.lang.
+   _(msgid, opts) — i18n lookup via i18next.  Mirrors server-side gettext
+              _() convention.  Keys are English source strings (msgid);
+              translations come from the i18next resource bundle in
+              i18n-resources.js (generated from .po files).
 
-   The ``T`` translation dictionary is auto-generated from .po files
-   into i18n-dict.js (loaded before this script).  .po is now the
-   single authoritative source — no more dual-write.
+   i18next is the frontend translation runtime; resources are inlined in
+   i18n-resources.js (loaded before this script).  .po is the single
+   authoritative source — no more dual-write.
 
    Authority:
      src/storyloom/i18n.py (gettext _() convention)
-     locale/zh_CN/LC_MESSAGES/storyloom.po (authoritative translations)
-     src/storyloom/i18n_compile.py §generate_js_dict (build-time generation)
+     src/storyloom/locale/zh_CN/LC_MESSAGES/storyloom.po (authoritative)
+     src/storyloom/i18n_compile.py §generate_i18n_resources (build-time)
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Shared constants ─────────────────────────────────────────────── */
@@ -66,6 +67,7 @@ const GameState = {
         this.lang = lang;
         localStorage.setItem("storyloom-lang", lang);
         document.documentElement.lang = lang;
+        i18next.changeLanguage(lang);
     },
 };
 
@@ -335,18 +337,29 @@ async function initConfig() {
     ThemeState.init();
 }
 
+// i18next — frontend translation runtime.  Resources are inlined in
+// i18n-resources.js (generated from locale/*.po); en is an empty identity
+// map, so i18next falls back to the English msgid (the key) when missing.
+i18next.init({
+    lng: GameState.lang,
+    fallbackLng: "en",
+    resources: window.STORYLOOM_I18N_RESOURCES,
+    // Interpolated values (condition text, state values) are inserted via
+    // textContent, not innerHTML — disable i18next's default HTML escaping.
+    interpolation: { escapeValue: false },
+});
+
 /**
  * Look up a translated string.
  * Mirrors server-side gettext _() convention.
  *
- * @param {string} msgid — English source string
+ * @param {string} msgid — English source string (the i18next key)
+ * @param {object} [opts] — interpolation variables (e.g. {cond: "x"})
  * @returns {string} translated string in the current language,
  *                   or msgid itself if no translation exists
  */
-function _(msgid) {
-    const dict = T[GameState.lang];
-    if (dict && dict[msgid] !== undefined) return dict[msgid];
-    return msgid;
+function _(msgid, opts) {
+    return i18next.t(msgid, opts);
 }
 
 /**

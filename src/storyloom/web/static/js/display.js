@@ -112,16 +112,13 @@ const Display = (function () {
             const varName = match[1];
             const current = GameState.stateVars[varName];
             if (current !== undefined) {
-                /* Single-pass replacement: avoids the (low-probability)
-                   edge case where `condition` itself contains "{val}". */
-                const tmpl = _("Requires {cond}, current: {val}");
-                return tmpl.replaceAll(
-                    /{cond}|{val}/g,
-                    (m) => m === "{cond}" ? condition : String(current)
-                );
+                return _("Requires {{cond}}, current: {{val}}", {
+                    cond: condition,
+                    val: String(current),
+                });
             }
         }
-        return _("Requires {cond}").replace("{cond}", condition);
+        return _("Requires {{cond}}", {cond: condition});
     }
 
     /** Flatten engine-evaluated choices into 1-indexed options.

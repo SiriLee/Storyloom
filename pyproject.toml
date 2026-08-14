@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=64", "babel>=2.14", "polib>=1.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -22,7 +22,7 @@ desktop = ["pywebview>=5.0"]
 storyloom-web = "storyloom.web.server:main"
 
 [tool.setuptools.package-data]
-storyloom = ["web/static/**/*", "core/lang_meta/*.json", "models/*.onnx"]
+storyloom = ["web/static/**/*", "core/lang_meta/*.json", "models/*.onnx", "locale/**/*", "content/**/*"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

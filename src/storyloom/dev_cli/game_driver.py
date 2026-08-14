@@ -612,8 +612,7 @@ def dev_main(argv: list[str] | None = None) -> None:
     # ── Config ─────────────────────────────────────────────────
     app_dir = _get_app_dir()
     config = UserConfig(app_dir)
-    locale_dir = str(app_dir / "locale")
-    init_i18n(config.language, locale_dir=locale_dir)
+    init_i18n(config.language)
 
     if argv is None:
         argv = sys.argv[1:]
