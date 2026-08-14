@@ -6,6 +6,21 @@
 
 ---
 
+## 2026-08-14（周五）— 文档：AI 上下文标准化为跨工具 AGENTS.md
+
+**背景**：仓库唯一的 AI 上下文文件是 `CLAUDE.md`，只有 Claude Code 自动加载；Cursor / Windsurf / GitHub Copilot / Gemini CLI 等主流编码代理对项目零支持。`AGENTS.md` 已是跨工具通用约定（Claude Code、Cursor、Windsurf、Copilot coding agent、Gemini CLI 均原生支持），本项目应跟进——避免"只有 Claude Code 能干活"。
+
+**决策**（commit `2786bc8`）：
+
+1. **单一权威**：新建根目录 `AGENTS.md`，内容从 `CLAUDE.md` 平移并工具中立化（项目概览、文档地图、运行/测试/构建、约定），新增 "AI-tool integration" 小节说明桥接约定；顺带修正过时的 Status（v2.0.0 → v2.3.0，补充 i18n 双源）并新增 data-driven 约定。
+2. **兼容桥**：`CLAUDE.md` 精简为薄桥（先读 AGENTS.md + 保留 Claude Code 生态说明：CLAUDE.local.md / .claude/ 均 gitignored）；新增 `.github/copilot-instructions.md` 一行桥接（经典 Copilot chat 不读 AGENTS.md）。
+3. **文档同步**：`README.md` Development 小节说明该约定；`core/co_create.py` 失效的 "CLAUDE.md §Tech Stack" 注释（该章节早已在精简中删除）改指 `AGENTS.md §Conventions`。
+4. **不做**：不创建 `.cursor/rules` / `.windsurf/rules` 副本——二者原生支持 AGENTS.md，副本只会漂移；`docs/superpowers/` 存档计划中的旧引用保留原样（已归档）。
+
+**依据**：`AGENTS.md`；`CLAUDE.md`；`.github/copilot-instructions.md`；`README.md`；`src/storyloom/core/co_create.py`；本日志 v2.3.0 条目（Status 版本依据）；早期 CLAUDE.md 精简先例（graph-mode-spec 条目）。
+
+---
+
 ## 2026-08-14（周五）— v2.3.0：i18n 双源化重构、更新错误分类、launcher 自更新修复
 
 > **概述**：v2.2.0 发布次日交付 v2.3.0。核心工作是 **i18n 双源化重构**——前端 UI 字符串从共享 .po 目录拆出，改为独立的 i18next JSON 资源；配套把 `locale/`、`content/` 移入包内作为 package data（`importlib.resources` 解析），改用 Babel 编译 `.mo`，前端引入 vendored i18next + http-backend 异步加载。此外：背景去除模型路径统一走 `importlib.resources`；更新检查失败从静默伪装"已是最新"改为分类上报错误；launcher 交换 bat 修复（自删除 + 重试锁释放）。全天 **12 commits**，测试 **1,120**（+17）。
