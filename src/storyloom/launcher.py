@@ -81,6 +81,7 @@ def _apply_launcher_update():
                 "timeout /t 1 /nobreak >nul\n"
                 f'move /Y "{LAUNCHER_NEW}" "{launcher_dest}"\n'
                 f'start "" "{launcher_dest}"\n'
+                'del "%~f0"\n'
             )
         subprocess.Popen(
             bat,
