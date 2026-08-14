@@ -201,36 +201,22 @@ class TestGetDimensions:
 # ═══════════════════════════════════════════════════════════════════
 
 class TestModelDir:
-    """_model_dir — bundled package path takes priority."""
+    """_model_dir — env override, else bundled package data."""
 
-    def test_bundled_pkg_dir_has_priority(self, tmp_path):
-        """When <package>/models/ exists, return it before writable paths."""
+    def test_env_override_takes_priority(self, tmp_path):
         from storyloom.io import img_utils
 
-        fake_pkg = tmp_path / "storyloom" / "io"
-        fake_pkg.mkdir(parents=True)
-        models = tmp_path / "storyloom" / "models"
-        models.mkdir()
+        override = tmp_path / "custom-models"
+        with patch.object(img_utils.os, "environ", {"STORYLOOM_MODEL_DIR": str(override)}):
+            assert img_utils._model_dir() == override
 
-        with patch.object(img_utils, "__file__", str(fake_pkg / "img_utils.py")):
-            with patch.object(img_utils.os, "environ", {}):
-                result = img_utils._model_dir()
-                assert result == models, f"Expected {models}, got {result}"
-
-    def test_falls_back_when_no_bundled_dir(self, tmp_path):
-        """When <package>/models/ doesn't exist, fall back to writable paths."""
+    def test_defaults_to_bundled_package_models(self):
+        import importlib.resources
         from storyloom.io import img_utils
 
-        fake_pkg = tmp_path / "storyloom" / "io"
-        fake_pkg.mkdir(parents=True)
-        # No models/ dir created
-
-        with patch.object(img_utils, "__file__", str(fake_pkg / "img_utils.py")):
-            with patch.object(img_utils.os, "environ", {
-                "STORYLOOM_APP_DIR": str(tmp_path / "app"),
-            }):
-                result = img_utils._model_dir()
-                assert result == tmp_path / "app" / "models"
+        expected = Path(str(importlib.resources.files("storyloom") / "models"))
+        with patch.object(img_utils.os, "environ", {}):
+            assert img_utils._model_dir() == expected
 
 
 # ═══════════════════════════════════════════════════════════════════

@@ -134,8 +134,8 @@ def get_dimensions(raw: bytes, fmt: str) -> tuple[int, int]:
 #
 # Model source: U²-Net (Xuebin Qin et al., 2020), ONNX export by rembg.
 
+import importlib.resources
 import os
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -158,25 +158,14 @@ def _model_dir() -> Path:
 
     Resolution order:
       1. ``STORYLOOM_MODEL_DIR`` env var (explicit override)
-      2. ``<package>/models/`` — bundled package data
-         (wheel / PyInstaller --add-data / dev source tree)
-      3. ``STORYLOOM_APP_DIR`` / "models" (alongside config.json)
-      4. PyInstaller: "models/" next to the executable
-      5. Fallback: "models/" in the current directory
+      2. ``<package>/models/`` — bundled package data, resolved via
+         importlib.resources (wheel / PyInstaller --onefile / dev source
+         tree), mirroring how ``locale/`` is located in i18n.py.
     """
     env = os.environ.get("STORYLOOM_MODEL_DIR")
     if env:
         return Path(env)
-    # Bundled in package (wheel, PyInstaller, dev)
-    pkg = Path(__file__).resolve().parent.parent / "models"
-    if pkg.is_dir():
-        return pkg
-    app_dir = os.environ.get("STORYLOOM_APP_DIR")
-    if app_dir:
-        return Path(app_dir) / "models"
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent / "models"
-    return Path.cwd() / "models"
+    return Path(str(importlib.resources.files("storyloom") / "models"))
 
 
 def _model_path() -> Path:
