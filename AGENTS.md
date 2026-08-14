@@ -135,3 +135,8 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
   per-tool, but must reference this file instead of duplicating it.
 - Personal, machine-local configuration (e.g. `CLAUDE.local.md`, `.claude/`)
   is gitignored — never rely on it from shared documents.
+
+## Editing these instructions
+
+`CLAUDE.md` is a symlink to this file — edit `AGENTS.md` (the real file),
+never a copy.
