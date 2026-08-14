@@ -450,7 +450,7 @@ class CoCreateValidator:
 #
 # Each supported language has a data file under lang_meta/{lang}.json.
 # Adding a new language = creating a single JSON file — no code changes.
-# See CLAUDE.md §Tech Stack (language-agnostic design).
+# See AGENTS.md §Conventions (language-agnostic, data-driven design).
 
 _LANG_META_CACHE: dict[str, dict[str, str]] = {}
 _LANG_META_DIR = Path(__file__).resolve().parent / "lang_meta"

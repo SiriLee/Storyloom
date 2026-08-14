@@ -167,6 +167,12 @@ python scripts/generate_manifest.py
 **Conventions:** Python ≥ 3.10 · stdlib-first · Conventional Commits ·
 English code & docs · mock tests (no real API calls).
 
+**AI context:** [`AGENTS.md`](AGENTS.md) is the single source of truth for
+coding-agent context (Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, …).
+[`CLAUDE.md`](CLAUDE.md) and
+[`.github/copilot-instructions.md`](.github/copilot-instructions.md) are thin
+compatibility bridges — keep shared knowledge in `AGENTS.md` only.
+
 ---
 
 [MIT](./LICENSE)
