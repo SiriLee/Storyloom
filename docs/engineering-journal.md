@@ -6,6 +6,116 @@
 
 ---
 
+## 2026-08-14（周五）— v2.3.0：i18n 双源化重构、更新错误分类、launcher 自更新修复
+
+> **概述**：v2.2.0 发布次日交付 v2.3.0。核心工作是 **i18n 双源化重构**——前端 UI 字符串从共享 .po 目录拆出，改为独立的 i18next JSON 资源；配套把 `locale/`、`content/` 移入包内作为 package data（`importlib.resources` 解析），改用 Babel 编译 `.mo`，前端引入 vendored i18next + http-backend 异步加载。此外：背景去除模型路径统一走 `importlib.resources`；更新检查失败从静默伪装"已是最新"改为分类上报错误；launcher 交换 bat 修复（自删除 + 重试锁释放）。全天 **12 commits**，测试 **1,120**（+17）。
+
+### i18n 双源化重构 — package data + Babel + i18next
+
+**背景**：v2.1.0 之前 i18n 是单一 Display.UI dict + 前端 api-guide.js 等硬编码英文文案；07-06 已做过一轮 gettext 迁移，但 `locale/` 在包外（dev 路径依赖 `parents[3]`，wheel/PyInstaller 里不可用），.po 编译器是手写的。需要一次彻底标准化：后端走标准 gettext，前端走 i18next，locale/content 随包分发。
+
+**决策**（commits `4cc70bf` → `068b50b` → `8249fe2` → `5591845` → `57ac3cf`，5 commits）：
+
+1. **package data 化**（`4cc70bf`）：`locale/` 与 `content/` 移入 `src/storyloom/` 包内，通过 `importlib.resources` 解析——修复 dev 路径、随 wheel 分发、PyInstaller 打包进二进制（替代独立 app/ 目录）。
+2. **Babel 接管编译**（`4cc70bf`）：替换手写 .po 编译器为 Babel `.po→.mo`；`i18n_compile.py` 重构为 build hook。配套 `test_i18n_compile.py` 覆盖编译与资源生成（`068b50b`），本地无隔离构建放宽 babel 约束 `>=2.10`（`8249fe2`）。
+3. **前端引入 i18next**（`4cc70bf`）：vendored 离线 `i18next.min.js`；`{cond}` 插值改 i18next `{{...}}` 语法。
+4. **单源 → 双源**（`5591845`）：初版方案用 polib 从 .po 提取生成前端 JSON（单源）；当天收敛为**双源**——`.po` 只保留后端 co-creation 字符串（3 条），前端 UI 字符串拆到 `web/static/locales/{lang}.json`（zh-CN/zh-TW 各 198 条）作为独立 i18next 资源，经 http-backend 异步加载（首次渲染前 await，语言切换时重载）。polib 从构建依赖移除。
+5. **CI 修复**（`57ac3cf`）：`test_i18n_compile.py` import babel，但 babel 只是 build-system 依赖，CI `pip install ".[bg]"` 不装它 → pytest 收集阶段即中止（0 tests run），`| tee` 掩盖真实退出码，badge 显示 "0/1 passed"。新增 `test` extra（babel、pytest）、`set -o pipefail`、badge 步骤 `always()`。
+
+**依据**：`src/storyloom/i18n.py`；`src/storyloom/i18n_compile.py`；`src/storyloom/locale/`；`src/storyloom/content/`；`src/storyloom/web/static/locales/{zh-CN,zh-TW,en}.json`；`src/storyloom/web/static/js/vendor/i18next*.js`；`.github/workflows/test.yml`；`tests/test_i18n_compile.py`；`tests/test_i18n.py`。
+
+### 背景去除模型路径统一 — importlib.resources
+
+**背景**：i18n locale 改为 package data 后，img_utils 的背景去除模型定位仍是旧的多层回退（`__file__`/frozen/cwd + 仓库根 models/ 遗留），与新规范不一致。
+
+**决策**（commit `c626959`）：`_model_dir()` 统一走 `importlib.resources`，仅保留 `STORYLOOM_MODEL_DIR` 环境变量覆盖——删除 legacy 回退层，与 i18n locale 查找同一模式。
+
+**依据**：`io/img_utils.py`；`tests/test_img_utils.py`。
+
+### 更新检查错误分类 — 不再伪装"已是最新"
+
+**背景**：版本检查失败（离线、超时、GitHub 限流）在服务端被静默吞掉，前端一律显示"已是最新"——用户无法区分"真的没更新"和"检查失败了"。
+
+**决策**（commit `6ef3d31`）：
+
+1. `VersionInfo` 新增 `error` 字段；`_classify_error()` 将异常映射为 `rate_limit | timeout | network | http | not_found | parse | unknown`。
+2. 三层检查（app/system_media/launcher）各自记录错误；持久 tag 的 404 视为"无更新"而非错误。
+3. 前端更新弹窗：某层失败显示 "Check failed: `<layer>`: `<reason>`"，仅当所有层都无更新才显示"已是最新"。
+4. zh_CN/zh_TW `.po` 补充错误文案。
+
+**依据**：`core/update_manager.py`；`web/static/js/router.js`；`tests/test_update_manager.py`（+72）；`locale/zh_CN/LC_MESSAGES/storyloom.po`。
+
+### Launcher 自更新修复 — 交换 bat 自删除 + 重试
+
+**背景**：Windows launcher 交换流程的 .bat 脚本在 lock 未释放时 move 失败（PyInstaller onefile 退出持锁 >1s），`launcher.new` 残留、需二次启动才完成交换；且 bat 运行后残留自身。
+
+**决策**（commits `78050e4` → `c70769c`，2 commits）：
+
+1. **自删除**（`78050e4`）：`_launcher_swap.bat` 末尾 `del "%~f0"`——交换完成后清理自身。
+2. **重试**（`c70769c`）：move 循环重试直到 `launcher.new` 消失再 relaunch——消除与 onefile 退出锁的竞态。
+
+launcher 版本 1.0.0 → 1.0.1（`d0c48c9`）→ 1.0.2（`c666928`）。
+
+**依据**：`src/storyloom/launcher.py`；`tests/test_launcher.py`；`launcher.version`。
+
+---
+
+## 2026-08-13（周四）— v2.2.0：品牌资产、竞赛计划、Launcher 独立版本化
+
+> **概述**：建立 **Storyloom 品牌资产体系**（logo/app icon/商标 SVG+PNG）、新增**竞赛项目计划草案**、交付 **Launcher 独立版本化与发布机制**（第三更新层）。同时修复 3 处引擎/Web bug：post-bridge SCENE 场景切换被静默丢弃、API 指南/冒险日志外部链接在 webview 内导航无法返回、图模式 Task 等待期无加载指示。全天 **21 commits**，版本 2.1.1 → 2.2.0。
+
+### 品牌资产体系 — logo/app icon/商标
+
+**背景**：Storyloom 此前没有官方品牌标识。需要一套可复用的品牌资产：仓库内 logo、README 展示、应用图标（PyInstaller 打包）、Web UI 内嵌标识。
+
+**决策**（commits `e8b6be6` → `1c8fd90` → `4c89239` → `2924638` → `d1dcdd1` → `40dec68` → `9d9fd3d`）：
+
+1. **SVG 三件套**（`e8b6be6`）：`assets/branding/` 下 `logo.svg`（单色标识）、`logo-lockup.svg`（商标+字标）、`logo-app.svg`（应用标识）。
+2. **README 展示**（`1c8fd90`）：README 顶部加 `logo-lockup.png`。
+3. **应用图标**（`4c89239`）：`assets/icons/icon.ico`（44KB）+ white-background 商标 PNG；build.sh 在 PyInstaller 打包时应用图标；white 版本随后发现未使用而删除（`2924638`）。
+4. **Web 内嵌标识**（`d1dcdd1`）：`icons.js` 新增 `Icons.logo()`——品牌图标进前端图标库。
+5. **元数据标准化**（`40dec68`、`9d9fd3d`）：README/pyproject/`__init__.py` 统一 description 与 license；PEP 639 SPDX 字符串形式（`license = "MIT"`）需 setuptools>=77，构建环境是 68.1.2，回退 PEP 621 表格形式。
+
+**依据**：`assets/branding/`；`assets/icons/`；`README.md`；`scripts/build.sh`；`web/static/js/icons.js`；`pyproject.toml`。
+
+### 竞赛项目计划草案
+
+**背景**：参加竞赛需要项目计划文档，先建立结构占位。
+
+**决策**（commit `576271a`）：`docs/competition/project-plan-draft.md` 新增 220 行结构占位——竞赛项目计划骨架。
+
+**依据**：`docs/competition/project-plan-draft.md`。
+
+### 引擎/Web 三处修复
+
+**背景**：积累的 3 个 bug：(1) LLM 在 bridge 后输出 `<set var="SCENE">` 场景切换被 post-bridge 抑制逻辑静默丢弃（DECLARE 同区被禁，SCENE 被误伤）；(2) pywebview 只对 `target="_blank"` 导航路由到系统浏览器，API 指南/冒险日志的 marked 渲染链接缺少该属性 → 在 webview 内导航无法返回；(3) 图模式 Task 等待期加载指示器从不出现——VN 加载点被空文本守卫（`if (!el || el.textContent) return`）挡住，Task 等待几乎总发生在前一段文本已显示之后。
+
+**决策**（commits `948da34` + `88b703e` + `4463231`）：
+
+1. **post-bridge SCENE 放行**（`948da34`）：场景切换是视觉/叙事元素（无用户输入依赖），与 `<seg>` 同属 post-bridge "narrative only" 区。移除 SCENE 的 post-bridge 抑制；DECLARE 仍禁止。事件 position 记为 `post`，照常入队。对应 stream_parser 测试用例翻转（suppressed → allowed）。
+2. **外部链接默认浏览器**（`88b703e`）：新增 `markExternalLinks()` 在 marked 渲染后给链接加 `target="_blank"`；同时把 API 指南内容从手写 api-guide.js 迁到 `locale/{lang}/content/guide.md`，新增通用 `/content/{lang}/{doc}` 路由 + `loadLocalizedContent()`——长文档与 gettext 目录同树，未来新文档无需新路由。
+3. **图模式加载指示器**（`4463231`）：加载点改为独立 overlay 元素渲染，Task 等待期显示、同时隐藏 click-to-continue；顺带修正 loading-debounce 注释（`f33a81a`）。
+
+**依据**：`parser/stream_parser.py`；`tests/test_stream_parser.py`；`tests/test_graph_mode_pipeline.py`；`web/static/js/api-guide.js`（删除）；`locale/{en,zh_CN,zh_TW}/content/guide.md`；`web/server.py`；`web/static/js/graph-renderer.js`；`web/static/css/graph.css`；`tests/test_web_server.py`。
+
+### Launcher 独立版本化与发布
+
+**背景**：launcher 自更新此前嵌入 app release 的 zip（app 内附带 `launcher.new`），launcher 与 app 同版本同节奏——launcher.py 微小改动也要随 app 发版，且 asset 命名 `Storyloom-v{ver}-{platform}.zip` 与完整 app 包 `storyloom-v{ver}` 仅大小写/版本号不同，存在碰撞。需要 launcher 作为**第三更新层**独立版本、独立发布、独立检查。
+
+**决策**（commits `6cad50a` → `85ab7fa` → `202f5b8` → `6521404` → `25f0763`，配套 `e24d67f`/`e569738`）：
+
+1. **独立版本文件**（`6cad50a`）：根目录 `launcher.version`（1.0.0）——仅 launcher.py 变更时递增。build.sh 单独打包 `Storyloom-v{ver}-{platform}.zip`（二进制 + 版本文件）；app-only zip 只含 app 载荷（launcher 与 wheel/sdist 移除）。
+2. **第三更新层**（`6cad50a`）：`UpdateManager` 新增 `_check_launcher_update()`；launcher 层进 `check_for_updates`/`download_and_extract`（layer="launcher" 将二进制 stage 为 `launcher.new` + 版本文件）；`regenerate_launcher` 改指向 launcher asset。前端更新弹窗加 launcher 行，删除死代码 `_bindUpdateCheck`。
+3. **asset 命名去碰撞**（`85ab7fa`）：改名 `storyloom-launcher-v{ver}-{platform}.zip`——与 `storyloom-app-v` 约定对齐。
+4. **持久 launcher tag**（`202f5b8`）：launcher 检查 `releases/tags/launcher`（与 system-media 对称）而非 `releases/latest`——launcher 更新脱离 app 发布周期；`_find_asset_url` 改为取最高版本而非首个匹配（修复 system_media 同源潜在 bug）。
+5. **变长版本解析**（`6521404`）：`_parse_version_from_asset_name` 正则从 `\d+\.\d+\.\d+` 放宽为 `\d+(?:\.\d+)*`——1/2/4 段版本不再静默失败。
+6. **system_media 上传提示修正**（`25f0763`）：`pack_system_media.sh` 提示改为 system-media tag（原指向 v{app_version}，照做会传错 release 导致 asset 找不到、更新静默失败）。
+7. **忽略 Windows spec**（`e569738`）：.gitignore 加 Windows launcher spec 文件。
+
+**依据**：`launcher.version`；`scripts/build.sh`；`core/update_manager.py`；`web/server.py`；`web/static/js/router.js`；`scripts/pack_system_media.sh`；`tests/test_update_manager.py`。
+
+---
+
 ## 2026-08-11（周一）— v2.1.0：协作取消、生成流、网络代理
 
 > **概述**：v2.0.0 发布后的第一个工作日，完成了 6 大功能模块的迭代。核心工作是**协作取消机制**（用户可在生成/预构建中途安全退出）和**生成视图流式任务列表**（实时展示 6 阶段进度）。此外：全栈网络代理支持、Round 1 prefix 重构为 system message、对话分隔符从冒号改为竖线、素材生成性能调优、API 指南国际化、设置页 "About" 模块。全天 **46 commits**，**49 files**，**+3,082/-594 lines**，测试从 1,081 增至 **1,103**（+22）。
