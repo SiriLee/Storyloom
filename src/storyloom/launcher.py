@@ -78,8 +78,10 @@ def _apply_launcher_update():
         with open(bat, "w") as f:
             f.write(
                 "@echo off\n"
+                ":retry\n"
                 "timeout /t 1 /nobreak >nul\n"
-                f'move /Y "{LAUNCHER_NEW}" "{launcher_dest}"\n'
+                f'move /Y "{LAUNCHER_NEW}" "{launcher_dest}" >nul 2>&1\n'
+                f'if exist "{LAUNCHER_NEW}" goto retry\n'
                 f'start "" "{launcher_dest}"\n'
                 'del "%~f0"\n'
             )

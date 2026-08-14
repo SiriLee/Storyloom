@@ -126,6 +126,10 @@ def test_apply_launcher_update_windows_bat_paths(tmp_path, monkeypatch):
     assert launcher_dest in content, f"Expected absolute dest in: {content}"
     # start command must also use absolute path.
     assert f'start ""' in content
+    # move must retry until launcher.new is gone (launcher may still
+    # hold the Storyloom.exe lock beyond the 1s timeout).
+    assert ":retry" in content
+    assert "goto retry" in content
     # .bat must self-delete after running (avoid leftover artifact).
     assert 'del "%~f0"' in content
     mock_popen.assert_called_once()
