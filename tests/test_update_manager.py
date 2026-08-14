@@ -470,7 +470,6 @@ def test_download_extract_app(tmp_path):
     zip_dir.mkdir()
     zip_path = _create_test_zip(str(zip_dir), {
         "app/storyloom-web": b"fake-exe",
-        "app/locale/en/LC_MESSAGES/storyloom.mo": b"fake-mo",
         "app/config.example.json": b'{"version": 2}',
     })
     target = tmp_path / "target"
@@ -490,9 +489,8 @@ def test_download_extract_app(tmp_path):
         download_and_extract("app", "https://example.com/app.zip", str(target), cb)
 
     assert os.path.isfile(str(target / "app_new" / "storyloom-web"))
-    assert os.path.isfile(
-        str(target / "app_new" / "locale" / "en" / "LC_MESSAGES" / "storyloom.mo")
-    )
+    # locale/ is now baked into the --onefile binary, not a separate app/ dir.
+    assert os.path.isfile(str(target / "app_new" / "config.example.json"))
     stages = [e.stage for e in events]
     assert "downloading" in stages
     assert "extracting" in stages

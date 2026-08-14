@@ -19,12 +19,9 @@ class TestI18NInit:
 
     def test_init_with_explicit_locale_dir(self):
         """Explicit locale_dir should not raise."""
-        # Use the actual project locale dir — this is an integration-smoke test
-        import os
-        locale_dir = os.path.join(
-            os.path.dirname(__file__), "..", "..", "locale"
-        )
-        init_i18n("zh-CN", locale_dir=os.path.abspath(locale_dir))
+        import importlib.resources
+        locale_dir = str(importlib.resources.files("storyloom") / "locale")
+        init_i18n("zh-CN", locale_dir=locale_dir)
         assert get_current_lang() == "zh-CN"
 
 
@@ -57,3 +54,17 @@ class TestI18NTranslate:
         init_i18n("en")
         result = _("nonexistent string xyz123")
         assert result == "nonexistent string xyz123"
+
+    def test_translates_zh_cn_round_trip(self, tmp_path):
+        """A real .po → .mo → gettext round-trip returns the translation."""
+        import importlib.resources
+        import shutil
+        from storyloom.i18n_compile import compile_all
+
+        pkg_locale = importlib.resources.files("storyloom") / "locale"
+        tmp_locale = tmp_path / "locale"
+        shutil.copytree(str(pkg_locale), str(tmp_locale))
+        compile_all(str(tmp_locale))
+
+        init_i18n("zh-CN", locale_dir=str(tmp_locale))
+        assert _("About") == "关于"

@@ -72,8 +72,10 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | `src/storyloom/launcher.py` | Launcher — atomic app_new→app swap, self-update (§3) |
 | `src/storyloom/config.py` | Configurable constants |
 | `src/storyloom/user_config.py` | UserConfig — centralized config management |
-| `src/storyloom/i18n.py` | gettext i18n (zh-CN, zh-TW, en) |
-| `src/storyloom/i18n_compile.py` | .po→.mo compiler + frontend JS dict generator (build hook) |
+| `src/storyloom/i18n.py` | gettext i18n (zh-CN, zh-TW, en) — `locale/` package data via `importlib.resources` |
+| `src/storyloom/i18n_compile.py` | Babel `.po→.mo` compile + polib i18next resource generator (build hook) |
+| `src/storyloom/locale/` | gettext `.po` catalogs — package data |
+| `src/storyloom/content/` | localized long-form docs, `{lang}/{doc}.md` — package data |
 | `scripts/build.sh` | PyInstaller + wheel packaging |
 | `pyproject.toml` | Project metadata, dependencies, entry points |
 | `tests/test_stream_parser.py` | StreamParser unit tests — tag → Event, position tracking, edge cases |
@@ -113,5 +115,5 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 
 - **Git commits:** Conventional Commits (`feat`/`fix`/`docs`/`refactor`)
 - **Code comments:** English
-- **i18n:** gettext (`.po`/`.mo`), languages in `src/storyloom/i18n.py`
+- **i18n:** backend gettext (`.po`/`.mo` via Babel), frontend i18next (`.po` → `i18n-resources.js` via polib), languages in `src/storyloom/i18n.py`
 - **Config:** Constants in `src/storyloom/config.py`, referenced by name — no hardcoded values in business logic

@@ -92,25 +92,25 @@ class TestContentRoute:
 
     @staticmethod
     def _write_content(app_dir, lang, doc, text):
-        # URL lang is BCP-47 (zh-CN); the directory is POSIX (zh_CN).
-        lang_dir = lang.replace("-", "_")
-        d = app_dir / "locale" / lang_dir / "content"
+        # Content directories use BCP-47 (zh-CN) directly — separate from the
+        # POSIX gettext catalog dirs under locale/.
+        d = app_dir / "content" / lang
         d.mkdir(parents=True, exist_ok=True)
         (d / f"{doc}.md").write_text(text, encoding="utf-8")
 
     def test_serve_guide_en(self, client, app_dir):
         self._write_content(app_dir, "en", "guide", "# API Setup Guide\n\nHello")
         import storyloom.web.server as server_mod
-        with patch.object(server_mod, "_locale_dir", str(app_dir / "locale")):
+        with patch.object(server_mod, "_content_dir", str(app_dir / "content")):
             res = client.get("/content/en/guide")
         assert res.status_code == 200
         assert "text/markdown" in res.headers["content-type"]
         assert res.text.startswith("# API Setup Guide")
 
-    def test_serve_guide_zh_cn_maps_underscore_dir(self, client, app_dir):
+    def test_serve_guide_zh_cn(self, client, app_dir):
         self._write_content(app_dir, "zh-CN", "guide", "# API 设置指南")
         import storyloom.web.server as server_mod
-        with patch.object(server_mod, "_locale_dir", str(app_dir / "locale")):
+        with patch.object(server_mod, "_content_dir", str(app_dir / "content")):
             res = client.get("/content/zh-CN/guide")
         assert res.status_code == 200
         assert "API 设置指南" in res.text
@@ -122,7 +122,7 @@ class TestContentRoute:
     def test_missing_document_404(self, client, app_dir):
         import storyloom.web.server as server_mod
         # Valid language but no content dir → file missing → 404.
-        with patch.object(server_mod, "_locale_dir", str(app_dir / "locale")):
+        with patch.object(server_mod, "_content_dir", str(app_dir / "content")):
             res = client.get("/content/en/nonexistent")
         assert res.status_code == 404
 
