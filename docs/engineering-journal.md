@@ -13,7 +13,7 @@
 **决策**（commit `2786bc8`）：
 
 1. **单一权威**：新建根目录 `AGENTS.md`，内容从 `CLAUDE.md` 平移并工具中立化（项目概览、文档地图、运行/测试/构建、约定），新增 "AI-tool integration" 小节说明桥接约定；顺带修正过时的 Status（v2.0.0 → v2.3.0，补充 i18n 双源）并新增 data-driven 约定。
-2. **兼容桥**：`CLAUDE.md` 精简为薄桥（先读 AGENTS.md + 保留 Claude Code 生态说明：CLAUDE.local.md / .claude/ 均 gitignored）；新增 `.github/copilot-instructions.md` 一行桥接（经典 Copilot chat 不读 AGENTS.md）。
+2. **兼容桥**：`CLAUDE.md` 改为**符号链接**指向 `AGENTS.md`——文件系统级链接，读取 CLAUDE.md 即读取 AGENTS.md 全文，内容永远一致、零漂移（Windows clone 需 `git config core.symlinks true`，否则降级为文本路径仍可读）；新增 `.github/copilot-instructions.md` 一行桥接（经典 Copilot chat 不读 AGENTS.md）。
 3. **文档同步**：`README.md` Development 小节说明该约定；`core/co_create.py` 失效的 "CLAUDE.md §Tech Stack" 注释（该章节早已在精简中删除）改指 `AGENTS.md §Conventions`。
 4. **不做**：不创建 `.cursor/rules` / `.windsurf/rules` 副本——二者原生支持 AGENTS.md，副本只会漂移；`docs/superpowers/` 存档计划中的旧引用保留原样（已归档）。
 

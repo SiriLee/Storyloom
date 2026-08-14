@@ -3,7 +3,8 @@
 > AI context file. Loaded automatically by AI coding agents (Claude Code,
 > Cursor, Windsurf, GitHub Copilot, Gemini CLI, …) on entering the project.
 > This is the **single source of truth** for project context — per-tool files
-> such as `CLAUDE.md` are thin compatibility bridges that point here.
+> such as `CLAUDE.md` (a symlink to this file) are thin bridges that resolve
+> here.
 
 ## Project
 
@@ -126,9 +127,10 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 ## AI-tool integration
 
 - `AGENTS.md` is the single source of truth for coding-agent context.
-- Per-tool files are **thin bridges** only: `CLAUDE.md` (Claude Code),
-  `.github/copilot-instructions.md` (classic Copilot chat). Never duplicate
-  shared knowledge into them.
+- Per-tool files stay thin: `CLAUDE.md` is a **symlink to this file**
+  (Claude Code; Windows clones degrade to a text pointer unless
+  `git config core.symlinks true`), `.github/copilot-instructions.md` is a
+  pointer (classic Copilot chat). Never duplicate shared knowledge into them.
 - Tool-specific rules (e.g. `.cursor/rules`, `.windsurf/rules`) may be added
   per-tool, but must reference this file instead of duplicating it.
 - Personal, machine-local configuration (e.g. `CLAUDE.local.md`, `.claude/`)
