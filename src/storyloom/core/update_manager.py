@@ -6,11 +6,13 @@ import json
 import os
 import re
 import shutil
+import socket
 import sys
 import tempfile
 import time
 import zipfile
 from dataclasses import dataclass, field
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, ProxyHandler, build_opener
 
 
@@ -71,6 +73,9 @@ class VersionInfo:
     latest: str   # "1.4.0" (empty if no update or offline)
     release_notes: str = ""
     asset_url: str = ""  # direct download URL for the release asset
+    # Error category when the version check failed ("" = ok):
+    # rate_limit | timeout | network | http | not_found | parse | unknown.
+    error: str = ""
     has_update: bool = field(default=False, init=False)
 
     def __post_init__(self):
@@ -126,6 +131,29 @@ def _http_get_json(url: str) -> dict:
     req = Request(url, headers={"Accept": "application/vnd.github+json"})
     with _get_opener().open(req, timeout=15) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+def _classify_error(exc: Exception) -> str:
+    """Map an HTTP/network exception to a short error category.
+
+    Categories: ``rate_limit``, ``timeout``, ``network``, ``http``,
+    ``not_found``, ``parse``, ``unknown``.
+    """
+    if isinstance(exc, HTTPError):
+        if exc.code == 404:
+            return "not_found"
+        if exc.code in (403, 429):  # GitHub unauthenticated limit is 60/hr
+            return "rate_limit"
+        return "http"
+    if isinstance(exc, TimeoutError):  # socket.timeout is an alias
+        return "timeout"
+    if isinstance(exc, URLError):
+        if isinstance(exc.reason, TimeoutError):
+            return "timeout"
+        return "network"
+    if isinstance(exc, ValueError):  # includes json.JSONDecodeError
+        return "parse"
+    return "unknown"
 
 
 def _parse_version_from_tag(tag: str) -> str:
@@ -202,11 +230,14 @@ def _check_app_update(app_version: str) -> VersionInfo:
 
     Returns a ``VersionInfo`` with ``latest=""`` on any error (offline,
     rate-limited, etc.) so one layer's failure never blocks the other.
+    The error category is recorded in ``VersionInfo.error``.
     """
     try:
         release = _http_get_json(_GITHUB_API_LATEST)
-    except Exception:
-        return VersionInfo(current=app_version, latest="")
+    except Exception as exc:
+        return VersionInfo(
+            current=app_version, latest="", error=_classify_error(exc)
+        )
 
     assets = release.get("assets", [])
     release_notes = release.get("body", "")
@@ -231,12 +262,18 @@ def _check_system_media_update(system_media_version: str) -> VersionInfo:
     (its assets carry the version in the filename, e.g.
     ``system_media-v1.1.0.zip``).
 
-    Returns a ``VersionInfo`` with ``latest=""`` on any error.
+    Returns a ``VersionInfo`` with ``latest=""`` on any error.  A 404
+    (tag not created yet) is treated as "no update" rather than an error.
     """
     try:
         release = _http_get_json(_GITHUB_API_SYSTEM_MEDIA)
-    except Exception:
-        return VersionInfo(current=system_media_version, latest="")
+    except Exception as exc:
+        err = _classify_error(exc)
+        if err == "not_found":
+            return VersionInfo(current=system_media_version, latest="")
+        return VersionInfo(
+            current=system_media_version, latest="", error=err
+        )
 
     assets = release.get("assets", [])
     sm_url, remote_sm_ver = _find_asset_url(
@@ -257,12 +294,18 @@ def _check_launcher_update(launcher_version: str) -> VersionInfo:
     ``storyloom-launcher-v{ver}-{platform}.zip``) and is only bumped when
     ``launcher.py`` itself changes.
 
-    Returns a ``VersionInfo`` with ``latest=""`` on any error.
+    Returns a ``VersionInfo`` with ``latest=""`` on any error.  A 404
+    (tag not created yet) is treated as "no update" rather than an error.
     """
     try:
         release = _http_get_json(_GITHUB_API_LAUNCHER)
-    except Exception:
-        return VersionInfo(current=launcher_version, latest="")
+    except Exception as exc:
+        err = _classify_error(exc)
+        if err == "not_found":
+            return VersionInfo(current=launcher_version, latest="")
+        return VersionInfo(
+            current=launcher_version, latest="", error=err
+        )
 
     assets = release.get("assets", [])
     url, ver = _find_asset_url(

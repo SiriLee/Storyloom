@@ -710,12 +710,23 @@
                     var el = document.getElementById("update-current-ver");
                     if (el) el.textContent = result.app.current;
 
-                    if (!result.app.has_update && !result.system_media.has_update
-                        && !(result.launcher && result.launcher.has_update)) {
+                    var layerErrors = _collectUpdateErrors(result);
+                    var hasUpdate = result.app.has_update
+                        || result.system_media.has_update
+                        || (result.launcher && result.launcher.has_update);
+
+                    if (hasUpdate) {
+                        _showUpdatePopup(result);
+                        if (layerErrors.length) {
+                            showToast(_("Update check partial failure") + ": "
+                                + layerErrors.join("; "));
+                        }
+                    } else if (layerErrors.length) {
+                        showToast(_("Check failed") + ": "
+                            + layerErrors.join("; "));
+                    } else {
                         showToast(_("Up to date"));
-                        return;
                     }
-                    _showUpdatePopup(result);
                 }).catch(function (err) {
                     btn.disabled = false;
                     btn.innerHTML = Icons.refresh() + esc(_("Check for Updates"));
@@ -1040,6 +1051,42 @@
                 b.classList.toggle("active", b.dataset.value === ThemeState.current);
             });
         }
+    }
+
+    /** Map an update-layer error category to a localized message. */
+    function _updateErrorLabel(code) {
+        switch (code) {
+            case "rate_limit":
+                return _("GitHub rate limit, try again later");
+            case "timeout":
+                return _("Request timed out");
+            case "network":
+                return _("Network error");
+            case "http":
+                return _("Server error");
+            case "not_found":
+                return _("Not found");
+            case "parse":
+                return _("Unexpected response");
+            default:
+                return _("Unknown error");
+        }
+    }
+
+    /** Collect non-empty layer error labels, e.g. 'App Core: GitHub rate limit'. */
+    function _collectUpdateErrors(result) {
+        var out = [];
+        if (result.app && result.app.error) {
+            out.push(_("App Core") + ": " + _updateErrorLabel(result.app.error));
+        }
+        if (result.system_media && result.system_media.error) {
+            out.push(_("System Media") + ": "
+                + _updateErrorLabel(result.system_media.error));
+        }
+        if (result.launcher && result.launcher.error) {
+            out.push(_("Launcher") + ": " + _updateErrorLabel(result.launcher.error));
+        }
+        return out;
     }
 
     /** Show a centered modal for update download. */

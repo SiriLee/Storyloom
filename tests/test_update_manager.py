@@ -1,9 +1,11 @@
 """Tests for UpdateManager — data types, version check, download, extraction."""
 import os
+import socket
 import sys
 import tempfile
 import zipfile
 from unittest.mock import Mock, patch
+from urllib.error import HTTPError, URLError
 
 import pytest
 
@@ -69,6 +71,76 @@ def test_version_gt_prerelease():
 
 def test_version_gt_invalid():
     assert _version_gt("abc", "1.0.0") is False
+
+
+# ── Error classification ──────────────────────────────────────────
+
+
+def test_classify_http_errors():
+    from storyloom.core.update_manager import _classify_error
+    assert _classify_error(HTTPError("u", 403, "Forbidden", None, None)) == "rate_limit"
+    assert _classify_error(HTTPError("u", 429, "Too Many", None, None)) == "rate_limit"
+    assert _classify_error(HTTPError("u", 404, "Not Found", None, None)) == "not_found"
+    assert _classify_error(HTTPError("u", 500, "Internal", None, None)) == "http"
+
+
+def test_classify_timeout():
+    from storyloom.core.update_manager import _classify_error
+    assert _classify_error(TimeoutError()) == "timeout"
+    assert _classify_error(URLError(socket.timeout())) == "timeout"
+
+
+def test_classify_network_and_parse():
+    from storyloom.core.update_manager import _classify_error
+    assert _classify_error(URLError("connection refused")) == "network"
+    assert _classify_error(ValueError("bad json")) == "parse"
+    assert _classify_error(RuntimeError("boom")) == "unknown"
+
+
+@patch("storyloom.core.update_manager._http_get_json")
+def test_check_error_category_propagates(mock_get):
+    """App layer failure records its category; sm/launcher remain ok."""
+    import sys
+    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
+
+    def _dispatch(url):
+        if "/tags/system-media" in url:
+            return _make_sm_release(assets=[])
+        if "/tags/launcher" in url:
+            return _make_launcher_release(assets=[])
+        raise URLError("connection refused")
+
+    mock_get.side_effect = _dispatch
+    result = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
+    assert result.app.error == "network"
+    assert result.app.has_update is False
+    assert result.system_media.error == ""
+    assert result.launcher.error == ""
+
+
+@patch("storyloom.core.update_manager._http_get_json")
+def test_check_404_tag_is_not_error(mock_get):
+    """launcher/system-media tag missing → no update, no error."""
+    import sys
+    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
+
+    def _dispatch(url):
+        if "/tags/system-media" in url:
+            raise HTTPError(url, 404, "Not Found", None, None)
+        if "/tags/launcher" in url:
+            raise HTTPError(url, 404, "Not Found", None, None)
+        return _make_app_release(tag="v1.3.0", assets=[
+            {"name": f"storyloom-app-v1.3.0-{plat}.zip",
+             "browser_download_url": "https://example.com/app.zip"},
+        ])
+
+    mock_get.side_effect = _dispatch
+    result = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
+    assert result.system_media.error == ""
+    assert result.system_media.latest == ""
+    assert result.system_media.has_update is False
+    assert result.launcher.error == ""
+    assert result.launcher.has_update is False
 
 
 def test_parse_version_from_tag():

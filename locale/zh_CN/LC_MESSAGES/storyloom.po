@@ -420,11 +420,32 @@ msgstr "下载中..."
 msgid "Extracting..."
 msgstr "提取中..."
 
+msgid "GitHub rate limit, try again later"
+msgstr "GitHub 限流，请稍后再试"
+
+msgid "Launcher"
+msgstr "启动器"
+
+msgid "Network error"
+msgstr "网络错误"
+
+msgid "Not found"
+msgstr "未找到"
+
 msgid "Please restart via Storyloom."
 msgstr "请通过 Storyloom 重新启动。"
 
+msgid "Request timed out"
+msgstr "请求超时"
+
+msgid "Server error"
+msgstr "服务器错误"
+
 msgid "System Media"
 msgstr "系统素材"
+
+msgid "Unexpected response"
+msgstr "响应异常"
 
 msgid "Up to date"
 msgstr "已是最新"
@@ -434,6 +455,9 @@ msgstr "更新"
 
 msgid "Update Available"
 msgstr "有可用更新"
+
+msgid "Update check partial failure"
+msgstr "部分更新检查失败"
 
 msgid "Update failed"
 msgstr "更新失败"
