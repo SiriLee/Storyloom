@@ -43,11 +43,11 @@ Models we've tested and can recommend:
 
 | Tier | Model | Notes |
 |------|-------|-------|
-| <span class="guide-badge best">Best</span> | `deepseek-v4-pro` | Top-tier reasoning, excellent structured output. Storyloom's default. |
+| <span class="guide-badge best">Best</span> | `deepseek-v4-flash` | Fast, low-latency. Recommended for streaming. |
 | <span class="guide-badge best">Best</span> | `claude-sonnet-5` | Strong creative writing, reliable formatting. Higher cost. |
 | <span class="guide-badge best">Best</span> | `gpt-5.2` | Excellent instruction following, very stable formatting. |
 | <span class="guide-badge best">Best</span> | `gemini-3-pro` | 1M context window, great for long-form narrative. |
-| <span class="guide-badge good">Good</span> | `deepseek-v4-flash` | Budget DeepSeek. Adequate for most use. |
+| <span class="guide-badge good">Good</span> | `deepseek-v4-pro` | Strong output, but slow thinking since the 08-13 update. |
 | <span class="guide-badge good">Good</span> | `qwen3-max` | Alibaba flagship. Good Chinese/English bilingual quality. |
 | <span class="guide-badge good">Good</span> | `glm-4.6` | Zhipu's latest. Competitive quality. |
 | <span class="guide-badge usable">Usable</span> | `gpt-5-mini` | Cheapest GPT-5 tier. May occasionally produce formatting errors. |

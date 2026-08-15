@@ -41,11 +41,11 @@ Storyloom 需要配置 API 才能运行。这里只提供实用经验；详细�
 
 | 推荐 | 模型 | 说明 |
 |------|------|------|
-| <span class="guide-badge best">首选</span> | `deepseek-v4-pro` | 综合最佳，Storyloom 默认。结构化输出强，性价比高。 |
+| <span class="guide-badge best">首选</span> | `deepseek-v4-flash` | 速度快、延迟低，推荐用于流式叙事。 |
 | <span class="guide-badge best">首选</span> | `claude-sonnet-5` | 创意写作优秀，格式可靠。价格较高。 |
 | <span class="guide-badge best">首选</span> | `gpt-5.2` | 指令遵循能力强，格式非常稳定。 |
 | <span class="guide-badge best">首选</span> | `gemini-3-pro` | 百万上下文窗口，长故事首选。 |
-| <span class="guide-badge good">不错</span> | `deepseek-v4-flash` | DeepSeek 经济版，大多数场景够用。 |
+| <span class="guide-badge good">不错</span> | `deepseek-v4-pro` | 输出强，但 08-13 更新后思考耗时过长。 |
 | <span class="guide-badge good">不错</span> | `qwen3-max` | 阿里旗舰，中英双语质量好。 |
 | <span class="guide-badge good">不错</span> | `glm-4.6` | 智谱最新，中文内容质量好。 |
 | <span class="guide-badge usable">可用</span> | `gpt-5-mini` | GPT-5 最便宜档，偶尔格式错误。 |
