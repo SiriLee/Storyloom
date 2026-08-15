@@ -51,6 +51,18 @@ system_media_src/{type}.json        ← source of truth (you edit THIS)
    python scripts/sysgen/generate_system_assets.py --only sys_id --force --model <model>
    ```
 
+## Releasing
+
+1. Generate the images, pack the ZIP locally, and upload it:
+   ```bash
+   bash scripts/pack_system_media.sh
+   gh release upload system-media system_media-v{version}.zip
+   ```
+   (Images are gitignored and AI-generated, so this stays manual.)
+2. Push the `system_media_src/VERSION` bump — CI auto-regenerates and
+   uploads `_manifest.json` to the `system-media` tag (see
+   `.github/workflows/release-system-media.yml`).
+
 ## Key scripts
 
 | Script | Purpose |
