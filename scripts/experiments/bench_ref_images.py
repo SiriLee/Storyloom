@@ -36,7 +36,7 @@ Prompt: build_generation_prompt(AssetType.CHAR_PORTRAIT, ...) —
 Timing: client.generate() wall-clock (API + download + rembg).
 
 Usage:
-    IMAGE_API_KEY=sk-xxx python scripts/bench_ref_images.py
+    IMAGE_API_KEY=sk-xxx python scripts/experiments/bench_ref_images.py
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ import sys
 import time
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from storyloom.assets import AssetType

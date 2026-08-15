@@ -32,7 +32,7 @@ speed factor is reference images, NOT concurrency.
 See bench_ref_images.py for reference-image benchmark.
 
 Usage:
-    IMAGE_API_KEY=sk-xxx python scripts/stress_test_image_api.py [--workers N] [--count N]
+    IMAGE_API_KEY=sk-xxx python scripts/experiments/stress_test_image_api.py [--workers N] [--count N]
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 from storyloom.io.img_api_client import ImgApiClient
 from storyloom.io._types import ImageSize, RemoveBgPolicy
 from storyloom.user_config import UserConfig

@@ -160,8 +160,8 @@ bash scripts/build.sh                # standalone binary + wheel
 bash scripts/pack_system_media.sh    # system asset pack for release
 
 # Generate system assets from source definitions (requires image API key)
-python scripts/generate_system_assets.py
-python scripts/generate_manifest.py
+python scripts/sysgen/generate_system_assets.py
+python scripts/sysgen/generate_manifest.py
 ```
 
 **Conventions:** Python ≥ 3.10 · stdlib-first · Conventional Commits ·

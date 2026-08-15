@@ -84,7 +84,7 @@ TASK_POOL_MAX_WORKERS = 6    # Thread pool for LLM match/select/generate tasks
 PREBUILD_MAX_WORKERS = 6     # Prebuilder concurrent image generation
 GENERATE_LIBRARY_TOP_N = 60      # library entries in LLM selection prompt (system ~25 + user ~35)
 # Reference images cause 4.4x slowdown on FLUX.2 Pro (15s→64s, see
-# scripts/bench_ref_images.py).  Set to 0 for speed; restore to 3 if
+# scripts/experiments/bench_ref_images.py).  Set to 0 for speed; restore to 3 if
 # future models handle references faster or strong style consistency is needed.
 GENERATE_REF_IMAGE_COUNT = 0     # max reference images for style guidance
 

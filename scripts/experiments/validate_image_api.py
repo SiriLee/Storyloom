@@ -29,17 +29,17 @@ Config resolution (matches 7.3 design):
 ============================================================================
 Usage:
     # Use config.json from project root (default)
-    python scripts/validate_image_api.py
+    python scripts/experiments/validate_image_api.py
 
     # Explicit app directory
-    python scripts/validate_image_api.py --app-dir ~/.storyloom
+    python scripts/experiments/validate_image_api.py --app-dir ~/.storyloom
 
     # Env var overrides (same pattern as LLM)
-    IMAGE_API_KEY=sk-xxx python scripts/validate_image_api.py
-    IMAGE_MODEL=seedream-5-0-260128 python scripts/validate_image_api.py
+    IMAGE_API_KEY=sk-xxx python scripts/experiments/validate_image_api.py
+    IMAGE_MODEL=seedream-5-0-260128 python scripts/experiments/validate_image_api.py
 
     # WSL2 with proxy (httpx reads HTTP_PROXY/HTTPS_PROXY automatically)
-    python scripts/validate_image_api.py
+    python scripts/experiments/validate_image_api.py
 ============================================================================
 """
 
@@ -52,7 +52,7 @@ import time
 from pathlib import Path
 
 # Ensure the project root is on sys.path so storyloom is importable
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 

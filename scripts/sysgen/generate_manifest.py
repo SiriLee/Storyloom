@@ -7,9 +7,9 @@ field is intentionally omitted (it is consumed only by the generation scripts).
 
 Usage::
 
-    python scripts/generate_manifest.py
-    python scripts/generate_manifest.py --dry-run
-    python scripts/generate_manifest.py --version 1.1.0
+    python scripts/sysgen/generate_manifest.py
+    python scripts/sysgen/generate_manifest.py --dry-run
+    python scripts/sysgen/generate_manifest.py --version 1.1.0
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import os
 import sys
 from pathlib import Path
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 _SRC_DIR = _PROJECT_ROOT / "system_media_src"
 _MANIFEST_PATH = _PROJECT_ROOT / "system_media" / "_manifest.json"
 _VERSION_PATH = _PROJECT_ROOT / "system_media" / "VERSION"

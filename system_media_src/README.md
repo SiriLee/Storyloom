@@ -10,9 +10,9 @@
 ```
 system_media_src/{type}.json        ← source of truth (you edit THIS)
         │
-        ├── generate_system_assets.py   → system_media/{type}/sys_*.png
+        ├── scripts/sysgen/generate_system_assets.py   → system_media/{type}/sys_*.png
         │
-        └── generate_manifest.py        → system_media/_manifest.json
+        └── scripts/sysgen/generate_manifest.py        → system_media/_manifest.json
                                            (name + description only;
                                             prompt is stripped)
 ```
@@ -30,32 +30,32 @@ system_media_src/{type}.json        ← source of truth (you edit THIS)
 
 2. **Generate the image:**
    ```bash
-   python scripts/generate_system_assets.py --only sys_new_id --model <model>
+   python scripts/sysgen/generate_system_assets.py --only sys_new_id --model <model>
    ```
    (Omit `--model` to use the default from config.json.)
 
 3. **Regenerate the manifest:**
    ```bash
-   python scripts/generate_manifest.py --version <new-version>
+   python scripts/sysgen/generate_manifest.py --version <new-version>
    ```
 
 ## Modifying an existing asset (description only)
 
 1. Edit the `description` (and `prompt` if desired) in
    `system_media_src/{type}.json`.
-2. Run `python scripts/generate_manifest.py --version <new-version>`.
+2. Run `python scripts/sysgen/generate_manifest.py --version <new-version>`.
 3. If the prompt changed and you want a new image, run:
    ```bash
-   python scripts/generate_system_assets.py --only sys_id --force --model <model>
+   python scripts/sysgen/generate_system_assets.py --only sys_id --force --model <model>
    ```
 
 ## Key scripts
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/generate_system_assets.py` | Generate PNG images from prompts |
-| `scripts/generate_manifest.py` | Write `_manifest.json` from source metadata |
-| `scripts/_sysgen_utils.py` | Shared helpers (asset lookup, output paths) |
+| `scripts/sysgen/generate_system_assets.py` | Generate PNG images from prompts |
+| `scripts/sysgen/generate_manifest.py` | Write `_manifest.json` from source metadata |
+| `scripts/sysgen/_sysgen_utils.py` | Shared helpers (asset lookup, output paths) |
 | `scripts/pack_system_media.sh` | Package `system_media/` into a distributable ZIP |
 
 ## File roles

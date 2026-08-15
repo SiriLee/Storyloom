@@ -5,12 +5,12 @@ already exist on disk are skipped unless ``--force`` is passed.
 
 Usage::
 
-    python scripts/generate_system_assets.py
-    python scripts/generate_system_assets.py --type char_portrait
-    python scripts/generate_system_assets.py --dry-run
-    python scripts/generate_system_assets.py --force
-    python scripts/generate_system_assets.py --start sys_classroom
-    python scripts/generate_system_assets.py --only sys_student_female,sys_classroom
+    python scripts/sysgen/generate_system_assets.py
+    python scripts/sysgen/generate_system_assets.py --type char_portrait
+    python scripts/sysgen/generate_system_assets.py --dry-run
+    python scripts/sysgen/generate_system_assets.py --force
+    python scripts/sysgen/generate_system_assets.py --start sys_classroom
+    python scripts/sysgen/generate_system_assets.py --only sys_student_female,sys_classroom
 """
 
 from __future__ import annotations
@@ -20,11 +20,11 @@ import sys
 import time
 from pathlib import Path
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from scripts._sysgen_utils import (
+from scripts.sysgen._sysgen_utils import (
     get_image_size,
     get_remove_bg,
     load_source,

@@ -5,10 +5,10 @@ Uses the prompt from ``system_media_src/{type}.json``.
 
 Usage::
 
-    python scripts/generate_single_asset.py sys_student_female
-    python scripts/generate_single_asset.py sys_classroom --dry-run
-    python scripts/generate_single_asset.py sys_doctor_male --model flux-2-pro
-    python scripts/generate_single_asset.py sys_tavern --force --app-dir ~/.storyloom
+    python scripts/sysgen/generate_single_asset.py sys_student_female
+    python scripts/sysgen/generate_single_asset.py sys_classroom --dry-run
+    python scripts/sysgen/generate_single_asset.py sys_doctor_male --model flux-2-pro
+    python scripts/sysgen/generate_single_asset.py sys_tavern --force --app-dir ~/.storyloom
 """
 
 from __future__ import annotations
@@ -18,11 +18,11 @@ import sys
 import time
 from pathlib import Path
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from scripts._sysgen_utils import (
+from scripts.sysgen._sysgen_utils import (
     find_asset,
     get_image_size,
     get_remove_bg,
@@ -70,7 +70,7 @@ def main() -> None:
     if result is None:
         print(f"ERROR: Asset not found: {args.asset_id}")
         print("Run with just the asset ID (no path), e.g.:")
-        print("  python scripts/generate_single_asset.py sys_student_female")
+        print("  python scripts/sysgen/generate_single_asset.py sys_student_female")
         sys.exit(1)
 
     asset_type, entry = result

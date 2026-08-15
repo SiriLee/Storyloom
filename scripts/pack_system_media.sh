@@ -26,7 +26,7 @@ fi
 # ── Prerequisites ───────────────────────────────────────────────────
 if [[ ! -f "$MANIFEST" ]]; then
     echo "ERROR: _manifest.json not found." >&2
-    echo "  Run:  python scripts/generate_manifest.py" >&2; exit 1
+    echo "  Run:  python scripts/sysgen/generate_manifest.py" >&2; exit 1
 fi
 if [[ ! -f "$VERSION_FILE" ]]; then
     echo "ERROR: VERSION not found." >&2; exit 1
@@ -96,7 +96,7 @@ for atype_key, src_fname in [
 
 if not ok:
     print("\nERROR: Consistency check failed.", file=sys.stderr)
-    print("  Re-run: python scripts/generate_manifest.py", file=sys.stderr)
+    print("  Re-run: python scripts/sysgen/generate_manifest.py", file=sys.stderr)
     print("  Bypass: bash scripts/pack_system_media.sh --skip-check", file=sys.stderr)
     sys.exit(1)
 print("  All consistent.")

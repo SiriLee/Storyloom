@@ -13,7 +13,7 @@ from storyloom.assets._types import AssetType
 from storyloom.io._types import ImageSize, RemoveBgPolicy
 from storyloom.io.img_utils import detect_format, get_dimensions, normalize_background
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 _SRC_DIR = _PROJECT_ROOT / "system_media_src"
 _OUTPUT_DIR = _PROJECT_ROOT / "system_media"
 
