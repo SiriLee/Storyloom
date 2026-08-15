@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from storyloom.launcher import (
+from launcher import (
     _apply_app_update,
     _apply_launcher_update,
     _platform_exe,
@@ -29,16 +29,16 @@ def test_platform_exe_windows(monkeypatch):
 
 
 def test_apply_app_update_no_pending(tmp_path, monkeypatch):
-    monkeypatch.setattr("storyloom.launcher.DIR", str(tmp_path))
+    monkeypatch.setattr("launcher.DIR", str(tmp_path))
     _apply_app_update()
     assert not (tmp_path / "app").exists()
 
 
 def test_apply_app_update_swaps(tmp_path, monkeypatch):
-    monkeypatch.setattr("storyloom.launcher.DIR", str(tmp_path))
-    monkeypatch.setattr("storyloom.launcher.APP", str(tmp_path / "app"))
-    monkeypatch.setattr("storyloom.launcher.APP_NEW", str(tmp_path / "app_new"))
-    monkeypatch.setattr("storyloom.launcher.APP_OLD", str(tmp_path / "app_old"))
+    monkeypatch.setattr("launcher.DIR", str(tmp_path))
+    monkeypatch.setattr("launcher.APP", str(tmp_path / "app"))
+    monkeypatch.setattr("launcher.APP_NEW", str(tmp_path / "app_new"))
+    monkeypatch.setattr("launcher.APP_OLD", str(tmp_path / "app_old"))
 
     main_exe = _platform_exe("storyloom-web")
     (tmp_path / "app").mkdir()
@@ -55,10 +55,10 @@ def test_apply_app_update_swaps(tmp_path, monkeypatch):
 
 def test_apply_app_update_no_old_app(tmp_path, monkeypatch):
     """First install via update — no app/ dir yet."""
-    monkeypatch.setattr("storyloom.launcher.DIR", str(tmp_path))
-    monkeypatch.setattr("storyloom.launcher.APP", str(tmp_path / "app"))
-    monkeypatch.setattr("storyloom.launcher.APP_NEW", str(tmp_path / "app_new"))
-    monkeypatch.setattr("storyloom.launcher.APP_OLD", str(tmp_path / "app_old"))
+    monkeypatch.setattr("launcher.DIR", str(tmp_path))
+    monkeypatch.setattr("launcher.APP", str(tmp_path / "app"))
+    monkeypatch.setattr("launcher.APP_NEW", str(tmp_path / "app_new"))
+    monkeypatch.setattr("launcher.APP_OLD", str(tmp_path / "app_old"))
 
     main_exe = _platform_exe("storyloom-web")
     (tmp_path / "app_new").mkdir()
@@ -71,17 +71,17 @@ def test_apply_app_update_no_old_app(tmp_path, monkeypatch):
 
 
 def test_apply_launcher_update_none(tmp_path, monkeypatch):
-    monkeypatch.setattr("storyloom.launcher.DIR", str(tmp_path))
-    monkeypatch.setattr("storyloom.launcher.LAUNCHER_NEW",
+    monkeypatch.setattr("launcher.DIR", str(tmp_path))
+    monkeypatch.setattr("launcher.LAUNCHER_NEW",
                         str(tmp_path / "launcher.new"))
     _apply_launcher_update()
 
 
 def test_apply_launcher_update_unix(tmp_path, monkeypatch):
-    monkeypatch.setattr("storyloom.launcher.DIR", str(tmp_path))
-    monkeypatch.setattr("storyloom.launcher.LAUNCHER_NEW",
+    monkeypatch.setattr("launcher.DIR", str(tmp_path))
+    monkeypatch.setattr("launcher.LAUNCHER_NEW",
                         str(tmp_path / "launcher.new"))
-    monkeypatch.setattr("storyloom.launcher.LAUNCHER_NAME", "Storyloom")
+    monkeypatch.setattr("launcher.LAUNCHER_NAME", "Storyloom")
     monkeypatch.setattr(sys, "platform", "linux")
 
     (tmp_path / "launcher.new").write_text("new-launcher")
@@ -99,18 +99,18 @@ def test_apply_launcher_update_unix(tmp_path, monkeypatch):
 
 def test_apply_launcher_update_windows_bat_paths(tmp_path, monkeypatch):
     """The .bat script must use absolute paths for both source and dest."""
-    monkeypatch.setattr("storyloom.launcher.DIR", str(tmp_path))
+    monkeypatch.setattr("launcher.DIR", str(tmp_path))
     monkeypatch.setattr(
-        "storyloom.launcher.LAUNCHER_NEW",
+        "launcher.LAUNCHER_NEW",
         str(tmp_path / "launcher.new"),
     )
-    monkeypatch.setattr("storyloom.launcher.LAUNCHER_NAME", "Storyloom.exe")
+    monkeypatch.setattr("launcher.LAUNCHER_NAME", "Storyloom.exe")
     monkeypatch.setattr(sys, "platform", "win32")
 
     (tmp_path / "launcher.new").write_text("new-launcher")
 
     mock_popen = Mock()
-    monkeypatch.setattr("storyloom.launcher.subprocess.Popen", mock_popen)
+    monkeypatch.setattr("launcher.subprocess.Popen", mock_popen)
 
     # sys.exit is called after spawning the .bat — prevent test exit.
     with pytest.raises(SystemExit):

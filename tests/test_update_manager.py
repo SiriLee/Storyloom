@@ -449,7 +449,7 @@ def test_download_extract_cleans_stale_app_new(tmp_path):
 
 def test_regenerate_launcher_success(tmp_path):
     """Happy path: launcher asset zip contains launcher + version file."""
-    from storyloom.launcher import _platform_exe
+    from launcher import _platform_exe
 
     launcher_name = _platform_exe("Storyloom")
 

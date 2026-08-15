@@ -73,7 +73,7 @@ Storyloom is an AI-powered interactive text fiction game engine. The LLM is the 
 | `src/storyloom/web/sessions.py` | In-memory session store for co-create + game loops |
 | `src/storyloom/dev_cli/` | Dev CLI — `DevObserver`, deque-buffered display (**v2.0.0: path detection not adapted to new layout, stale/deprecated**) |
 | `src/storyloom/core/update_manager.py` | UpdateManager — version check, download, extraction (§4) |
-| `src/storyloom/launcher.py` | Launcher — atomic app_new→app swap, self-update (§3) |
+| `src/launcher.py` | Launcher — atomic app_new→app swap, self-update (§3) |
 | `src/storyloom/config.py` | Configurable constants |
 | `src/storyloom/user_config.py` | UserConfig — centralized config management |
 | `src/storyloom/i18n.py` | gettext i18n (zh-CN, zh-TW, en) — `locale/` package data via `importlib.resources` |
