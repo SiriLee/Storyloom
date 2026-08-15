@@ -24,24 +24,24 @@ Download `storyloom-v{VERSION}-{platform}.zip` from
 [Releases](https://github.com/SiriLee/Storyloom/releases/latest), extract,
 and run `Storyloom`.
 
-### Wheel
+### From PyPI
 
 *Requires Python ≥ 3.10.*
 
-Download `storyloom-{VERSION}-py3-none-any.whl` from
-[Releases](https://github.com/SiriLee/Storyloom/releases/latest), then:
-
 ```bash
-pip install ./storyloom-{VERSION}-py3-none-any.whl
-storyloom-web
+pip install storyloom
 ```
 
-Optional dependencies (install separately if needed):
+Optional extras:
 
 ```bash
-pip install pywebview           # native desktop window (falls back to browser)
-pip install onnxruntime         # background removal (model already bundled)
+pip install "storyloom[desktop,bg]"   # native window + background removal
 ```
+
+| Extra | Adds |
+|-------|------|
+| `desktop` | Native desktop window via `pywebview` — falls back to browser if unavailable |
+| `bg` | Background removal for generated images (`onnxruntime`; model already bundled) |
 
 System media assets are not included in the wheel.  Download them via
 **Settings → Updates** on first launch.
@@ -53,11 +53,6 @@ git clone https://github.com/SiriLee/Storyloom.git
 cd Storyloom
 pip install -e ".[desktop,bg]"
 ```
-
-| Extra | Adds |
-|-------|------|
-| `desktop` | Native desktop window via `pywebview` — falls back to browser if unavailable |
-| `bg` | Background removal for generated images (`onnxruntime`; model already bundled) |
 
 ---
 
