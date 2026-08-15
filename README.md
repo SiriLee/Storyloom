@@ -29,13 +29,13 @@ and run `Storyloom`.
 *Requires Python ≥ 3.10.*
 
 ```bash
-pip install storyloom
+pip install storyloom-engine
 ```
 
 Optional extras:
 
 ```bash
-pip install "storyloom[desktop,bg]"   # native window + background removal
+pip install "storyloom-engine[desktop,bg]"   # native window + background removal
 ```
 
 | Extra | Adds |
