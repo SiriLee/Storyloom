@@ -79,9 +79,10 @@ _STATIC = Path(__file__).resolve().parent / "static"
 _DOC_SLUG_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 # App directory — where config.json / saves / media / system_media live.
-# Dev: repo root (server.py → web → storyloom → src → repo root).
+# Dev/editable: repo root (server.py → web → storyloom → src → repo root).
 # PyInstaller (new launcher layout): exe at <root>/app/storyloom-web → root = ../..
 # PyInstaller (old flat layout): exe at <root>/storyloom-web → root = .
+# Installed wheel: site-packages isn't user-writable → fall back to cwd.
 if getattr(sys, 'frozen', False):
     exe_dir = Path(sys.executable).parent
     if exe_dir.name == "app":
@@ -89,7 +90,11 @@ if getattr(sys, 'frozen', False):
     else:
         _PROJECT_ROOT = exe_dir
 else:
-    _PROJECT_ROOT = Path(__file__).resolve().parents[3]
+    _pkg = Path(__file__).resolve()
+    if "site-packages" in _pkg.parts or "dist-packages" in _pkg.parts:
+        _PROJECT_ROOT = Path.cwd()
+    else:
+        _PROJECT_ROOT = _pkg.parents[3]
 _APP_DIR = os.environ.get("STORYLOOM_APP_DIR", str(_PROJECT_ROOT))
 
 app = FastAPI(title="Storyloom", docs_url=None, redoc_url=None)
@@ -1338,6 +1343,11 @@ async def update_check(force: bool = False):
         launcher_version=launcher_ver,
         force=force,
     )
+    # Wheel/source installs have no launcher to atomically swap a new app
+    # binary, so the app layer updates via pip rather than a zip download.
+    if not getattr(sys, "frozen", False):
+        result.app.apply_kind = "pip"
+        result.app.asset_url = ""
     return result
 
 
@@ -1377,6 +1387,11 @@ async def update_stream(stream_id: str):
             check = check_for_updates(
                 __version__, sm_ver, launcher_ver, force=False
             )
+            # Same wheel guard as /api/update/check — never download an app
+            # zip on a launcher-less install.
+            if not getattr(sys, "frozen", False):
+                check.app.apply_kind = "pip"
+                check.app.asset_url = ""
 
             for layer in layers:
                 if layer == "app" and check.app.has_update:

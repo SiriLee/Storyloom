@@ -914,6 +914,7 @@ class TestUpdateAPI:
         # Should complete without download
         mock_dl.assert_not_called()
 
+    @patch("sys.frozen", True, create=True)
     @patch("storyloom.web.server.download_and_extract")
     @patch("storyloom.web.server.check_for_updates")
     def test_stream_download_error(
@@ -941,7 +942,7 @@ class TestUpdateAPI:
             mock_dl.side_effect = RuntimeError("connection reset")
 
             sm_dir = app_dir / "system_media"
-            sm_dir.mkdir()
+            sm_dir.mkdir(exist_ok=True)
             (sm_dir / "VERSION").write_text("1.1.0")
 
             resp = client.post("/api/update/apply",

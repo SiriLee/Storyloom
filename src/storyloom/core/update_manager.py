@@ -89,6 +89,9 @@ class VersionInfo:
     # Error category when the version check failed ("" = ok):
     # rate_limit | timeout | network | http | not_found | parse | unknown.
     error: str = ""
+    # How the update is applied: "download" (exe — launcher swaps the zip
+    # in place) or "pip" (wheel/source — user runs `pip install --upgrade`).
+    apply_kind: str = "download"
     has_update: bool = field(default=False, init=False)
 
     def __post_init__(self):

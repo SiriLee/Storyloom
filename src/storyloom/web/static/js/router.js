@@ -1099,11 +1099,21 @@
         var layers = [];
         var rows = "";
         if (result.app.has_update) {
-            layers.push("app");
-            rows += '<div class="update-popup-layer">'
-                + '<strong>' + esc(_("App Core")) + '</strong> &nbsp; '
-                + esc(result.app.current) + ' → ' + esc(result.app.latest)
-                + '</div>';
+            if (result.app.apply_kind === "pip") {
+                rows += '<div class="update-popup-layer">'
+                    + '<strong>' + esc(_("App Core")) + '</strong> &nbsp; '
+                    + esc(result.app.current) + ' → ' + esc(result.app.latest)
+                    + '<div class="text-muted" style="margin-top:0.25rem">'
+                    + esc(_("Update via pip: pip install --upgrade storyloom"))
+                    + '</div>'
+                    + '</div>';
+            } else {
+                layers.push("app");
+                rows += '<div class="update-popup-layer">'
+                    + '<strong>' + esc(_("App Core")) + '</strong> &nbsp; '
+                    + esc(result.app.current) + ' → ' + esc(result.app.latest)
+                    + '</div>';
+            }
         }
         if (result.system_media.has_update) {
             layers.push("system_media");
@@ -1124,17 +1134,23 @@
 
         var overlay = document.createElement("div");
         overlay.id = "update-popup-overlay";
+        var actionsHtml = layers.length > 0
+            ? '<div class="update-popup-actions">'
+                + '<button class="menu-btn accent" id="btn-update-start">'
+                + esc(_("Update")) + '</button>'
+                + '<button class="menu-btn" id="btn-update-close">'
+                + esc(_("Cancel")) + '</button>'
+                + '</div>'
+            : '<div class="update-popup-actions">'
+                + '<button class="menu-btn" id="btn-update-close">'
+                + esc(_("Close")) + '</button>'
+                + '</div>';
         overlay.innerHTML =
             '<div class="update-popup">'
             + '<h3 class="update-popup-title">' + esc(_("Update Available"))
             + '</h3>'
             + rows
-            + '<div class="update-popup-actions">'
-            + '<button class="menu-btn accent" id="btn-update-start">'
-            + esc(_("Update")) + '</button>'
-            + '<button class="menu-btn" id="btn-update-close">'
-            + esc(_("Cancel")) + '</button>'
-            + '</div>'
+            + actionsHtml
             + '<div id="update-popup-progress" class="hidden"></div>'
             + '</div>';
         document.body.appendChild(overlay);
@@ -1147,8 +1163,9 @@
         document.getElementById("btn-update-close")
             .addEventListener("click", remove);
 
-        document.getElementById("btn-update-start")
-            .addEventListener("click", function () {
+        var startBtn = document.getElementById("btn-update-start");
+        if (startBtn) {
+            startBtn.addEventListener("click", function () {
                 var actions = overlay.querySelector(".update-popup-actions");
                 if (actions) actions.classList.add("hidden");
                 var prog = document.getElementById("update-popup-progress");
@@ -1156,6 +1173,7 @@
 
                 _runUpdateDownload(layers, prog, remove);
             });
+        }
     }
 
     /** Stream the download progress into the popup. */

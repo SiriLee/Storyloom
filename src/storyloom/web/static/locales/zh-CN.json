@@ -172,6 +172,7 @@
   "Update check partial failure": "部分更新检查失败",
   "Update failed": "更新失败",
   "Update ready": "更新就绪",
+  "Update via pip: pip install --upgrade storyloom": "请通过 pip 更新：pip install --upgrade storyloom",
   "Updates": "更新",
   "Variables": "变量",
   "Violet": "紫罗兰",
