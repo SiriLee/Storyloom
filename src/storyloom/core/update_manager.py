@@ -4,7 +4,6 @@ Spec: docs/superpowers/specs/2026-08-10-auto-update-design.md §4
 """
 import json
 import os
-import re
 import shutil
 import socket
 import sys
@@ -15,13 +14,30 @@ from dataclasses import dataclass, field
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, ProxyHandler, build_opener
 
+from storyloom.config import (
+    GITHUB_DOWNLOAD_BASE,
+    GITHUB_RELEASES_URL,
+    LAUNCHER_MANIFEST_FILENAME,
+    LAUNCHER_TAG,
+    SYSTEM_MEDIA_MANIFEST_FILENAME,
+    SYSTEM_MEDIA_TAG,
+    UPDATE_MANIFEST_FILENAME,
+)
+
 
 # ── Config ────────────────────────────────────────────────────────
 
-_GITHUB_API_BASE = "https://api.github.com/repos/SiriLee/Storyloom/releases"
-_GITHUB_API_LATEST = f"{_GITHUB_API_BASE}/latest"
-_GITHUB_API_SYSTEM_MEDIA = f"{_GITHUB_API_BASE}/tags/system-media"
-_GITHUB_API_LAUNCHER = f"{_GITHUB_API_BASE}/tags/launcher"
+# Per-layer manifest URLs, served by the release *download* CDN (not the
+# rate-limited REST API).  Underlying constants live in config.py.
+_APP_MANIFEST_URL = (
+    f"{GITHUB_RELEASES_URL}/latest/download/{UPDATE_MANIFEST_FILENAME}"
+)
+_SYSTEM_MEDIA_MANIFEST_URL = (
+    f"{GITHUB_DOWNLOAD_BASE}/{SYSTEM_MEDIA_TAG}/{SYSTEM_MEDIA_MANIFEST_FILENAME}"
+)
+_LAUNCHER_MANIFEST_URL = (
+    f"{GITHUB_DOWNLOAD_BASE}/{LAUNCHER_TAG}/{LAUNCHER_MANIFEST_FILENAME}"
+)
 CACHE_SECONDS = 900  # 15 minutes
 
 # Per spec §4.3
@@ -123,14 +139,21 @@ def _version_gt(a: str, b: str) -> bool:
     return _version_tuple(a) > _version_tuple(b)
 
 
-# ── GitHub API helpers ────────────────────────────────────────────
+# ── HTTP helpers ──────────────────────────────────────────────────
 
 
 def _http_get_json(url: str) -> dict:
     """GET JSON from a URL.  Raises on HTTP errors or connection failure."""
-    req = Request(url, headers={"Accept": "application/vnd.github+json"})
+    req = Request(url, headers={"Accept": "application/json"})
     with _get_opener().open(req, timeout=15) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+def _http_get_text(url: str) -> str:
+    """GET a plain-text body (e.g. the launcher ``VERSION`` asset)."""
+    req = Request(url, headers={"Accept": "text/plain"})
+    with _get_opener().open(req, timeout=15) as resp:
+        return resp.read().decode("utf-8").strip()
 
 
 def _classify_error(exc: Exception) -> str:
@@ -142,7 +165,7 @@ def _classify_error(exc: Exception) -> str:
     if isinstance(exc, HTTPError):
         if exc.code == 404:
             return "not_found"
-        if exc.code in (403, 429):  # GitHub unauthenticated limit is 60/hr
+        if exc.code in (403, 429):  # e.g. an upstream proxy or CDN throttle
             return "rate_limit"
         return "http"
     if isinstance(exc, TimeoutError):  # socket.timeout is an alias
@@ -156,46 +179,25 @@ def _classify_error(exc: Exception) -> str:
     return "unknown"
 
 
-def _parse_version_from_tag(tag: str) -> str:
-    """'v1.4.0' → '1.4.0'"""
-    return tag.lstrip("v")
+def _download_url(layer: str, version: str) -> str:
+    """Deterministic asset URL for a layer, derived from tag + version.
 
-
-def _parse_version_from_asset_name(name: str, prefix: str) -> str | None:
-    """Extract version from asset filename.
-
-    E.g. 'system_media-v1.2.0.zip', prefix='system_media-v' → '1.2.0'.
-    Accepts one or more dot-separated numeric components (``1``, ``1.2``,
-    ``1.2.3``), stopping at the first non-numeric delimiter.
+    Asset names are fixed by ``scripts/build.sh`` — no need to query the
+    REST API to discover them.  ``releases/download/…`` 302s to the CDN.
     """
-    pattern = re.escape(prefix) + r"(\d+(?:\.\d+)*)"
-    m = re.search(pattern, name)
-    return m.group(1) if m else None
-
-
-def _find_asset_url(
-    assets: list, pattern: str, platform_specific: bool = True
-) -> tuple[str | None, str | None]:
-    """Find an asset by name pattern.  Returns (url, version) or (None, None).
-
-    If *platform_specific*, only matches ``{pattern}*{_PLATFORM}*`` —
-    never falls through to a wrong platform.
-
-    A persistent release tag (system-media, launcher) may accumulate
-    multiple versions, so return the highest version rather than the
-    first match.
-    """
-    best: tuple[str | None, str | None] | None = None
-    for a in assets:
-        name = a.get("name", "")
-        if pattern not in name:
-            continue
-        if platform_specific and _PLATFORM not in name:
-            continue
-        ver = _parse_version_from_asset_name(name, pattern)
-        if best is None or _version_gt(ver or "", best[1] or ""):
-            best = (a.get("browser_download_url"), ver)
-    return best if best is not None else (None, None)
+    if layer == "app":
+        return (
+            f"{GITHUB_DOWNLOAD_BASE}/v{version}/"
+            f"storyloom-app-v{version}-{_PLATFORM}.zip"
+        )
+    if layer == "system_media":
+        return f"{GITHUB_DOWNLOAD_BASE}/{SYSTEM_MEDIA_TAG}/system_media-v{version}.zip"
+    if layer == "launcher":
+        return (
+            f"{GITHUB_DOWNLOAD_BASE}/{LAUNCHER_TAG}/"
+            f"storyloom-launcher-v{version}-{_PLATFORM}.zip"
+        )
+    raise ValueError(f"Unknown layer: {layer!r}")
 
 
 # ── Download ──────────────────────────────────────────────────────
@@ -226,47 +228,40 @@ def _download_file(url: str, dest: str, progress_callback=None) -> None:
 
 
 def _check_app_update(app_version: str) -> VersionInfo:
-    """Query ``releases/latest`` for the app layer.
+    """Read the app ``update.json`` manifest from the ``latest`` release.
 
     Returns a ``VersionInfo`` with ``latest=""`` on any error (offline,
-    rate-limited, etc.) so one layer's failure never blocks the other.
+    manifest missing, etc.) so one layer's failure never blocks the other.
     The error category is recorded in ``VersionInfo.error``.
     """
     try:
-        release = _http_get_json(_GITHUB_API_LATEST)
+        manifest = _http_get_json(_APP_MANIFEST_URL)
     except Exception as exc:
         return VersionInfo(
             current=app_version, latest="", error=_classify_error(exc)
         )
 
-    assets = release.get("assets", [])
-    release_notes = release.get("body", "")
-    remote_tag = release.get("tag_name", "")
-    remote_app_ver = _parse_version_from_tag(remote_tag)
-    app_url, _ = _find_asset_url(
-        assets, "storyloom-app-v", platform_specific=True
-    )
+    remote_ver = str(manifest.get("version", "")).lstrip("v")
+    release_notes = manifest.get("notes", "") or manifest.get("body", "")
 
     return VersionInfo(
         current=app_version,
-        latest=remote_app_ver,
+        latest=remote_ver,
         release_notes=release_notes,
-        asset_url=app_url or "",
+        asset_url=_download_url("app", remote_ver) if remote_ver else "",
     )
 
 
 def _check_system_media_update(system_media_version: str) -> VersionInfo:
-    """Query the ``system-media`` release tag for the system_media layer.
+    """Read the ``_manifest.json`` asset from the ``system-media`` tag.
 
-    The ``system-media`` release is versioned independently from the app
-    (its assets carry the version in the filename, e.g.
-    ``system_media-v1.1.0.zip``).
-
-    Returns a ``VersionInfo`` with ``latest=""`` on any error.  A 404
-    (tag not created yet) is treated as "no update" rather than an error.
+    The manifest already carries ``version`` (and ``min_app_version``),
+    so it doubles as the remote version source — no separate version
+    asset needed.  A 404 (manifest not yet uploaded as a standalone
+    asset) is treated as "no update" rather than an error.
     """
     try:
-        release = _http_get_json(_GITHUB_API_SYSTEM_MEDIA)
+        manifest = _http_get_json(_SYSTEM_MEDIA_MANIFEST_URL)
     except Exception as exc:
         err = _classify_error(exc)
         if err == "not_found":
@@ -275,30 +270,30 @@ def _check_system_media_update(system_media_version: str) -> VersionInfo:
             current=system_media_version, latest="", error=err
         )
 
-    assets = release.get("assets", [])
-    sm_url, remote_sm_ver = _find_asset_url(
-        assets, "system_media-v", platform_specific=False
-    )
+    remote_ver = str(manifest.get("version", "")).lstrip("v")
 
     return VersionInfo(
         current=system_media_version,
-        latest=remote_sm_ver or "",
-        asset_url=sm_url or "",
+        latest=remote_ver,
+        asset_url=_download_url("system_media", remote_ver) if remote_ver else "",
     )
 
 
 def _check_launcher_update(launcher_version: str) -> VersionInfo:
-    """Query ``releases/tags/launcher`` for the launcher layer.
+    """Read the ``VERSION`` asset from the ``launcher`` tag.
 
-    The launcher is versioned independently of the app (its asset is
-    ``storyloom-launcher-v{ver}-{platform}.zip``) and is only bumped when
-    ``launcher.py`` itself changes.
+    The launcher is versioned independently of the app and is only bumped
+    when ``launcher.py`` itself changes.
 
-    Returns a ``VersionInfo`` with ``latest=""`` on any error.  A 404
-    (tag not created yet) is treated as "no update" rather than an error.
+    When no launcher is installed (wheel users, or a missing
+    ``launcher.version`` file), the layer is not applicable — return an
+    empty ``VersionInfo`` so the UI never shows a spurious update.
     """
+    if not launcher_version:
+        return VersionInfo(current="", latest="")
+
     try:
-        release = _http_get_json(_GITHUB_API_LAUNCHER)
+        remote_ver = _http_get_text(_LAUNCHER_MANIFEST_URL).lstrip("v")
     except Exception as exc:
         err = _classify_error(exc)
         if err == "not_found":
@@ -307,15 +302,10 @@ def _check_launcher_update(launcher_version: str) -> VersionInfo:
             current=launcher_version, latest="", error=err
         )
 
-    assets = release.get("assets", [])
-    url, ver = _find_asset_url(
-        assets, "storyloom-launcher-v", platform_specific=True
-    )
-
     return VersionInfo(
         current=launcher_version,
-        latest=ver or "",
-        asset_url=url or "",
+        latest=remote_ver,
+        asset_url=_download_url("launcher", remote_ver) if remote_ver else "",
     )
 
 
@@ -326,12 +316,13 @@ def check_for_updates(
     *,
     force: bool = False,
 ) -> UpdateCheckResult:
-    """Check GitHub Releases for available updates.
+    """Check for available updates across the three update layers.
 
-    Queries three independent releases for three update layers:
-      - ``releases/latest`` for the app layer.
-      - ``releases/tags/system-media`` for the system_media layer.
-      - ``releases/tags/launcher`` for the launcher layer.
+    Each layer reads a small manifest file served by the GitHub release
+    *download* CDN — never the rate-limited REST API:
+      - app: ``releases/latest/download/update.json``
+      - system_media: ``releases/download/system-media/_manifest.json``
+      - launcher: ``releases/download/launcher/VERSION``
 
     Each layer fails independently — a network error on one never
     prevents the other from reporting results.

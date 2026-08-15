@@ -14,9 +14,7 @@ from storyloom.core.update_manager import (
     UpdateCheckResult,
     UpdateProgress,
     VersionInfo,
-    _find_asset_url,
-    _parse_version_from_asset_name,
-    _parse_version_from_tag,
+    _download_url,
     _version_gt,
     check_for_updates,
     download_and_extract,
@@ -97,20 +95,74 @@ def test_classify_network_and_parse():
     assert _classify_error(RuntimeError("boom")) == "unknown"
 
 
-@patch("storyloom.core.update_manager._http_get_json")
-def test_check_error_category_propagates(mock_get):
-    """App layer failure records its category; sm/launcher remain ok."""
-    import sys
+# ── Deterministic download URL ────────────────────────────────────
+
+
+def test_download_url_app():
+    url = _download_url("app", "1.4.0")
     plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
+    assert url == (
+        "https://github.com/SiriLee/Storyloom/releases/download/"
+        f"v1.4.0/storyloom-app-v1.4.0-{plat}.zip"
+    )
+
+
+def test_download_url_system_media():
+    url = _download_url("system_media", "1.2.0")
+    assert url == (
+        "https://github.com/SiriLee/Storyloom/releases/download/"
+        "system-media/system_media-v1.2.0.zip"
+    )
+
+
+def test_download_url_launcher():
+    url = _download_url("launcher", "1.1.0")
+    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
+    assert url == (
+        "https://github.com/SiriLee/Storyloom/releases/download/"
+        f"launcher/storyloom-launcher-v1.1.0-{plat}.zip"
+    )
+
+
+def test_download_url_unknown_layer():
+    with pytest.raises(ValueError):
+        _download_url("nope", "1.0.0")
+
+
+# ── Version check (manifest model) ────────────────────────────────
+
+
+def _app_manifest(version="1.4.0", notes="## notes"):
+    """Mock the app ``update.json`` manifest."""
+    return {"version": version, "notes": notes}
+
+
+def _sm_manifest(version="1.2.0"):
+    """Mock the system_media ``_manifest.json`` manifest."""
+    return {"version": version, "min_app_version": "1.3.0"}
+
+
+def _route_json(mock_json, *, app, sm):
+    """Route ``_http_get_json`` by URL substring: app vs system_media."""
+    def dispatch(url):
+        if "system-media" in url:
+            return sm
+        return app
+    mock_json.side_effect = dispatch
+
+
+@patch("storyloom.core.update_manager._http_get_json")
+@patch("storyloom.core.update_manager._http_get_text")
+def test_check_error_category_propagates(mock_text, mock_json):
+    """App layer failure records its category; sm/launcher remain ok."""
+    mock_text.return_value = "1.0.0"
 
     def _dispatch(url):
-        if "/tags/system-media" in url:
-            return _make_sm_release(assets=[])
-        if "/tags/launcher" in url:
-            return _make_launcher_release(assets=[])
+        if "system-media" in url:
+            return _sm_manifest()
         raise URLError("connection refused")
 
-    mock_get.side_effect = _dispatch
+    mock_json.side_effect = _dispatch
     result = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
     assert result.app.error == "network"
     assert result.app.has_update is False
@@ -119,22 +171,17 @@ def test_check_error_category_propagates(mock_get):
 
 
 @patch("storyloom.core.update_manager._http_get_json")
-def test_check_404_tag_is_not_error(mock_get):
-    """launcher/system-media tag missing → no update, no error."""
-    import sys
-    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
+@patch("storyloom.core.update_manager._http_get_text")
+def test_check_404_manifest_is_not_error(mock_text, mock_json):
+    """Missing sm/launcher manifest → no update, no error; app ok."""
+    mock_text.side_effect = HTTPError("u", 404, "Not Found", None, None)
 
     def _dispatch(url):
-        if "/tags/system-media" in url:
+        if "system-media" in url:
             raise HTTPError(url, 404, "Not Found", None, None)
-        if "/tags/launcher" in url:
-            raise HTTPError(url, 404, "Not Found", None, None)
-        return _make_app_release(tag="v1.3.0", assets=[
-            {"name": f"storyloom-app-v1.3.0-{plat}.zip",
-             "browser_download_url": "https://example.com/app.zip"},
-        ])
+        return _app_manifest(version="1.3.0")
 
-    mock_get.side_effect = _dispatch
+    mock_json.side_effect = _dispatch
     result = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
     assert result.system_media.error == ""
     assert result.system_media.latest == ""
@@ -143,313 +190,124 @@ def test_check_404_tag_is_not_error(mock_get):
     assert result.launcher.has_update is False
 
 
-def test_parse_version_from_tag():
-    assert _parse_version_from_tag("v1.4.0") == "1.4.0"
-    assert _parse_version_from_tag("1.4.0") == "1.4.0"
-    assert _parse_version_from_tag("") == ""
-
-
-def test_parse_version_from_asset_name():
-    assert _parse_version_from_asset_name(
-        "system_media-v1.2.0.zip", "system_media-v"
-    ) == "1.2.0"
-    assert _parse_version_from_asset_name(
-        "storyloom-v1.4.0-Linux.zip", "storyloom-v"
-    ) == "1.4.0"
-    assert (
-        _parse_version_from_asset_name("no_version_here.zip", "system_media-v")
-        is None
-    )
-
-
-def test_parse_version_from_asset_name_variable_length():
-    """Version may have 1..N components; extract all of them."""
-    assert _parse_version_from_asset_name(
-        "storyloom-launcher-v1.0-Linux.zip", "storyloom-launcher-v"
-    ) == "1.0"
-    assert _parse_version_from_asset_name(
-        "storyloom-launcher-v1-Linux.zip", "storyloom-launcher-v"
-    ) == "1"
-    assert _parse_version_from_asset_name(
-        "storyloom-launcher-v1.0.0.1-Linux.zip", "storyloom-launcher-v"
-    ) == "1.0.0.1"
-
-
-def test_find_asset_url_platform_specific():
-    assets = [
-        {
-            "name": "storyloom-v1.4.0-Linux.zip",
-            "browser_download_url": "https://example.com/linux.zip",
-        },
-        {
-            "name": "storyloom-v1.4.0-Windows.zip",
-            "browser_download_url": "https://example.com/win.zip",
-        },
-    ]
-    with patch(
-        "storyloom.core.update_manager._PLATFORM", "Windows"
-    ):
-        url, ver = _find_asset_url(assets, "storyloom-v", platform_specific=True)
-        assert url == "https://example.com/win.zip"
-        assert ver == "1.4.0"
-
-
-def test_find_asset_url_platform_agnostic():
-    assets = [
-        {"name": "system_media-v1.2.0.zip",
-         "browser_download_url": "https://example.com/sm.zip"},
-    ]
-    url, ver = _find_asset_url(assets, "system_media-v", platform_specific=False)
-    assert url == "https://example.com/sm.zip"
-    assert ver == "1.2.0"
-
-
-def test_find_asset_url_not_found():
-    assets = [{"name": "other-asset.zip",
-               "browser_download_url": "https://example.com/other.zip"}]
-    url, ver = _find_asset_url(assets, "system_media-v", platform_specific=False)
-    assert url is None
-    assert ver is None
-
-
-def test_find_asset_url_picks_highest_version():
-    """A persistent tag accumulates versions — return the highest, not first."""
-    assets = [
-        {"name": "system_media-v1.1.0.zip",
-         "browser_download_url": "https://example.com/sm-old.zip"},
-        {"name": "system_media-v1.3.0.zip",
-         "browser_download_url": "https://example.com/sm-new.zip"},
-        {"name": "system_media-v1.2.0.zip",
-         "browser_download_url": "https://example.com/sm-mid.zip"},
-    ]
-    url, ver = _find_asset_url(assets, "system_media-v", platform_specific=False)
-    assert ver == "1.3.0"
-    assert url == "https://example.com/sm-new.zip"
-
-
-# ── Version check tests ───────────────────────────────────────────
-
-
-def _make_app_release(tag="v1.4.0", assets=None, body="## Release notes"):
-    """Build a mock response for the app release (``releases/latest``)."""
-    import sys
-    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
-    if assets is None:
-        assets = [
-            {"name": f"storyloom-app-{tag}-{plat}.zip",
-             "browser_download_url": "https://example.com/app.zip"},
-        ]
-    return {
-        "tag_name": tag,
-        "body": body,
-        "assets": assets,
-    }
-
-
-def _make_sm_release(assets=None):
-    """Build a mock response for the system-media release tag."""
-    if assets is None:
-        assets = [
-            {"name": "system_media-v1.2.0.zip",
-             "browser_download_url": "https://example.com/sm.zip"},
-        ]
-    return {
-        "tag_name": "system-media",
-        "body": "",
-        "assets": assets,
-    }
-
-
-def _make_launcher_release(assets=None):
-    """Build a mock response for the launcher release tag."""
-    if assets is None:
-        assets = []
-    return {
-        "tag_name": "launcher",
-        "body": "",
-        "assets": assets,
-    }
-
-
-def _patch_updates(mock_get, *, app_release, sm_release, launcher_release=None):
-    """Set up the three-release mock.
-
-    ``_http_get_json`` is called three times per ``check_for_updates()`` —
-    once each for ``releases/latest`` (app), ``releases/tags/system-media``,
-    and ``releases/tags/launcher``.  Route by URL substring.
-    """
-    if launcher_release is None:
-        launcher_release = _make_launcher_release()
-
-    def _dispatch(url):
-        if "/tags/system-media" in url:
-            return sm_release
-        if "/tags/launcher" in url:
-            return launcher_release
-        return app_release
-
-    mock_get.side_effect = _dispatch
-
-
 @patch("storyloom.core.update_manager._http_get_json")
-def test_check_no_update(mock_get):
-    import sys
-    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
-    _patch_updates(
-        mock_get,
-        app_release=_make_app_release(tag="v1.3.0", assets=[
-            {"name": f"storyloom-app-v1.3.0-{plat}.zip",
-             "browser_download_url": "https://example.com/app.zip"},
-        ]),
-        sm_release=_make_sm_release(assets=[
-            {"name": "system_media-v1.1.0.zip",
-             "browser_download_url": "https://example.com/sm.zip"},
-        ]),
-    )
+@patch("storyloom.core.update_manager._http_get_text")
+def test_check_no_update(mock_text, mock_json):
+    _route_json(mock_json, app=_app_manifest("1.3.0"), sm=_sm_manifest("1.1.0"))
+    mock_text.return_value = "1.0.0"
     result = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
     assert result.app.has_update is False
     assert result.system_media.has_update is False
+    assert result.launcher.has_update is False
 
 
 @patch("storyloom.core.update_manager._http_get_json")
-def test_check_app_update(mock_get):
-    import sys
-    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
-    _patch_updates(
-        mock_get,
-        app_release=_make_app_release(tag="v1.4.0", assets=[
-            {"name": f"storyloom-app-v1.4.0-{plat}.zip",
-             "browser_download_url": "https://example.com/app.zip"},
-        ]),
-        sm_release=_make_sm_release(assets=[
-            {"name": "system_media-v1.2.0.zip",
-             "browser_download_url": "https://example.com/sm.zip"},
-        ]),
-    )
+@patch("storyloom.core.update_manager._http_get_text")
+def test_check_app_update(mock_text, mock_json):
+    _route_json(mock_json, app=_app_manifest("1.4.0"), sm=_sm_manifest("1.1.0"))
+    mock_text.return_value = "1.0.0"
     result = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
     assert result.app.has_update is True
     assert result.app.latest == "1.4.0"
-    assert result.app.asset_url == "https://example.com/app.zip"
+    assert result.app.asset_url == _download_url("app", "1.4.0")
+    assert result.app.release_notes == "## notes"
 
 
 @patch("storyloom.core.update_manager._http_get_json")
-def test_check_system_media_update(mock_get):
-    import sys
-    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
-    _patch_updates(
-        mock_get,
-        app_release=_make_app_release(tag="v1.3.0", assets=[
-            {"name": f"storyloom-app-v1.3.0-{plat}.zip",
-             "browser_download_url": "https://example.com/app.zip"},
-        ]),
-        sm_release=_make_sm_release(assets=[
-            {"name": "system_media-v1.2.0.zip",
-             "browser_download_url": "https://example.com/sm.zip"},
-        ]),
-    )
+@patch("storyloom.core.update_manager._http_get_text")
+def test_check_system_media_update(mock_text, mock_json):
+    _route_json(mock_json, app=_app_manifest("1.3.0"), sm=_sm_manifest("1.2.0"))
+    mock_text.return_value = "1.0.0"
     result = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
     assert result.system_media.has_update is True
     assert result.system_media.latest == "1.2.0"
+    assert result.system_media.asset_url == _download_url("system_media", "1.2.0")
 
 
 @patch("storyloom.core.update_manager._http_get_json")
-def test_check_no_system_media_asset(mock_get):
-    import sys
-    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
-    _patch_updates(
-        mock_get,
-        app_release=_make_app_release(tag="v1.3.0", assets=[
-            {"name": f"storyloom-app-v1.3.0-{plat}.zip",
-             "browser_download_url": "https://example.com/app.zip"},
-        ]),
-        sm_release=_make_sm_release(assets=[]),  # no system_media asset
-    )
+@patch("storyloom.core.update_manager._http_get_text")
+def test_check_no_system_media_asset(mock_text, mock_json):
+    """sm manifest without a version → no update (mirrors empty asset list)."""
+    _route_json(mock_json, app=_app_manifest("1.3.0"), sm={})
+    mock_text.return_value = "1.0.0"
     result = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
     assert result.system_media.has_update is False
     assert result.system_media.latest == ""
 
 
 @patch("storyloom.core.update_manager._http_get_json")
-def test_check_launcher_update(mock_get):
-    import sys
-    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
-    _patch_updates(
-        mock_get,
-        app_release=_make_app_release(tag="v1.4.0", assets=[
-            {"name": f"storyloom-app-v1.4.0-{plat}.zip",
-             "browser_download_url": "https://example.com/app.zip"},
-        ]),
-        sm_release=_make_sm_release(assets=[]),
-        launcher_release=_make_launcher_release(assets=[
-            {"name": f"storyloom-launcher-v1.1.0-{plat}.zip",
-             "browser_download_url": "https://example.com/launcher.zip"},
-        ]),
-    )
+@patch("storyloom.core.update_manager._http_get_text")
+def test_check_launcher_update(mock_text, mock_json):
+    _route_json(mock_json, app=_app_manifest("1.4.0"), sm=_sm_manifest("1.1.0"))
+    mock_text.return_value = "1.1.0"
     result = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
     assert result.launcher.has_update is True
     assert result.launcher.latest == "1.1.0"
-    assert result.launcher.asset_url == "https://example.com/launcher.zip"
+    assert result.launcher.asset_url == _download_url("launcher", "1.1.0")
 
 
 @patch("storyloom.core.update_manager._http_get_json")
-def test_check_launcher_no_update(mock_get):
-    import sys
-    plat = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
-    _patch_updates(
-        mock_get,
-        app_release=_make_app_release(tag="v1.4.0", assets=[
-            {"name": f"storyloom-app-v1.4.0-{plat}.zip",
-             "browser_download_url": "https://example.com/app.zip"},
-        ]),
-        sm_release=_make_sm_release(assets=[]),
-        launcher_release=_make_launcher_release(assets=[
-            {"name": f"storyloom-launcher-v1.0.0-{plat}.zip",
-             "browser_download_url": "https://example.com/launcher.zip"},
-        ]),
-    )
+@patch("storyloom.core.update_manager._http_get_text")
+def test_check_launcher_no_update(mock_text, mock_json):
+    _route_json(mock_json, app=_app_manifest("1.4.0"), sm=_sm_manifest("1.1.0"))
+    mock_text.return_value = "1.0.0"
     result = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
     assert result.launcher.has_update is False
     assert result.launcher.latest == "1.0.0"
 
 
 @patch("storyloom.core.update_manager._http_get_json")
-def test_check_api_error_returns_empty(mock_get):
-    """Every layer fails independently — app error doesn't block sm, and
-    vice versa.  When both API calls throw, both layers are empty."""
-    mock_get.side_effect = RuntimeError("rate limited")
+@patch("storyloom.core.update_manager._http_get_text")
+def test_check_launcher_empty_skipped(mock_text, mock_json):
+    """No launcher installed (empty version) → layer skipped, no HTTP call."""
+    _route_json(mock_json, app=_app_manifest("1.4.0"), sm=_sm_manifest("1.1.0"))
+    result = check_for_updates("1.3.0", "1.1.0", "", force=True)
+    assert result.launcher.has_update is False
+    assert result.launcher.latest == ""
+    assert result.launcher.error == ""
+    mock_text.assert_not_called()
+
+
+@patch("storyloom.core.update_manager._http_get_json")
+@patch("storyloom.core.update_manager._http_get_text")
+def test_check_api_error_returns_empty(mock_text, mock_json):
+    """Every layer fails independently — thrown errors yield empty layers."""
+    mock_json.side_effect = RuntimeError("boom")
+    mock_text.side_effect = RuntimeError("boom")
     result = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
     assert result.app.has_update is False
     assert result.app.latest == ""
     assert result.system_media.has_update is False
     assert result.system_media.latest == ""
+    assert result.launcher.has_update is False
+    assert result.launcher.latest == ""
 
 
 @patch("storyloom.core.update_manager._http_get_json")
-def test_check_cache(mock_get):
-    _patch_updates(
-        mock_get,
-        app_release=_make_app_release(tag="v1.4.0"),
-        sm_release=_make_sm_release(),
-    )
-    # force=True → 3 HTTP calls (one per layer)
+@patch("storyloom.core.update_manager._http_get_text")
+def test_check_cache(mock_text, mock_json):
+    _route_json(mock_json, app=_app_manifest("1.4.0"), sm=_sm_manifest("1.2.0"))
+    mock_text.return_value = "1.0.0"
+    # force=True → 2 JSON + 1 text HTTP calls
     r1 = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
-    assert mock_get.call_count == 3
-    # force=False → cached, 0 additional calls
+    assert mock_json.call_count == 2
+    assert mock_text.call_count == 1
+    # force=False → cached, no additional calls
     r2 = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=False)
-    assert mock_get.call_count == 3
+    assert mock_json.call_count == 2
+    assert mock_text.call_count == 1
     assert r2.app.latest == r1.app.latest
-    # force=True → bypass cache, 3 more calls
+    # force=True → bypass cache, more calls
     r3 = check_for_updates("1.3.0", "1.1.0", "1.0.0", force=True)
-    assert mock_get.call_count == 6
+    assert mock_json.call_count == 4
+    assert mock_text.call_count == 2
 
 
 @patch("storyloom.core.update_manager._http_get_json")
-def test_check_prerelease_no_downgrade(mock_get):
-    _patch_updates(
-        mock_get,
-        app_release=_make_app_release(tag="v1.4.0"),
-        sm_release=_make_sm_release(),
-    )
+@patch("storyloom.core.update_manager._http_get_text")
+def test_check_prerelease_no_downgrade(mock_text, mock_json):
+    _route_json(mock_json, app=_app_manifest("1.4.0"), sm=_sm_manifest("1.2.0"))
+    mock_text.return_value = "1.0.0"
     result = check_for_updates("1.5.0-dev", "1.1.0", "1.0.0", force=True)
     assert result.app.has_update is False
 

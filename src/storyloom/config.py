@@ -89,5 +89,17 @@ GENERATE_LIBRARY_TOP_N = 60      # library entries in LLM selection prompt (syst
 GENERATE_REF_IMAGE_COUNT = 0     # max reference images for style guidance
 
 # ── Auto-update ────────────────────────────────────────────────────
+# Update checks read a small per-layer manifest file via the GitHub release
+# *download* CDN (``releases/download/…``), never the rate-limited REST API
+# (``api.github.com``).  See docs/superpowers/specs/2026-08-10-auto-update-design.md §4.
 GITHUB_REPO_OWNER = "SiriLee"
 GITHUB_REPO_NAME = "Storyloom"
+GITHUB_RELEASES_URL = (
+    f"https://github.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/releases"
+)
+GITHUB_DOWNLOAD_BASE = f"{GITHUB_RELEASES_URL}/download"
+UPDATE_MANIFEST_FILENAME = "update.json"        # app layer manifest asset
+SYSTEM_MEDIA_TAG = "system-media"               # fixed release tag for system_media
+SYSTEM_MEDIA_MANIFEST_FILENAME = "_manifest.json"  # version + min_app_version
+LAUNCHER_TAG = "launcher"                       # fixed release tag for the launcher
+LAUNCHER_MANIFEST_FILENAME = "VERSION"          # plain-text launcher version
