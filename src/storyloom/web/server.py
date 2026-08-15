@@ -78,24 +78,50 @@ _STATIC = Path(__file__).resolve().parent / "static"
 # plain slug — no dots/slashes — so it can never escape the content dir.
 _DOC_SLUG_RE = re.compile(r"[A-Za-z0-9_-]+")
 
-# App directory — where config.json / saves / media / system_media live.
-# Dev/editable: repo root (server.py → web → storyloom → src → repo root).
-# PyInstaller (new launcher layout): exe at <root>/app/storyloom-web → root = ../..
-# PyInstaller (old flat layout): exe at <root>/storyloom-web → root = .
-# Installed wheel: site-packages isn't user-writable → fall back to cwd.
-if getattr(sys, 'frozen', False):
-    exe_dir = Path(sys.executable).parent
-    if exe_dir.name == "app":
-        _PROJECT_ROOT = exe_dir.parent
+def _find_project_root(start: Path) -> Path:
+    """Walk up from *start* to the nearest dir containing ``pyproject.toml``.
+
+    Falls back to the working directory if no marker is found (should not
+    happen for a source checkout or editable install).
+    """
+    for parent in start.parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    return Path.cwd()
+
+
+def _platform_data_dir() -> Path:
+    """Per-user platform data dir (XDG / APPDATA / macOS App Support)."""
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", str(Path.home() / "AppData/Roaming")))
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
     else:
-        _PROJECT_ROOT = exe_dir
-else:
-    _pkg = Path(__file__).resolve()
-    if "site-packages" in _pkg.parts or "dist-packages" in _pkg.parts:
-        _PROJECT_ROOT = Path.cwd()
-    else:
-        _PROJECT_ROOT = _pkg.parents[3]
-_APP_DIR = os.environ.get("STORYLOOM_APP_DIR", str(_PROJECT_ROOT))
+        base = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share")))
+    return base / "Storyloom"
+
+
+def _default_app_dir() -> Path:
+    """Resolve the default app/data directory (``STORYLOOM_APP_DIR`` overrides).
+
+    - Frozen (PyInstaller): shared root next to the binary — the parent of
+      ``app/`` (new launcher layout) or the binary dir (old flat layout).
+    - Source/editable: repo root, found by walking up to ``pyproject.toml``
+      (not a hard-coded path depth).
+    - Installed wheel: a per-user platform data dir, never ``site-packages``.
+    """
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).parent
+        return exe_dir.parent if exe_dir.name == "app" else exe_dir
+
+    pkg = Path(__file__).resolve()
+    if "site-packages" in pkg.parts or "dist-packages" in pkg.parts:
+        return _platform_data_dir()
+
+    return _find_project_root(pkg)
+
+
+_APP_DIR = os.environ.get("STORYLOOM_APP_DIR") or str(_default_app_dir())
 
 app = FastAPI(title="Storyloom", docs_url=None, redoc_url=None)
 cfg = UserConfig(_APP_DIR)
