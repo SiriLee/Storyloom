@@ -81,7 +81,9 @@ $PYTHON -m build --no-isolation
 
 # System media — pack via pack_system_media.sh for filtered, consistent output
 # (skips runtime thumbnails, validates manifest vs. source).
-# Pre-built zip takes priority; falls back to packing from local system_media/.
+# Priority: local pre-built zip > pack from local system_media/ > fetch the
+# latest pack from the persistent `system-media` release tag (build-time CDN
+# fetch — CI checkouts have no local system_media, which is gitignored).
 SM_VERSION=$(head -1 system_media/VERSION 2>/dev/null | tr -d '[:space:]' || true)
 SM_ZIP="system_media-v${SM_VERSION}.zip"
 
@@ -92,7 +94,30 @@ elif [ -f "system_media/_manifest.json" ]; then
     bash scripts/pack_system_media.sh --skip-check
     SM_ZIP="system_media-v${SM_VERSION}.zip"
 else
-    echo "--- System media: not found (run scripts/pack_system_media.sh first) ---"
+    echo "--- System media: fetching latest from 'system-media' release tag ---"
+    SM_ZIP=$($PYTHON - <<'PY'
+import json, shutil, urllib.request
+
+base = "https://github.com/SiriLee/Storyloom/releases/download/system-media"
+try:
+    with urllib.request.urlopen(base + "/_manifest.json", timeout=30) as r:
+        ver = str(json.load(r).get("version", "")).strip()
+    if not ver:
+        raise RuntimeError("remote manifest missing 'version'")
+    zip_name = "system_media-v" + ver + ".zip"
+    with urllib.request.urlopen(base + "/" + zip_name, timeout=300) as src:
+        with open(zip_name, "wb") as dst:
+            shutil.copyfileobj(src, dst)
+    print(zip_name)
+except Exception as exc:
+    print(f"WARNING: system_media fetch failed: {exc}", file=sys.stderr)
+PY
+)
+    if [ -n "$SM_ZIP" ]; then
+        echo "--- System media: downloaded $SM_ZIP ---"
+    else
+        echo "--- System media: not found locally or remotely ---"
+    fi
 fi
 
 # 3. PyInstaller single-file executable
