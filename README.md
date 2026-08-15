@@ -77,6 +77,12 @@ pip uninstall storyloom-engine
 rm -rf ~/.local/share/Storyloom   # adjust path per the table above
 ```
 
+### Network & proxy
+
+Updates are fetched from GitHub Releases. Behind a firewall or in
+regions where GitHub is restricted, set a proxy in **Settings → System →
+Network Proxy** (HTTP/SOCKS5).
+
 ---
 
 ## Usage

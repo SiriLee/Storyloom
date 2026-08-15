@@ -74,6 +74,11 @@ pip uninstall storyloom-engine
 rm -rf ~/.local/share/Storyloom   # 按上表调整路径
 ```
 
+### 网络与代理
+
+更新从 GitHub Releases 拉取。在防火墙后或 GitHub 受限的地区，请在
+**设置 → 系统 → 网络代理**（HTTP/SOCKS5）中配置代理。
+
 ---
 
 ## 使用
