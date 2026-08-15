@@ -256,20 +256,9 @@ const GraphRenderer = (function () {
     /* ── Loading indicator ──────────────────────────────────────── */
 
     function showLoading() {
-        var dialog = $("#vnDialog");
-        if (!dialog || dialog.querySelector(".vn-loading")) return;
-        /* Render as an independent overlay, NOT by overwriting #vnText —
-           the last segment must stay visible while the engine blocks on a
-           Task.  The old `el.textContent` guard made the indicator dead on
-           arrival: a Task wait almost always happens after the previous
-           segment's text is already on screen.  Hide CTC meanwhile —
-           "click to continue" would be misleading when there is nothing
-           to advance to. */
-        var ctc = $("#vnCtc");
-        if (ctc) ctc.classList.remove("visible");
-        var el = document.createElement("div");
-        el.className = "vn-loading";
-        el.innerHTML = '<svg width="60" height="12" viewBox="0 0 60 12">'
+        var el = $("#vnText");
+        if (!el || el.textContent) return;
+        el.innerHTML = '<svg width="60" height="12" viewBox="0 0 60 12" style="display:block;margin:0 auto">'
             + '<circle cx="6" cy="6" r="4" fill="var(--text-secondary)" opacity="0.3">'
             + '<animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" begin="0s" repeatCount="indefinite"/></circle>'
             + '<circle cx="22" cy="6" r="4" fill="var(--text-secondary)" opacity="0.3">'
@@ -279,13 +268,11 @@ const GraphRenderer = (function () {
             + '<circle cx="54" cy="6" r="4" fill="var(--text-secondary)" opacity="0.3">'
             + '<animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" begin="0.6s" repeatCount="indefinite"/></circle>'
             + '</svg>';
-        dialog.appendChild(el);
     }
 
     function hideLoading() {
-        var dialog = $("#vnDialog");
-        var el = dialog && dialog.querySelector(".vn-loading");
-        if (el) el.remove();
+        var el = $("#vnText");
+        if (el && el.querySelector("svg")) el.textContent = "";
     }
 
     /* ═══════════════════════════════════════════════════════════════

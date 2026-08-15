@@ -315,7 +315,7 @@ const GameView = (function () {
          one event per tick, paces by mode, and handles options
          when the queue is naturally empty (no synchronous flush).
 
-       Loading indicator is debounced 1 s — prevents flicker
+       Loading indicator is debounced 500 ms — prevents flicker
        during normal pacing gaps while still showing for TTFT /
        inter-round waits (the only genuinely empty-queue states).
        ═══════════════════════════════════════════════════════════════ */
