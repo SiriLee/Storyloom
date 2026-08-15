@@ -10,6 +10,9 @@ Usage::
     python scripts/sysgen/generate_manifest.py
     python scripts/sysgen/generate_manifest.py --dry-run
     python scripts/sysgen/generate_manifest.py --version 1.1.0
+
+The version is read from ``system_media_src/VERSION`` (the tracked source of
+truth); ``--version`` overrides it for a one-off run.
 """
 
 from __future__ import annotations
@@ -24,6 +27,9 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 _SRC_DIR = _PROJECT_ROOT / "system_media_src"
 _MANIFEST_PATH = _PROJECT_ROOT / "system_media" / "_manifest.json"
 _VERSION_PATH = _PROJECT_ROOT / "system_media" / "VERSION"
+# The tracked source of truth for the content version.  ``system_media/VERSION``
+# is generated output and gitignored; bump the version here, then regenerate.
+_SRC_VERSION_PATH = _SRC_DIR / "VERSION"
 
 MIN_APP_VERSION = "1.3.0"
 
@@ -99,7 +105,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--version", type=str, default=None,
-        help="Manifest version (default: read from existing VERSION file)",
+        help="Manifest version (default: read from system_media_src/VERSION)",
     )
     args = parser.parse_args()
 
@@ -119,8 +125,8 @@ def main() -> None:
     # ── Version ───────────────────────────────────────────────────────
     version = args.version
     if version is None:
-        if _VERSION_PATH.exists():
-            version = _VERSION_PATH.read_text().strip()
+        if _SRC_VERSION_PATH.exists():
+            version = _SRC_VERSION_PATH.read_text().strip()
         else:
             version = "0.0.0"
 

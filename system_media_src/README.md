@@ -34,16 +34,18 @@ system_media_src/{type}.json        ← source of truth (you edit THIS)
    ```
    (Omit `--model` to use the default from config.json.)
 
-3. **Regenerate the manifest:**
+3. **Bump the content version** in `system_media_src/VERSION`, then
+   regenerate the manifest (it reads the version from that file):
    ```bash
-   python scripts/sysgen/generate_manifest.py --version <new-version>
+   python scripts/sysgen/generate_manifest.py
    ```
 
 ## Modifying an existing asset (description only)
 
 1. Edit the `description` (and `prompt` if desired) in
    `system_media_src/{type}.json`.
-2. Run `python scripts/sysgen/generate_manifest.py --version <new-version>`.
+2. Bump `system_media_src/VERSION` if the change warrants a new content
+   release, then run `python scripts/sysgen/generate_manifest.py`.
 3. If the prompt changed and you want a new image, run:
    ```bash
    python scripts/sysgen/generate_system_assets.py --only sys_id --force --model <model>
@@ -64,6 +66,7 @@ system_media_src/{type}.json        ← source of truth (you edit THIS)
 |------|------|
 | `system_media_src/char_portrait.json` | Character portrait definitions (25 entries) |
 | `system_media_src/background_img.json` | Background image definitions (26 entries) |
+| `system_media_src/VERSION` | **Tracked.**  Semantic version — source of truth; bump here, then regenerate |
 | `system_media/_manifest.json` | **Generated.**  Runtime manifest consumed by `AssetLibrary.import_system_assets()` |
-| `system_media/VERSION` | **Generated.**  Semantic version — bump via `--version` on manifest regeneration |
+| `system_media/VERSION` | **Generated.**  Copies the source version |
 | `system_media/{type}/sys_*.png` | **Generated.**  Rendered images |
