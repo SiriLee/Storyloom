@@ -1400,7 +1400,6 @@ class TestGameLoopGraphPipeline:
         sys_dir.mkdir()
         manifest = {
             "version": "1.0.0",
-            "min_app_version": "1.3.0",
             "assets": {
                 "char_portrait": {
                     "sys_adult_female": {

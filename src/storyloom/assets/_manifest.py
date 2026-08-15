@@ -36,11 +36,9 @@ class SystemManifest:
 
     Attributes:
         version: Semantic version of the system-asset package (e.g. "1.0.0").
-        min_app_version: Minimum Storyloom version required.
         assets: ``AssetType`` → ``{asset_id: ManifestEntry}``.
     """
     version: str
-    min_app_version: str
     assets: dict[AssetType, dict[str, ManifestEntry]]
 
     @staticmethod
@@ -59,8 +57,6 @@ class SystemManifest:
         version = data.get("version")
         if version is None:
             raise ValueError("_manifest.json: missing required key 'version'")
-
-        min_app_version = data.get("min_app_version", "0.0.0")
 
         raw_assets = data.get("assets")
         if raw_assets is None:
@@ -83,6 +79,5 @@ class SystemManifest:
 
         return SystemManifest(
             version=version,
-            min_app_version=min_app_version,
             assets=assets,
         )

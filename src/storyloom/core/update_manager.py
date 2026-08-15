@@ -253,8 +253,8 @@ def _check_app_update(app_version: str) -> VersionInfo:
 def _check_system_media_update(system_media_version: str) -> VersionInfo:
     """Read the ``_manifest.json`` asset from the ``system-media`` tag.
 
-    The manifest already carries ``version`` (and ``min_app_version``),
-    so it doubles as the remote version source — no separate version
+    The manifest already carries ``version``, so it doubles as the
+    remote version source — no separate version
     asset needed.  A 404 (manifest not yet uploaded as a standalone
     asset) is treated as "no update" rather than an error.
     """

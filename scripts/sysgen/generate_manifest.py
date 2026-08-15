@@ -31,8 +31,6 @@ _VERSION_PATH = _PROJECT_ROOT / "system_media" / "VERSION"
 # is generated output and gitignored; bump the version here, then regenerate.
 _SRC_VERSION_PATH = _SRC_DIR / "VERSION"
 
-MIN_APP_VERSION = "1.3.0"
-
 # Asset types expected under system_media_src/
 ASSET_TYPES = ["char_portrait", "background_img"]
 
@@ -82,7 +80,6 @@ def write_manifest(assets: dict, version: str) -> None:
     """
     manifest = {
         "version": version,
-        "min_app_version": MIN_APP_VERSION,
         "assets": assets,
     }
 

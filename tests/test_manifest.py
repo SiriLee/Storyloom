@@ -29,7 +29,6 @@ def _make_valid_manifest() -> dict:
     """Return a minimal valid manifest dict for reuse across tests."""
     return {
         "version": "1.0.0",
-        "min_app_version": "1.3.0",
         "assets": {
             "char_portrait": {
                 "sys_hero_001": {
@@ -91,7 +90,6 @@ class TestSystemManifestLoad:
 
         m = SystemManifest.load(str(tmp_path))
         assert m.version == "1.0.0"
-        assert m.min_app_version == "1.3.0"
         assert AssetType.CHAR_PORTRAIT in m.assets
         assert AssetType.BACKGROUND in m.assets
         assert len(m.assets[AssetType.CHAR_PORTRAIT]) == 1
@@ -118,7 +116,6 @@ class TestSystemManifestLoad:
         """Empty assets dict is valid — no assets declared yet."""
         data = {
             "version": "0.0.0",
-            "min_app_version": "1.3.0",
             "assets": {},
         }
         _write_manifest(tmp_path, data)

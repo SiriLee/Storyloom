@@ -1213,7 +1213,6 @@ class TestSystemAssetReconciliation:
         """Return a minimal valid manifest dict."""
         return {
             "version": version,
-            "min_app_version": "1.3.0",
             "assets": assets or {},
         }
 

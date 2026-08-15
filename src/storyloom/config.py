@@ -100,6 +100,6 @@ GITHUB_RELEASES_URL = (
 GITHUB_DOWNLOAD_BASE = f"{GITHUB_RELEASES_URL}/download"
 UPDATE_MANIFEST_FILENAME = "update.json"        # app layer manifest asset
 SYSTEM_MEDIA_TAG = "system-media"               # fixed release tag for system_media
-SYSTEM_MEDIA_MANIFEST_FILENAME = "_manifest.json"  # version + min_app_version
+SYSTEM_MEDIA_MANIFEST_FILENAME = "_manifest.json"  # version
 LAUNCHER_TAG = "launcher"                       # fixed release tag for the launcher
 LAUNCHER_MANIFEST_FILENAME = "VERSION"          # plain-text launcher version

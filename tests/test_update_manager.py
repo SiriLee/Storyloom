@@ -139,7 +139,7 @@ def _app_manifest(version="1.4.0", notes="## notes"):
 
 def _sm_manifest(version="1.2.0"):
     """Mock the system_media ``_manifest.json`` manifest."""
-    return {"version": version, "min_app_version": "1.3.0"}
+    return {"version": version}
 
 
 def _route_json(mock_json, *, app, sm):
@@ -384,7 +384,7 @@ def test_download_extract_system_media(tmp_path):
     _create_test_zip(str(zip_dir), {
         "char_portrait/sys_young_male.png": b"fake-png",
         "VERSION": b"1.2.0",
-        "_manifest.json": b'{"version":"1.2.0","min_app_version":"1.3.0"}',
+        "_manifest.json": b'{"version":"1.2.0"}',
     })
     target = tmp_path / "target"
     target.mkdir()
