@@ -1104,7 +1104,7 @@
                     + '<strong>' + esc(_("App Core")) + '</strong> &nbsp; '
                     + esc(result.app.current) + ' → ' + esc(result.app.latest)
                     + '<div class="text-muted" style="margin-top:0.25rem">'
-                    + esc(_("Update via pip: pip install --upgrade storyloom"))
+                    + esc(_("Update via pip: pip install --upgrade storyloom-engine"))
                     + '</div>'
                     + '</div>';
             } else {

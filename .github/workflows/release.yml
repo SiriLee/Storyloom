@@ -152,8 +152,8 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             artifacts/storyloom-v${VERSION}-*.zip \
             artifacts/storyloom-app-v${VERSION}-*.zip \
-            artifacts/storyloom-${VERSION}-*.whl \
-            artifacts/storyloom-${VERSION}.tar.gz \
+            artifacts/storyloom_engine-${VERSION}-*.whl \
+            artifacts/storyloom_engine-${VERSION}.tar.gz \
             dist/update.json \
             --repo "$GITHUB_REPOSITORY" \
             --generate-notes \
