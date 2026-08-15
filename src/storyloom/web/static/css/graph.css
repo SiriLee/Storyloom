@@ -186,10 +186,10 @@
 .vn-ctc.visible { opacity: 0.7; }
 @keyframes pulse { 50% { opacity: 0.3; } }
 
-/* Engine-wait indicator — overlays the CTC slot (bottom-right) so the
-   last segment's text stays visible while a Task is pending. */
+/* Engine-wait indicator — centered below the dialog text so the
+   last segment stays visible while a Task is pending. */
 .vn-loading {
-  position: absolute; bottom: 1rem; right: 2rem; z-index: 6;
+  position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%); z-index: 6;
   display: flex; align-items: center;
   animation: fadeIn 0.3s ease;
 }
