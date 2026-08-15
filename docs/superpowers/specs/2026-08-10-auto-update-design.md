@@ -223,34 +223,49 @@ New module: `src/storyloom/core/update_manager.py`
 
 ### 4.1 Responsibilities
 
-- Query GitHub Releases API for latest app version.
-- Query for latest system_media version (separate release asset).
+- Read a small per-layer manifest file from the GitHub release *download*
+  CDN — never the rate-limited REST API (`api.github.com`).
 - Compare against installed versions.
 - Download and extract release zips with progress reporting.
 - Never touch user data.
 
 ### 4.2 Version sources
 
-| Layer | Local version source | Remote version source |
-|-------|---------------------|----------------------|
-| App Core | `storyloom.__version__` | GitHub latest release `tag_name` (strip `v` prefix) |
-| System Media | `system_media/VERSION` file | GitHub release asset `system_media-v{ver}.zip` |
+Each layer declares its current version in a manifest asset served from the
+release CDN (`releases/download/…`, which 302s to
+`release-assets.githubusercontent.com` — not rate-limited).
 
-### 4.3 GitHub API integration
+| Layer | Local version source | Remote manifest (CDN) | Download asset (deterministic) |
+|-------|---------------------|-----------------------|-------------------------------|
+| App Core | `storyloom.__version__` | `releases/latest/download/update.json` → `version` | `storyloom-app-v{ver}-{platform}.zip` |
+| System Media | `system_media/VERSION` file | `releases/download/system-media/_manifest.json` → `version` | `system_media-v{ver}.zip` |
+| Launcher | `launcher.version` file (exe dist only) | `releases/download/launcher/VERSION` (plain text) | `storyloom-launcher-v{ver}-{platform}.zip` |
+
+### 4.3 Manifest format
 
 ```
-GET https://api.github.com/repos/SiriLee/Storyloom/releases/latest
-Authorization: none (public repo)
+GET https://github.com/SiriLee/Storyloom/releases/latest/download/update.json
 ```
 
-Parse response:
-- `tag_name` → latest app version (e.g. `"v1.4.0"`)
-- `assets[].name` → find `storyloom-v{ver}-{platform}.zip` and
-  `system_media-v{ver}.zip`
-- `assets[].browser_download_url` → direct download URL
-- `body` → release notes (markdown, for UI display)
+The app manifest (`update.json`) carries:
 
-Platform detection for asset matching:
+```json
+{
+  "version": "1.4.0",
+  "notes": "markdown release notes"
+}
+```
+
+The system_media manifest is the existing `_manifest.json` (already carries
+`version` + `min_app_version`).  The launcher manifest is a plain-text
+`VERSION` file.
+
+Download URLs are deterministic — derived from the manifest version and the
+fixed asset naming convention, so no API call is needed to discover them.
+The launcher layer is skipped entirely when no launcher is installed (empty
+`launcher.version`).
+
+Platform detection for asset naming:
 ```python
 import sys
 if sys.platform == "win32":
@@ -330,10 +345,10 @@ All endpoints under the web server.
 
 Returns `UpdateCheckResult`.
 
-Side effect: makes one HTTP request to GitHub Releases API.
+Side effect: makes three manifest requests over the release download CDN
+(no API rate limit).
 
-Caching: results cached for 15 minutes to avoid rate-limiting on repeated
-clicks.  `?force=true` bypasses cache.
+Caching: results cached for 15 minutes.  `?force=true` bypasses cache.
 
 ### 5.2 `POST /api/update/apply`
 
@@ -493,10 +508,9 @@ storyloom-v1.4.0-Linux.zip         ← {name}-v{ver}-{platform}.zip
 4. Rename `app_new/` → `app/`.
 5. Double-click `Storyloom`.
 
-The Launcher source (§3.3) is also shipped inside the main app
-(`src/storyloom/launcher.py` bundled in `storyloom-web`) so the app
-can regenerate the Launcher binary if needed (`python -m storyloom
---regenerate-launcher`).
+`--regenerate-launcher` recovers a deleted Launcher binary by downloading
+it from the launcher release asset (see §4.2) — it does not rebuild from
+source.
 
 **Update:**
 1. App downloads zip and extracts to temp.
@@ -572,7 +586,7 @@ in the current working directory or `STORYLOOM_APP_DIR`.
 
 | Scenario | Handling |
 |----------|----------|
-| GitHub API rate-limited (60 req/hr unauthenticated) | Cache results 15 min; show "try again later" message with retry time |
+| Manifest request fails (network/offline) | Cache results 15 min; per-layer `error` category shown in UI |
 | Download interrupted | Delete partial file; allow retry |
 | Disk full during extraction | Delete partial extraction; show error with space requirement |
 | New version requires higher min_app_version for system_media | Check `_manifest.json` min_app_version before applying; warn if incompatible |
