@@ -38,7 +38,6 @@ _LAUNCHER_MANIFEST_URL = (
 )
 CACHE_SECONDS = 900  # 15 minutes
 
-# Per spec §4.3
 if sys.platform == "win32":
     _PLATFORM = "Windows"
 elif sys.platform == "darwin":
