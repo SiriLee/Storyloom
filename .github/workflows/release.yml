@@ -1,0 +1,154 @@
+name: Release
+
+# Tag-triggered release pipeline: test → build (matrix) → publish.
+#
+# On a `v*` tag push this:
+#   1. runs the test suite (a tag is otherwise untested — test.yml only
+#      covers `main` and PRs);
+#   2. builds wheel + PyInstaller binaries + release zips on Linux & Windows;
+#   3. creates the GitHub release and uploads the app assets + `update.json`
+#      manifest (read by the in-app updater via the release CDN);
+#   4. uploads the launcher zips + `VERSION` manifest to the persistent
+#      `launcher` tag;
+#   5. publishes the wheel to PyPI.
+#
+# system_media is NOT built here — its assets + `_manifest.json` are
+# gitignored (assembled/generated out-of-tree).  Release that layer locally
+# with `bash scripts/release.sh` (or un-ignore its manifest metadata first).
+#
+# Required secrets:
+#   PYPI_API_TOKEN — a PyPI API token scoped to the `storyloom` project.
+# The `launcher` release tag must exist (it does for this repo); the workflow
+# creates it on first run as a fallback.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install ".[bg,test]"
+      - name: Run tests
+        run: pytest --tb=short
+
+  build:
+    name: Build (${{ matrix.os }})
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build wheel + PyInstaller + zips
+        shell: bash
+        run: bash scripts/build.sh
+      - name: Upload platform zips
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: dist/*.zip
+          if-no-files-found: error
+      - name: Upload PyPI packages (Linux only — they are platform-independent)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-pypi
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate app manifest (update.json)
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          # notes is left empty — the GitHub release body (auto-generated
+          # below) is the human-readable changelog; the in-app UI does not
+          # render notes yet.
+          python3 - "$VERSION" > dist/update.json <<'PY'
+          import json, sys
+          print(json.dumps({"version": sys.argv[1], "notes": ""}, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Create release + upload app assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            artifacts/storyloom-v${VERSION}-*.zip \
+            artifacts/storyloom-app-v${VERSION}-*.zip \
+            artifacts/storyloom-${VERSION}-*.whl \
+            artifacts/storyloom-${VERSION}.tar.gz \
+            dist/update.json \
+            --repo "$GITHUB_REPOSITORY" \
+            --generate-notes \
+            --title "$GITHUB_REF_NAME"
+
+      - name: Upload launcher layer (zips + VERSION manifest)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LAUNCHER_VER="$(head -1 launcher.version | tr -d '[:space:]')"
+
+          # Bootstrap the persistent `launcher` tag if it does not exist yet.
+          gh release view launcher --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create launcher --repo "$GITHUB_REPOSITORY" --title "Launcher"
+
+          gh release upload launcher \
+            artifacts/storyloom-launcher-v${LAUNCHER_VER}-*.zip \
+            --repo "$GITHUB_REPOSITORY" --clobber
+
+          # The launcher manifest is plain text (launcher.version), uploaded
+          # as the `VERSION` asset the updater reads via the release CDN.
+          cp launcher.version dist/VERSION
+          gh release upload launcher dist/VERSION \
+            --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Prepare PyPI packages
+        run: |
+          mkdir -p pypi-dist
+          find artifacts -maxdepth 1 \( -name '*.whl' -o -name '*.tar.gz' \) \
+            -exec cp {} pypi-dist/ \;
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: pypi-dist/
+          password: ${{ secrets.PYPI_API_TOKEN }}
