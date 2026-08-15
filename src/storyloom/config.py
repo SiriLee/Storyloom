@@ -57,7 +57,7 @@ OUTLINE_NODE_RANGES = {
 }
 
 # ── API defaults ──────────────────────────────────────────────
-DEFAULT_MODEL = "deepseek-v4-pro"
+DEFAULT_MODEL = "deepseek-v4-flash"
 STREAM_STALL_TIMEOUT_SEC = 180
 
 # ── Image API defaults ───────────────────────────────────────

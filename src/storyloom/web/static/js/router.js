@@ -559,7 +559,7 @@
             + '<div class="settings-card-title">' + Icons.key() + esc(_("API Configuration")) + '</div>'
             + _settingText("api_base_url", _("API Base URL"), "https://api.deepseek.com")
             + _settingPassword("api_key", _("API Key"), "sk-...")
-            + _settingText("api_model", _("Model"), "deepseek-v4-pro")
+            + _settingText("api_model", _("Model"), "deepseek-v4-flash")
             + '</div>';
         _bindSettingsInputs(container);
     }

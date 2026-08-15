@@ -15,7 +15,7 @@ class TestUserConfigDefaults:
         assert cfg.language == "en"
         assert cfg.api_key == ""
         assert cfg.api_base_url == "https://api.deepseek.com"
-        assert cfg.api_model == "deepseek-v4-pro"
+        assert cfg.api_model == "deepseek-v4-flash"
 
     def test_headless_set_and_read_properties(self):
         cfg = UserConfig()

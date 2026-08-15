@@ -29,7 +29,7 @@ class UserConfig:
         "accent_color": "green",
         "api_key": "",
         "api_base_url": "https://api.deepseek.com",
-        "api_model": "deepseek-v4-pro",
+        "api_model": "deepseek-v4-flash",
         "game_mode": "text",
         "img_api_key": "",
         "img_api_base_url": "",
