@@ -6,6 +6,8 @@
 
 > An AI-powered real-time visual novel engine.
 
+[English](./README.md) | [简体中文](./README-zh-CN.md)
+
 [![Python](https://img.shields.io/badge/python-%3E%3D10-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/SiriLee/e809f4fcaea1700560591c9867659fc0/raw/badge.json)](https://github.com/SiriLee/Storyloom/actions)
