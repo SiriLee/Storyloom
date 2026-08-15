@@ -77,7 +77,7 @@ $PYTHON -m pip install -q -e ".[bg,desktop]" build pyinstaller wheel 2>/dev/null
 # 2. pip packages (wheel + sdist)
 #    i18n (.mo + frontend JS dict) compiled automatically by setup.py build hook
 echo "--- Building pip packages ---"
-$PYTHON -m build --no-isolation
+$PYTHON -m build
 
 # System media — pack via pack_system_media.sh for filtered, consistent output
 # (skips runtime thumbnails, validates manifest vs. source).
