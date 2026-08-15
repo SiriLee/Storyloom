@@ -1298,7 +1298,6 @@ async def saves_delete(game_id: str, filename: str):
 
 # ═══════════════════════════════════════════════════════════════════
 # Auto-Update
-# Spec: docs/superpowers/specs/2026-08-10-auto-update-design.md §5
 # ═══════════════════════════════════════════════════════════════════
 
 

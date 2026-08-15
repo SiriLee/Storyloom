@@ -91,7 +91,7 @@ GENERATE_REF_IMAGE_COUNT = 0     # max reference images for style guidance
 # ── Auto-update ────────────────────────────────────────────────────
 # Update checks read a small per-layer manifest file via the GitHub release
 # *download* CDN (``releases/download/…``), never the rate-limited REST API
-# (``api.github.com``).  See docs/superpowers/specs/2026-08-10-auto-update-design.md §4.
+# (``api.github.com``).
 GITHUB_REPO_OWNER = "SiriLee"
 GITHUB_REPO_NAME = "Storyloom"
 GITHUB_RELEASES_URL = (

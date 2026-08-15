@@ -1,6 +1,4 @@
 """UpdateManager — version checking, download, and extraction for auto-updates.
-
-Spec: docs/superpowers/specs/2026-08-10-auto-update-design.md §4
 """
 import json
 import os

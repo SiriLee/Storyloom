@@ -4,8 +4,6 @@ Storyloom Launcher — apply pending updates and launch the main application.
 Compiled to a standalone executable with PyInstaller (``--onefile``).
 The Launcher is stateless: it does not download, check for updates, or
 write anything except during the atomic swap at startup.
-
-Spec: docs/superpowers/specs/2026-08-10-auto-update-design.md §3
 """
 import os
 import shutil
@@ -32,7 +30,6 @@ def _apply_app_update():
 
     Verifies *app_new* is complete before swapping — an incomplete
     download must never replace a working installation.
-    Spec: docs/superpowers/specs/2026-08-10-auto-update-design.md §9
     """
     if not os.path.isdir(APP_NEW):
         return

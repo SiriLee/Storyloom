@@ -2,8 +2,7 @@
 # Release helper — publish the per-layer update manifests to GitHub Releases.
 #
 # The update checker reads these manifests from the release *download* CDN
-# (never api.github.com).  See
-# docs/superpowers/specs/2026-08-10-auto-update-design.md §4.
+# (never api.github.com).
 #
 # Run AFTER creating the GitHub releases (`gh release create vX.Y.Z`, and the
 # persistent `system-media` / `launcher` tags).  Idempotent — `--clobber`
