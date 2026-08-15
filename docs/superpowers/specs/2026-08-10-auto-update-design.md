@@ -482,7 +482,7 @@ source in §3.3:
 $PYTHON -m PyInstaller --onefile \
     --name "$LAUNCHER_NAME" \
     --clean \
-    src/launcher.py
+    src/storyloom/launcher.py
 ```
 
 No `--add-data` — the Launcher has zero bundled data.  Exe size ~8 MB.

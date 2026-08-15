@@ -118,7 +118,7 @@ $PYTHON -m PyInstaller --onefile $PYI_FLAGS \
     --name "$LAUNCHER_NAME" \
     --icon "$ICON" \
     --clean \
-    src/launcher.py
+    src/storyloom/launcher.py
 
 # 3c. Package Launcher as a separate update asset — downloaded only when
 #     launcher.version bumps (independent of the app version).
