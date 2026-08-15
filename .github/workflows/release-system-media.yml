@@ -1,0 +1,46 @@
+name: Release System Media Manifest
+
+# Auto-syncs the system_media manifest to the persistent `system-media`
+# release tag whenever `system_media_src/VERSION` bumps on `main`.
+#
+# The updater reads `releases/download/system-media/_manifest.json` (CDN) to
+# detect a new content version, so this manifest must stay in lockstep with
+# the version.  The asset ZIP itself is NOT built here — its images are
+# gitignored and AI-generated, so it is packed + uploaded locally
+# (`scripts/pack_system_media.sh` + `gh release upload`) before the VERSION
+# bump is pushed.  See system_media_src/README.md.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'system_media_src/VERSION'
+
+permissions:
+  contents: write
+
+jobs:
+  manifest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Regenerate manifest from source
+        run: python scripts/sysgen/generate_manifest.py
+
+      - name: Upload manifest to system-media tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Bootstrap the persistent tag on first run.
+          gh release view system-media --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create system-media --repo "$GITHUB_REPOSITORY" \
+                 --title "System Media Assets"
+
+          gh release upload system-media system_media/_manifest.json \
+            --repo "$GITHUB_REPOSITORY" --clobber
