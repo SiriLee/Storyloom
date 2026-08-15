@@ -147,10 +147,10 @@ blocking the text pipeline.
 ## Development
 
 ```bash
-# Clone and install
+# Clone and install (the `test` extra adds pytest + babel for the test suite)
 git clone https://github.com/SiriLee/Storyloom.git
 cd Storyloom
-pip install -e ".[desktop,bg]"
+pip install -e ".[desktop,bg,test]"
 
 # Tests (no API key needed)
 pytest
