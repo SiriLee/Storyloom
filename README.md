@@ -67,11 +67,11 @@ outside the installed package:
 
 Override with the `STORYLOOM_APP_DIR` environment variable.
 
-`pip uninstall storyloom` removes only the package — **not** your data.
+`pip uninstall storyloom-engine` removes only the package — **not** your data.
 Saves and media are kept.  To remove everything:
 
 ```bash
-pip uninstall storyloom
+pip uninstall storyloom-engine
 rm -rf ~/.local/share/Storyloom   # adjust path per the table above
 ```
 
