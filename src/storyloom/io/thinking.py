@@ -32,13 +32,19 @@ from __future__ import annotations
 
 _THINKING_PRESETS: list[tuple[str, dict, dict, dict]] = [
     # ── DeepSeek ──────────────────────────────────────────────────────
-    # Verified Aug 2026.  thinking.type is the official API parameter.
-    # Default is thinking ON — explicit disabled is needed to skip CoT.
+    # Official API (api-docs.deepseek.com, Aug 2026).  Two independent
+    # controls: thinking.type (on/off toggle) and reasoning_effort
+    # (top-level intensity — low/high/max).  Thinking defaults to ON
+    # with effort=high.  Since 2026-08-13 (V4-Pro-0813 GA), the default
+    # high effort emits a long chain-of-thought (reasoning_content)
+    # before content — long enough to trip the streaming stall timeout.
+    # So we pin light/enabled to low effort.  (disabled must NOT also
+    # send reasoning_effort — the API rejects that combination.)
     (
         "deepseek",
         {"thinking": {"type": "disabled"}},
-        {"thinking": {"type": "enabled"}},
-        {},                                              # enabled = API default
+        {"thinking": {"type": "enabled"}, "reasoning_effort": "low"},
+        {"thinking": {"type": "enabled"}, "reasoning_effort": "low"},
     ),
     # ── Anthropic Claude ──────────────────────────────────────────────
     # Per official docs (platform.claude.com, Aug 2026):

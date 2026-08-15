@@ -104,16 +104,22 @@ class TestThinkingPresets:
         assert params == {"thinking": {"type": "disabled"}}
 
     def test_deepseek_light(self):
-        """DeepSeek model + light → thinking.type=enabled."""
+        """DeepSeek model + light → low-effort thinking."""
         from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("deepseek-chat", "light")
-        assert params == {"thinking": {"type": "enabled"}}
+        assert params == {
+            "thinking": {"type": "enabled"},
+            "reasoning_effort": "low",
+        }
 
-    def test_deepseek_enabled_is_empty(self):
-        """DeepSeek enabled mode → empty (API default)."""
+    def test_deepseek_enabled_is_low_effort(self):
+        """DeepSeek enabled mode → low-effort thinking (pinned, not API default)."""
         from storyloom.io.thinking import get_thinking_params
         params = get_thinking_params("deepseek-v4-pro", "enabled")
-        assert params == {}
+        assert params == {
+            "thinking": {"type": "enabled"},
+            "reasoning_effort": "low",
+        }
 
     # ── Claude ────────────────────────────────────────────────────────
 

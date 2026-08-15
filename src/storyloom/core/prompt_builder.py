@@ -285,7 +285,9 @@ ROUND_TEMPLATE = """# Current Status
 ## Continue From
 {bridge_text}
 
-Plan silently using "Before You Write". Satisfy every rule in "Requirements". Follow "Story Setting" and "Current Status".
+This is a real-time interactive game:
+- Time is limited — plan briefly using "Before You Write", then write immediately.
+- Quality is required — satisfy every rule in "Requirements" and follow "Story Setting" and "Current Status".
 """
 
 GRAPH_ROUND1_PREFIX = """You are the director for a real-time visual novel game. Generate exactly one story segment per round based on the outline and current state. Do not jump ahead — the story unfolds round by round.
@@ -596,7 +598,9 @@ GRAPH_ROUND_TEMPLATE = """# Current Status
 {bridge_text}
 {scene_line}
 
-Plan silently using "Before You Write". Satisfy every rule in "Requirements". Follow "Story Setting" and "Current Status".
+This is a real-time interactive game:
+- Time is limited — plan briefly using "Before You Write", then write immediately.
+- Quality is required — satisfy every rule in "Requirements" and follow "Story Setting" and "Current Status".
 """
 
 ADVENTURE_LOG_PROMPT = """You are an adventure log author for an interactive text adventure game. Write a player-facing recap for the completed adventure.

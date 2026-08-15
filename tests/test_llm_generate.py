@@ -690,8 +690,11 @@ class TestForcedSelection:
         assert len(api.calls) == 2
         # First attempt: light thinking
         assert api.calls[0]["extra_params"]["thinking"]["type"] == "disabled"  # fast attempt
-        # Retry: enabled (heavier) thinking
-        assert api.calls[1]["extra_params"] == {}
+        # Retry: enabled thinking (low effort — pinned, not API default)
+        assert api.calls[1]["extra_params"] == {
+            "thinking": {"type": "enabled"},
+            "reasoning_effort": "low",
+        }
 
     def test_both_attempts_fail_picks_system(self, fs_roster, fs_library):
         """Both LLM calls fail → programmatic pick from system catalog."""
