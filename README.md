@@ -54,6 +54,27 @@ cd Storyloom
 pip install -e ".[desktop,bg]"
 ```
 
+### Data directory & uninstall
+
+User data — `config.json`, `saves/`, `media/`, `system_media/` — lives
+outside the installed package:
+
+| Install | Data directory |
+|---------|----------------|
+| Standalone binary | Next to the `Storyloom` executable |
+| Wheel (pip) | `~/.local/share/Storyloom` (Linux), `~/Library/Application Support/Storyloom` (macOS), `%APPDATA%\Storyloom` (Windows) |
+| From source | The repository root |
+
+Override with the `STORYLOOM_APP_DIR` environment variable.
+
+`pip uninstall storyloom` removes only the package — **not** your data.
+Saves and media are kept.  To remove everything:
+
+```bash
+pip uninstall storyloom
+rm -rf ~/.local/share/Storyloom   # adjust path per the table above
+```
+
 ---
 
 ## Usage
