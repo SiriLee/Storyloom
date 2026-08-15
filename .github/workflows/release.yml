@@ -1,6 +1,6 @@
 name: Release
 
-# Tag-triggered release pipeline: test → build (matrix) → publish.
+# Tag-triggered release pipeline: verify → test → build (matrix) → publish.
 #
 # On a `v*` tag push this:
 #   1. runs the test suite (a tag is otherwise untested — test.yml only
@@ -30,10 +30,48 @@ permissions:
   contents: write
 
 jobs:
+  verify:
+    name: Verify release invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Check version consistency (tag == __version__ == pyproject)
+        run: |
+          TAG_VER="${GITHUB_REF_NAME#v}"
+          PY_VER="$(python3 -c "import re; print(re.search(r'__version__\s*=\s*\"(.+?)\"', open('src/storyloom/__init__.py', encoding='utf-8').read()).group(1))")"
+          TOML_VER="$(python3 -c "import re; print(re.search(r'^version\s*=\s*\"(.+?)\"', open('pyproject.toml', encoding='utf-8').read(), re.M).group(1))")"
+          if [ "$TAG_VER" != "$PY_VER" ] || [ "$TAG_VER" != "$TOML_VER" ]; then
+            echo "Version mismatch: tag=v${TAG_VER} __version__=${PY_VER} pyproject=${TOML_VER}" >&2
+            exit 1
+          fi
+          echo "Version consistent: v${TAG_VER}"
+
+      - name: Check launcher.version bumped when launcher.py changed
+        run: |
+          PREV_TAG="$(git describe --tags --abbrev=0 --match 'v*' HEAD^ 2>/dev/null || true)"
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous release tag — first release; skip launcher check"
+            exit 0
+          fi
+          if git diff --quiet "$PREV_TAG" HEAD -- src/storyloom/launcher.py; then
+            echo "launcher.py unchanged since ${PREV_TAG} — ok"
+          elif git diff --quiet "$PREV_TAG" HEAD -- launcher.version; then
+            echo "launcher.py changed since ${PREV_TAG} but launcher.version was not bumped" >&2
+            exit 1
+          else
+            echo "launcher.py changed and launcher.version bumped — ok"
+          fi
+
   test:
     name: Test
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: verify
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
