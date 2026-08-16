@@ -9,6 +9,7 @@ import json
 import os
 import threading
 
+from storyloom.assets._names import fold_name
 from storyloom.assets._types import AssetItem, AssetType
 
 from typing import TYPE_CHECKING
@@ -126,6 +127,26 @@ class GameAssetRoster:
         """
         with self._lock:
             return self._items.get(asset_type, {}).get(local_name)
+
+    def lookup_folded(self, asset_type: AssetType, local_name: str) -> AssetItem | None:
+        """Return the entry matching *local_name*, folding 繁简/case/width.
+
+        Exact match first (fast path, preserves ``lookup`` semantics).
+        On miss, folds both *local_name* and each roster key to a
+        canonical form (``fold_name``) and returns the first equivalent
+        entry.  The returned ``AssetItem.local_name`` is the canonical
+        roster key — callers must use it (not the folded query) as
+        ``Task.result`` so later exact lookups succeed.
+        """
+        item = self.lookup(asset_type, local_name)
+        if item is not None:
+            return item
+        folded = fold_name(local_name)
+        with self._lock:
+            for name, item in self._items.get(asset_type, {}).items():
+                if fold_name(name) == folded:
+                    return item
+        return None
 
     def clear(self) -> None:
         """Remove all entries.  Calls ``library.decrease_usage`` for every

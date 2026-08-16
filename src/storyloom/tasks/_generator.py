@@ -86,8 +86,15 @@ class TaskGenerator:
         task = Task(TaskType.MATCH, event.line, asset_type)
         self._queue.append(task)
 
-        if local_name and self._roster.lookup(asset_type, local_name) is not None:
-            task.complete(result=local_name)          # O(1) hit
+        # Folded lookup — 繁简/case/width variants hit without the LLM.
+        item = (
+            self._roster.lookup_folded(asset_type, local_name)
+            if local_name else None
+        )
+        if item is not None:
+            # result must be the canonical roster key, not the folded
+            # query — EventDispatcher re-looks-up by result exactly.
+            task.complete(result=item.local_name)     # O(1) hit
         elif local_name and self._match_processor is not None:
             task.process = self._match_processor(asset_type, local_name,
                                                            self._roster)
@@ -115,8 +122,8 @@ class TaskGenerator:
         task = Task(TaskType.GENERATE, 0, asset_type)
         self._queue.append(task)
 
-        if local_name and self._roster.lookup(asset_type, local_name) is not None:
-            task.complete()                            # already declared
+        if local_name and self._roster.lookup_folded(asset_type, local_name) is not None:
+            task.complete()                            # already declared (folded)
         elif local_name:
             # Placeholder first — sync, before pool submit (design.md §6.4)
             self._roster.add(asset_type, local_name, desc, target=None)

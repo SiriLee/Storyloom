@@ -23,7 +23,7 @@ test = ["babel>=2.10", "pytest>=7.0"]
 storyloom-web = "storyloom.web.server:main"
 
 [tool.setuptools.package-data]
-storyloom = ["web/static/**/*", "core/lang_meta/*.json", "models/*.onnx", "locale/**/*", "content/**/*"]
+storyloom = ["web/static/**/*", "core/lang_meta/*.json", "models/*.onnx", "locale/**/*", "content/**/*", "assets/data/*.json"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
