@@ -13,7 +13,7 @@
 [![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/SiriLee/e809f4fcaea1700560591c9867659fc0/raw/badge.json)](https://github.com/SiriLee/Storyloom/actions)
 
 <p align="center">
-  <img src="assets/demo/choice.gif" alt="Storyloom 图形模式选项演示" width="720">
+  <img src="assets/demo/hero.jpg" alt="Storyloom 图形模式游戏画面" width="720">
 </p>
 
 ---
@@ -105,9 +105,13 @@ python -m storyloom.web
 
 ## 截图
 
-| 主菜单 | 共创 | 存档 | 素材管理 |
-|--------|------|------|----------|
-| ![主菜单](assets/demo/menu.png) | ![共创](assets/demo/co-create.png) | ![存档](assets/demo/saves.png) | ![素材管理](assets/demo/assets.png) |
+| 主菜单 | 共创 | 故事设定 | 素材预构建 |
+|--------|------|---------|-----------|
+| ![主菜单](assets/demo/menu.png) | ![共创](assets/demo/co-create.png) | ![故事设定](assets/demo/generate.png) | ![素材预构建](assets/demo/prebuild.png) |
+
+| 存档 | 设置 | 素材管理 |
+|------|------|---------|
+| ![存档](assets/demo/saves.png) | ![设置](assets/demo/setting.png) | ![素材管理](assets/demo/assets.png) |
 
 ---
 

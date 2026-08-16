@@ -13,7 +13,7 @@
 [![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/SiriLee/e809f4fcaea1700560591c9867659fc0/raw/badge.json)](https://github.com/SiriLee/Storyloom/actions)
 
 <p align="center">
-  <img src="assets/demo/choice.gif" alt="Storyloom graph-mode choice demo" width="720">
+  <img src="assets/demo/hero.jpg" alt="Storyloom graph mode gameplay" width="720">
 </p>
 
 ---
@@ -111,9 +111,13 @@ First launch opens the Settings page.  Enter your API key, select a mode
 
 ## Screenshots
 
-| Main menu | Co-creation | Saves | Assets |
-|-----------|-------------|-------|--------|
-| ![Main menu](assets/demo/menu.png) | ![Co-creation](assets/demo/co-create.png) | ![Saves](assets/demo/saves.png) | ![Assets](assets/demo/assets.png) |
+| Main menu | Co-creation | Story settings | Asset pre-build |
+|-----------|-------------|----------------|-----------------|
+| ![Main menu](assets/demo/menu.png) | ![Co-creation](assets/demo/co-create.png) | ![Story settings](assets/demo/generate.png) | ![Asset pre-build](assets/demo/prebuild.png) |
+
+| Saves | Settings | Assets |
+|-------|----------|--------|
+| ![Saves](assets/demo/saves.png) | ![Settings](assets/demo/setting.png) | ![Assets](assets/demo/assets.png) |
 
 ---
 
