@@ -105,13 +105,20 @@ python -m storyloom.web
 
 ## 截图
 
-| 主菜单 | 共创 | 故事设定 | 素材预构建 |
-|--------|------|---------|-----------|
-| ![主菜单](assets/demo/menu.png) | ![共创](assets/demo/co-create.png) | ![故事设定](assets/demo/generate.png) | ![素材预构建](assets/demo/prebuild.png) |
-
-| 存档 | 设置 | 素材管理 |
-|------|------|---------|
-| ![存档](assets/demo/saves.png) | ![设置](assets/demo/setting.png) | ![素材管理](assets/demo/assets.png) |
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/demo/menu.png" alt="主菜单" width="170"><br>主菜单</td>
+    <td align="center"><img src="assets/demo/co-create.png" alt="共创" width="170"><br>共创</td>
+    <td align="center"><img src="assets/demo/generate.png" alt="故事设定" width="170"><br>故事设定</td>
+    <td align="center"><img src="assets/demo/prebuild.png" alt="素材预构建" width="170"><br>素材预构建</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/demo/hero.jpg" alt="游戏画面" width="170"><br>游戏画面</td>
+    <td align="center"><img src="assets/demo/saves.png" alt="存档" width="170"><br>存档</td>
+    <td align="center"><img src="assets/demo/setting.png" alt="设置" width="170"><br>设置</td>
+    <td align="center"><img src="assets/demo/assets.jpg" alt="素材管理" width="170"><br>素材管理</td>
+  </tr>
+</table>
 
 ---
 

@@ -111,13 +111,20 @@ First launch opens the Settings page.  Enter your API key, select a mode
 
 ## Screenshots
 
-| Main menu | Co-creation | Story settings | Asset pre-build |
-|-----------|-------------|----------------|-----------------|
-| ![Main menu](assets/demo/menu.png) | ![Co-creation](assets/demo/co-create.png) | ![Story settings](assets/demo/generate.png) | ![Asset pre-build](assets/demo/prebuild.png) |
-
-| Saves | Settings | Assets |
-|-------|----------|--------|
-| ![Saves](assets/demo/saves.png) | ![Settings](assets/demo/setting.png) | ![Assets](assets/demo/assets.png) |
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/demo/menu.png" alt="Main menu" width="170"><br>Main menu</td>
+    <td align="center"><img src="assets/demo/co-create.png" alt="Co-creation" width="170"><br>Co-creation</td>
+    <td align="center"><img src="assets/demo/generate.png" alt="Story settings" width="170"><br>Story settings</td>
+    <td align="center"><img src="assets/demo/prebuild.png" alt="Asset pre-build" width="170"><br>Asset pre-build</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/demo/hero.jpg" alt="Gameplay" width="170"><br>Gameplay</td>
+    <td align="center"><img src="assets/demo/saves.png" alt="Saves" width="170"><br>Saves</td>
+    <td align="center"><img src="assets/demo/setting.png" alt="Settings" width="170"><br>Settings</td>
+    <td align="center"><img src="assets/demo/assets.jpg" alt="Assets" width="170"><br>Assets</td>
+  </tr>
+</table>
 
 ---
 
