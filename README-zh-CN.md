@@ -103,7 +103,7 @@ python -m storyloom.web
 
 ---
 
-## 截图
+## 界面预览
 
 <table align="center">
   <tr>
