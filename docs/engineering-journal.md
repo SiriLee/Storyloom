@@ -6,6 +6,140 @@
 
 ---
 
+## 2026-08-16（周日）— README 视觉打磨、汉字脚本变体折叠、LICENSE 对齐
+
+> **概述**：v2.3.1 发布后的文档与健壮性收尾。README 补上视觉演示（demo GIF → 游戏流程截图、固定宽度 HTML 网格、"截图"→"界面预览"术语统一、zh-CN 打磨并同步英文）；资产程序匹配折叠汉字脚本变体（繁/日汉字名 O(1) 命中，内置 OpenCC 派生的繁→简表）；LICENSE 版权持有者对齐仓库公开身份。全天 **8 commits**。
+
+### README 视觉呈现打磨
+
+**背景**：README 长期无演示内容；首次加入的 demo GIF 超 GitHub 5MB 限制（`375920f` 压缩后仍在），静态截图更稳定可控。截图布局靠手写 markdown，对齐不可控；zh-CN 用词 "截图" 偏口语。
+
+**决策**（commits `d841f3a` → `375920f` → `97f1c8c` → `7630f58` → `37a1c8e` → `63b02ea`）：
+
+1. 首次加入 demo GIF 与界面截图（`d841f3a`）→ 压缩到 GitHub 5MB 限制内（`375920f`）→ 最终改用**游戏流程截图**替代 GIF（`97f1c8c`，静态图免去 GIF 压缩/体积问题）。
+2. 截图改用**固定宽度 HTML 网格**布局（`7630f58`），多图对齐一致。
+3. zh-CN "截图" 统一改称 "**界面预览**"（`37a1c8e`）。
+4. zh-CN README 全面打磨并与英文版同步（`63b02ea`）。
+
+**依据**：`README.md`；`README.zh-CN.md`；`assets/` 截图资源；commits `d841f3a`~`63b02ea`。
+
+### 汉字脚本变体折叠 — 资产程序匹配 O(1) 命中
+
+**背景**：Director LLM 可能输出繁体/日文汉字名（如 藤原結衣），而 roster 存储简体（藤原结衣）。精确字符串程序匹配 miss → 走强制 LLM 匹配，LLM 回显的又是繁体形式，被精确字符串校验拒绝，日志出现 "LLM match failed after 2 attempts"。
+
+**决策**（commit `9c26a99`）：
+
+1. `GameAssetRoster.lookup_folded`：匹配前把两侧都折叠为规范形式——NFKC 归一 + strip + casefold + **繁→简转换**，程序匹配点两个调用处都改用该方法，脚本变体无需 LLM 即可 O(1) 命中。
+2. 新增 `assets/_names.py`（折叠工具）与 `assets/data/hanzi_t2s.json`（OpenCC 派生的繁→简对照表，Apache-2.0，约 19KB）。
+3. 配套 `tests/test_name_fold.py`（+146）覆盖折叠匹配。
+
+**依据**：`assets/_names.py`；`assets/data/hanzi_t2s.json`；`assets/_roster.py`；`tasks/_generator.py`；`tests/test_name_fold.py`。
+
+### LICENSE 版权持有者对齐
+
+**背景**：LICENSE 版权持有者写的是 Slev display name，而仓库公开身份是 **SiriLee**（repo owner、README 链接与 badges 均指向该账号）——持有者与项目对外身份不一致。
+
+**决策**（commit `816794e`）：版权持有者改为 SiriLee。
+
+**依据**：`LICENSE`。
+
+---
+
+## 2026-08-15（周六）— v2.3.1：manifest 化自动更新、标签触发 CI 发布、PyPI 发布 storyloom-engine
+
+> **概述**：v2.3.0 发布次日的发布机制大改。三大主线：(1) **自动更新 manifest 化**——更新检查从 `api.github.com` REST 改为 per-layer CDN 静态 manifest，根治每次检查必现的 GitHub rate limit；(2) **发布流水线 CI 化**——`v*` 标签触发 verify→test→build→publish，system_media 版本改为 git 跟踪；(3) **PyPI 发布**——发行名改为 `storyloom-engine`（`storyloom` 被拒，与已存在项目冲突），并补齐 wheel 安装支持、数据目录语义化、system_media CDN 回退等打包缺口。另有 README 简体中文版、DeepSeek 推理延迟修复（默认模型换 flash）、图模式加载指示器居中。全天 **34 commits**，版本 2.3.0 → **2.3.1**。
+
+### 自动更新 manifest 化 — per-layer CDN
+
+**背景**：更新检查此前走 `api.github.com` REST API（`releases/latest`），每次启动检查都命中 GitHub 未认证限流，前端稳定显示 "GitHub rate limit" 错误——用户无法判断是否有更新。
+
+**决策**（commits `f925a9c` + 配套 `89677b6`/`4b6c2c2`/`fb9be9c`/`96a08ec`/`d9e6237`）：
+
+1. **per-layer CDN manifest**（`f925a9c`）：三层各自从 release 下载 CDN 读静态 manifest，不再打 REST API——
+   - app → `releases/latest/download/update.json`（`{"version","notes"}`）
+   - system_media → `releases/download/system-media/_manifest.json`
+   - launcher → `releases/download/launcher/VERSION`（纯文本）
+   下载 URL 由版本 + 固定 asset 命名**确定性推导**；未安装 launcher 时 launcher 层直接跳过。`update_manager.py` 大改（+173/-230），测试随之重写（+414/-230）。
+2. **发布脚本**（`4b6c2c2`）：新增 `scripts/release.sh VERSION [NOTES]`——幂等发布三层 manifests（`--clobber`），供本地/手动发布；CI 内联执行。
+3. **清理**：移除 `min_app_version`（`d9e6237`）、废弃 superpowers spec 引用（`fb9be9c`、`96a08ec`）。
+4. **文档**（`89677b6`）：auto-update design §4.2/§4.3 重写为 per-layer CDN manifest 模型；§7.2 regenerate-launcher 措辞修正（下载而非重建）。
+
+**依据**：`core/update_manager.py`；`config.py`；`scripts/release.sh`；`docs/superpowers/specs/2026-08-10-auto-update-design.md`；`tests/test_update_manager.py`。
+
+### 标签触发的 CI 发布流水线
+
+**背景**：此前发版靠手动 `build.sh` + `gh release create`——本地代理上传大文件慢且易超时；launcher/system_media/app 三层发布分散无统一编排。需要"推 tag 即发布"。
+
+**决策**（commits `8295244` + `07dc473` + `232262b` + `52546a3` + `8cfe0ce`）：
+
+1. **tag 触发工作流**（`8295244`）：`.github/workflows/release.yml`——`v*` 标签推送 → verify → test → build（Linux+Windows matrix）→ publish：创建 GitHub release、上传 app 资产 + update.json、上传 launcher zips + VERSION manifest、发布 wheel 到 PyPI（`PYPI_API_TOKEN` secret）。system_media 独立发布（AI 生成资产 gitignored，不入仓库）。
+2. **发布不变量**（`07dc473`）：workflow 内校验 asset 命名/glob 一致性，防止静默失败。
+3. **system_media 版本 git 化**（`232262b`）：版本契约移入跟踪文件 `system_media_src/VERSION`，`generate_manifest.py` 默认读它（`--version` 仍可一次性覆盖）——不再只存在于 gitignored 的生成 `system_media/VERSION`。
+4. **system-media manifest 同步 workflow**（`52546a3`）+ `system_media_src/README.md` 发布流文档（`8cfe0ce`）。
+
+**依据**：`.github/workflows/release.yml`；`.github/workflows/system-media.yml`；`system_media_src/VERSION`；`scripts/generate_manifest.py`。
+
+### PyPI 发布为 storyloom-engine
+
+**背景**：向 PyPI 提交 `storyloom` 被拒（400 "too similar to existing project"）——与已有的 `story-loom`（无关的视频制作引擎）冲突。需改名发行，同时保持 import 包名不变。
+
+**决策**（commits `4b032f5` → `6f45df7` → `8149d61` + 配套 `e0b79c7`/`74be701`/`630b855`）：
+
+1. **发行名改名**（`4b032f5`）：`pyproject.toml` name 改 `storyloom-engine`；import 包保持 `storyloom`；entry point `storyloom-web` 不变；wheel 名变为 `storyloom_engine-{ver}-py3-none-any.whl`（连字符→下划线）。
+2. **PyPI 面字符串全量同步**（`6f45df7`、`8149d61`）：README `pip install`、release.yml asset globs、前端 router.js + locales 的 pip-update 提示、`pip uninstall` 指引——一处漏改就会给用户错误的安装/卸载命令。
+3. **构建隔离修复**（`630b855`）：`python -m build --no-isolation` 会跳过 `build-system.requires`，i18n build hook 缺 Babel → 去掉 `--no-isolation`，隔离构建正常装 Babel（`>=2.10`）。
+4. **文档**（`74be701`、`e0b79c7`）：`test` extra 写入开发安装说明；README 安装章节更新为 PyPI 安装。
+
+**依据**：`pyproject.toml`；`README.md`；`.github/workflows/release.yml`；`web/static/js/router.js`；`web/static/locales/{zh-CN,zh-TW}.json`；`scripts/build.sh`。
+
+### Packaging：wheel 安装支持与数据目录语义化
+
+**背景**：wheel/source 安装没有 launcher，app 层无法原地 swap，更新语义需区分；site-packages 安装下数据目录硬编码 `parents[3]` 深度与 `site-packages in parts` 字符串 hack 都不可靠；CI 空 checkout 无本地 system_media（gitignored AI 资产），build.sh 静默跳过导致首装 zip 不完整。
+
+**决策**（commits `1f97e17` + `057bdfd` + `aad2079` + `0e27388` + `0388bf1`/`b629fbf`）：
+
+1. **wheel 安装的自动更新**（`1f97e17`）：无 launcher 时 app 层标记为 **pip update**——前端显示 `pip install --upgrade storyloom-engine` 而非二进制下载；site-packages 安装默认数据目录 = cwd（config/saves 不写进 Python lib 目录）。
+2. **数据目录语义化**（`057bdfd`）：显式 helper 取代路径 hack——frozen → 二进制相邻布局；wheel → per-user 平台数据目录（XDG / APPDATA / macOS Application Support）；source/editable → 经 pyproject.toml 定位仓库根。
+3. **system_media CDN 回退**（`aad2079`）：build.sh 第三级回退——本地无 system_media 时，从 system-media tag 的 `_manifest.json` 读版本 → CDN 下载 `system_media-v{version}.zip`；本地已有仍优先。已用空 checkout 模拟验证（下载 v1.1.0 并正确解出 VERSION/_manifest.json/char_portrait/background_img）。
+4. **scripts/ 重组**（`0e27388`）：拆为 `sysgen/`（系统生成）与 `experiments/`。
+5. **launcher 移出→回退**（`0388bf1` → `b629fbf`）：初版把 launcher.py 移出包（PyInstaller entry script，非库模块，wheel 排除）——随即回退：CI test.yml 非 editable 安装下，顶层 `src/launcher.py` 无法以 `launcher` import（仅 editable 安装才有 `src/` 在 sys.path）；且 launcher.py 仅 3.6KB、有单测，随 wheel 分发无害。
+
+**依据**：`scripts/build.sh`；`core/update_manager.py`；`user_config.py`；`src/storyloom/launcher.py`；`tests/test_launcher.py`；`.github/workflows/test.yml`。
+
+### README 简体中文版与多语言入口
+
+**背景**：README 此前仅英文；简体中文用户需要母语文档；国内用户的网络/代理需求未记录。
+
+**决策**（commits `2938b9f` + `0327110` + `08b31fb`）：新增 **README.zh-CN.md** 简体中文版；README 顶部加语言切换器；网络与代理说明（en + zh-CN）补充。
+
+**依据**：`README.md`；`README.zh-CN.md`。
+
+### DeepSeek v4-pro 推理延迟 → flash 默认（v2.3.1）
+
+**背景**：DeepSeek 08-13 的 V4-Pro-0813 GA 把 thinking 默认改为 high effort——叙事 Round 1 调用在首 token 前跑约 56s 链式推理，游戏视图表现为"卡在加载"，且触发叙事 stall 超时。
+
+**决策**（commits `5c32a66` + `2dd9adc` + `a740bde` + `d6d4135`）：
+
+1. **推理延迟钳制**（`5c32a66`）：deepseek light/enabled 固定 low effort；新增 real-time interactive-game prompt guard——让规划保持简短而不牺牲格式合规（`io/thinking.py`、`core/prompt_builder.py`）。
+2. **文档推荐换序**（`2dd9adc`）：v4-pro 降为 "good"，低延迟 flash 升为 "best"。
+3. **默认模型切换**（`a740bde`）：`DEFAULT_MODEL`、`UserConfig._DEFAULTS`、`config.example.json`、前端 settings placeholder 全量改为 **deepseek-v4-flash**。
+4. **版本 bump**（`d6d4135`）：2.3.0 → 2.3.1。
+
+**依据**：`io/thinking.py`；`core/prompt_builder.py`；`config.py`；`user_config.py`；`config.example.json`；`tests/test_llm_match.py`；`tests/test_llm_generate.py`。
+
+### 图模式加载指示器：回退与最终居中
+
+**背景**：08-13 §7.7 引入的独立 overlay 加载指示器与既有 empty-text-gated 逻辑反复拉扯，最终需要确定位置。
+
+**决策**（commits `0fa1cf7` → `8ba7b5b` → `49e3040`）：
+
+1. 初版回退到 §7.7 前状态（empty-text-gated `showLoading`/`hideLoading` 覆盖 `#vnText`、删除 `.vn-loading` overlay 规则）——随即撤销回退（`8ba7b5b`，保留 overlay 方案）。
+2. 最终定位（`49e3040`）：engine-wait 圆点从右下角 CTC 槽改为**对话文本下方水平居中**。
+
+**依据**：`web/static/js/graph-renderer.js`；`web/static/css/graph.css`；`web/static/js/game.js`。
+
+---
+
 ## 2026-08-14（周五）— 文档：AI 上下文标准化为跨工具 AGENTS.md
 
 **背景**：仓库唯一的 AI 上下文文件是 `CLAUDE.md`，只有 Claude Code 自动加载；Cursor / Windsurf / GitHub Copilot / Gemini CLI 等主流编码代理对项目零支持。`AGENTS.md` 已是跨工具通用约定（Claude Code、Cursor、Windsurf、Copilot coding agent、Gemini CLI 均原生支持），本项目应跟进——避免"只有 Claude Code 能干活"。
