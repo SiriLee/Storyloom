@@ -58,7 +58,7 @@ pip install -e ".[desktop,bg]"
 
 ### 数据目录与卸载
 
-用户数据 —— `config.json`、`saves/`、`media/`、`system_media/` —— 存放在安装包之外：
+用户数据 —— `config.json`、`saves/`、`media/`、`system_media/` —— 存放在应用本体（`app/`）之外：
 
 | 安装方式 | 数据目录 |
 |---------|---------|
@@ -95,10 +95,10 @@ storyloom-web --help          # 查看全部选项
 python -m storyloom.web
 ```
 
-首次启动会打开设置页。输入 API 密钥，选择模式（**文本**或**图形**），
+首次启动时，请打开设置页。输入 API 密钥，选择模式（**文本**或**图形**），
 然后开始新游戏。
 
-> **系统媒体素材**（约 267 MB 的角色立绘与背景图片）已包含在独立发布版的
+> **系统媒体素材**（角色立绘与背景图片）已包含在独立发布版的
 > 压缩包中。通过 wheel 或源码安装的用户，可在应用内通过 **设置 → 更新** 下载。
 
 ---
@@ -131,12 +131,11 @@ python -m storyloom.web
 | 状态校验 | LLM 只*建议*写入；引擎先做类型检查再应用；被拒绝的写入会反馈给 LLM |
 | 双层分支 | 场景内选项 + 检查点处的纲要级路线分叉 |
 | 素材管线 | O(1) 目录匹配 → LLM 兜底 → AI 生成；异步、非阻塞 |
-| 上下文管理 | 滑动窗口 + 第一轮锚点 + 检查点压缩；约 5 万 token |
+| 上下文管理 | 滑动窗口 + 系统提示词（常驻锚点）+ 检查点压缩；约 5 万 token |
 | 共创 | AI 先就你的创意进行访谈，再生成世界、角色与剧情 |
 | 存档 / 读档 | 原子 JSON 存档；与模式无关 —— 可随时在文本 / 图形之间切换 |
 | i18n | 英语、简体中文、繁体中文（gettext） |
 | Web 界面 | FastAPI + SSE + 原生 JS SPA |
-| CLI | 带调试观察器的终端客户端 |
 | 打包 | 独立二进制（PyInstaller）+ pip wheel + 系统素材包 |
 
 ---
@@ -193,7 +192,7 @@ pip install -e ".[desktop,bg,test]"
 # 测试（无需 API 密钥）
 pytest
 
-# 构建
+# 构建（可由 CI 自动执行）
 bash scripts/build.sh                # 独立二进制 + wheel
 bash scripts/pack_system_media.sh    # 发布用的系统素材包
 
@@ -205,11 +204,7 @@ python scripts/sysgen/generate_manifest.py
 **约定：** Python ≥ 3.10 · 标准库优先 · Conventional Commits ·
 代码与文档使用英文 · mock 测试（不调用真实 API）。
 
-**AI 上下文：** [`AGENTS.md`](AGENTS.md) 是编码代理上下文的唯一权威来源
-（Claude Code、Cursor、Windsurf、Copilot、Gemini CLI 等）。
-[`CLAUDE.md`](CLAUDE.md) 与
-[`.github/copilot-instructions.md`](.github/copilot-instructions.md) 是轻量
-兼容桥 —— 共享知识只放在 `AGENTS.md` 中。
+**AI 上下文：** [`AGENTS.md`](AGENTS.md)
 
 ---
 

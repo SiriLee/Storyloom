@@ -61,7 +61,7 @@ pip install -e ".[desktop,bg]"
 ### Data directory & uninstall
 
 User data — `config.json`, `saves/`, `media/`, `system_media/` — lives
-outside the installed package:
+outside the app payload (`app/`):
 
 | Install | Data directory |
 |---------|----------------|
@@ -99,13 +99,12 @@ storyloom-web --help          # show all options
 python -m storyloom.web
 ```
 
-First launch opens the Settings page.  Enter your API key, select a mode
+On first launch, open the Settings page.  Enter your API key, select a mode
 (**Text** or **Graph**), and start a new game.
 
-> **System media assets** (~267 MB of character portraits and background
-> images) are included in the standalone release zip alongside the binary.
-> Wheel and source users can download them via **Settings → Updates**
-> inside the app.
+> **System media assets** (character portraits and background images) are
+> included in the standalone release zip. Wheel and source users can
+> download them via **Settings → Updates** inside the app.
 
 ---
 
@@ -137,12 +136,11 @@ First launch opens the Settings page.  Enter your API key, select a mode
 | State validation | LLM *suggests* writes; engine type-checks before applying; rejected writes feed back |
 | Two-layer branching | In-scene choices + outline-level route forks at checkpoints |
 | Asset pipeline | O(1) catalog match → LLM fallback → AI generation; async, non-blocking |
-| Context management | Sliding window + Round 1 anchor + checkpoint compression; ~50K tokens |
+| Context management | Sliding window + system prompt (permanent anchor) + checkpoint compression; ~50K tokens |
 | Co-creation | AI interviews you about your idea before generating world, characters, and plot |
 | Save / load | Atomic JSON saves; mode-agnostic — switch text/graph any time |
 | i18n | English, 简体中文, 繁體中文 (gettext) |
 | Web UI | FastAPI + SSE + vanilla JS SPA |
-| CLI | Terminal client with debug observer |
 | Packaging | Standalone binary (PyInstaller) + pip wheel + system asset pack |
 
 ---
@@ -200,7 +198,7 @@ pip install -e ".[desktop,bg,test]"
 # Tests (no API key needed)
 pytest
 
-# Build
+# Build (can be run automatically by CI)
 bash scripts/build.sh                # standalone binary + wheel
 bash scripts/pack_system_media.sh    # system asset pack for release
 
@@ -212,11 +210,7 @@ python scripts/sysgen/generate_manifest.py
 **Conventions:** Python ≥ 3.10 · stdlib-first · Conventional Commits ·
 English code & docs · mock tests (no real API calls).
 
-**AI context:** [`AGENTS.md`](AGENTS.md) is the single source of truth for
-coding-agent context (Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, …).
-[`CLAUDE.md`](CLAUDE.md) and
-[`.github/copilot-instructions.md`](.github/copilot-instructions.md) are thin
-compatibility bridges — keep shared knowledge in `AGENTS.md` only.
+**AI context:** [`AGENTS.md`](AGENTS.md)
 
 ---
 
