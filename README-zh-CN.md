@@ -12,7 +12,9 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/SiriLee/e809f4fcaea1700560591c9867659fc0/raw/badge.json)](https://github.com/SiriLee/Storyloom/actions)
 
-<!-- TODO: screenshot or GIF demo -->
+<p align="center">
+  <img src="assets/demo/choice.gif" alt="Storyloom 图形模式选项演示" width="720">
+</p>
 
 ---
 
@@ -98,6 +100,14 @@ python -m storyloom.web
 
 > **系统媒体素材**（约 267 MB 的角色立绘与背景图片）已包含在独立发布版的
 > 压缩包中。通过 wheel 或源码安装的用户，可在应用内通过 **设置 → 更新** 下载。
+
+---
+
+## 截图
+
+| 主菜单 | 共创 | 存档 | 素材管理 |
+|--------|------|------|----------|
+| ![主菜单](assets/demo/menu.png) | ![共创](assets/demo/co-create.png) | ![存档](assets/demo/saves.png) | ![素材管理](assets/demo/assets.png) |
 
 ---
 

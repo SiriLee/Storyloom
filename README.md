@@ -12,7 +12,9 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/SiriLee/e809f4fcaea1700560591c9867659fc0/raw/badge.json)](https://github.com/SiriLee/Storyloom/actions)
 
-<!-- TODO: screenshot or GIF demo -->
+<p align="center">
+  <img src="assets/demo/choice.gif" alt="Storyloom graph-mode choice demo" width="720">
+</p>
 
 ---
 
@@ -104,6 +106,14 @@ First launch opens the Settings page.  Enter your API key, select a mode
 > images) are included in the standalone release zip alongside the binary.
 > Wheel and source users can download them via **Settings → Updates**
 > inside the app.
+
+---
+
+## Screenshots
+
+| Main menu | Co-creation | Saves | Assets |
+|-----------|-------------|-------|--------|
+| ![Main menu](assets/demo/menu.png) | ![Co-creation](assets/demo/co-create.png) | ![Saves](assets/demo/saves.png) | ![Assets](assets/demo/assets.png) |
 
 ---
 
