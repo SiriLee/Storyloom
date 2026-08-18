@@ -117,6 +117,12 @@ jobs:
 
   release:
     name: Publish
+    # Forks do not inherit the PYPI_API_TOKEN secret. Without this gate a
+    # fork's own `v*` tag push would fail the PyPI step (job turns red) — or,
+    # if the fork owner configured a token, silently publish over the
+    # canonical `storyloom-engine` package on PyPI. Gate the whole publish
+    # job to the canonical repo.
+    if: github.repository == 'SiriLee/Storyloom'
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
