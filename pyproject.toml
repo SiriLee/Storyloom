@@ -30,3 +30,9 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 addopts = "--ignore=tests/prompt_lab"
+# Tests must import the checked-out source tree, never an installed
+# `storyloom` (a stale wheel / editable install in the environment would
+# otherwise shadow src and run an outdated or incomplete codebase — e.g.
+# the recent `_names` module missing). `pythonpath` is prepended to
+# sys.path by pytest, so both local and CI runs are deterministic.
+pythonpath = ["src"]

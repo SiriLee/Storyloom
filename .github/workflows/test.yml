@@ -30,7 +30,10 @@ jobs:
         # always() keeps the badge in sync even when tests fail; pipefail
         # above makes the Run tests step fail on real failures (the badge
         # color still reflects the result via the summary grep below).
-        if: ${{ always() && github.ref == 'refs/heads/main' }}
+        # The repository gate keeps the step in the canonical repo only:
+        # forks lack the GIST_TOKEN secret, so on a fork's own main-branch
+        # push this step would KeyError and fail the job despite green tests.
+        if: ${{ always() && github.repository == 'SiriLee/Storyloom' && github.ref == 'refs/heads/main' }}
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: e809f4fcaea1700560591c9867659fc0
