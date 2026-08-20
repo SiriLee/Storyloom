@@ -1,6 +1,6 @@
 """Storyloom — AI-powered real-time visual novel engine."""
 
-__version__ = "2.3.2"
+__version__ = "2.3.3"
 
 from storyloom.io.api_client import ApiClient, ApiError, ApiResult
 from storyloom.config import WINDOW_SIZE, DEFAULT_MODEL
