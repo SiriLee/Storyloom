@@ -273,7 +273,7 @@ class TestRemoveBackground:
     def test_returns_bytes_when_available(self, monkeypatch):
         """When everything works, returns PNG RGBA bytes."""
         from storyloom.io import img_utils
-        import numpy as np
+        np = pytest.importorskip("numpy")  # bg-removal path; skip without `bg` extra
 
         # ONNX output: (batch=1, channel=1, H=320, W=320)
         pred = np.ones((1, 1, 320, 320), dtype=np.float32) * 0.8

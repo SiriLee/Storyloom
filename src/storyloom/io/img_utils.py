@@ -138,8 +138,6 @@ import importlib.resources
 import os
 from pathlib import Path
 
-import numpy as np
-
 from storyloom.config import (
     BG_REMOVAL_MODEL_FILENAME,
     BG_REMOVAL_MODEL_SHA256,
@@ -221,6 +219,7 @@ def _preprocess(img: "PILImage") -> np.ndarray:
 
     Matches the U²-Net preprocessing pipeline from rembg.
     """
+    import numpy as np  # lazy: bg-removal only (see `bg` extra)
     from PIL import Image
     im = img.convert("RGB").resize((320, 320), Image.Resampling.LANCZOS)
     im_ary = np.array(im).astype(np.float32)
@@ -251,6 +250,7 @@ def remove_background(raw: bytes, fmt: str) -> bytes | None:
 
     try:
         from io import BytesIO
+        import numpy as np  # lazy: bg-removal only (see `bg` extra)
         from PIL import Image
 
         session = _get_session()
