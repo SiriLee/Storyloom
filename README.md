@@ -55,6 +55,8 @@ System media assets are not included in the wheel.  Download them via
 ```bash
 git clone https://github.com/SiriLee/Storyloom.git
 cd Storyloom
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[desktop,bg]"
 ```
 
@@ -190,10 +192,13 @@ blocking the text pipeline.
 ## Development
 
 ```bash
-# Clone and install (the `test` extra adds pytest + babel for the test suite)
+# Clone and install.  `[test]` (pytest + babel) covers all core tests;
+# add `[bg]` / `[desktop]` only when developing those features.
 git clone https://github.com/SiriLee/Storyloom.git
 cd Storyloom
-pip install -e ".[desktop,bg,test]"
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[test]"
 
 # Tests (no API key needed)
 pytest

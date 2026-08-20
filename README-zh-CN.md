@@ -53,6 +53,8 @@ pip install "storyloom-engine[desktop,bg]"   # 原生窗口 + 背景移除
 ```bash
 git clone https://github.com/SiriLee/Storyloom.git
 cd Storyloom
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[desktop,bg]"
 ```
 
@@ -184,10 +186,13 @@ graph TD
 ## 开发
 
 ```bash
-# 克隆并安装（`test` 附加组件会引入 pytest 与 babel，用于测试套件）
+# 克隆并安装。`[test]`（pytest + babel）覆盖全部核心测试；
+# 仅当开发对应功能时才额外加 `[bg]` / `[desktop]`。
 git clone https://github.com/SiriLee/Storyloom.git
 cd Storyloom
-pip install -e ".[desktop,bg,test]"
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[test]"
 
 # 测试（无需 API 密钥）
 pytest
