@@ -94,7 +94,7 @@ storyloom-web --port 8080     # 自定义端口（默认：自动分配）
 storyloom-web --help          # 查看全部选项
 
 # 或者
-python -m storyloom.web
+python3 -m storyloom.web
 ```
 
 首次启动时，请打开设置页。输入 API 密钥，选择模式（**文本**或**图形**），

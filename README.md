@@ -98,7 +98,7 @@ storyloom-web --port 8080     # custom port (default: auto-assign)
 storyloom-web --help          # show all options
 
 # or
-python -m storyloom.web
+python3 -m storyloom.web
 ```
 
 On first launch, open the Settings page.  Enter your API key, select a mode
