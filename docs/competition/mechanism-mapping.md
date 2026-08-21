@@ -263,7 +263,7 @@ busy(true) 锁住输入直到图片阶段结束 → 下一回合
 **怎么实现**：
 - `visualnovel/llm.py:75-100`：llama.cpp 后端 `complete()`/`complete_json()` 都是
   `create_chat_completion()` **阻塞调用**，无 `stream=True`；transformers 后端（`llm.py:140`）同理。
-- 前端 `templates/index.html:1011-1019`：`setInterval` 每 16ms 追加一个字符——纯装饰。
+- 前端 `frontend/index.html:1011-1019`：`setInterval` 每 16ms 追加一个字符——纯装饰。
 - 后果（分析报告 §3.2）：TTFT = 完整生成时间，首展示时间不压缩。
 
 **和 Storyloom 的对应**：这是 Storyloom 流式解析要解决的问题本身。Storyloom 的
@@ -280,7 +280,7 @@ busy(true) 锁住输入直到图片阶段结束 → 下一回合
 - `visualnovel/engine.py:260-333` `/turn_text`：STT + LLM + 状态变更，返回无图 ViewState
   （含文本、立绘名、情绪、选项）。
 - `visualnovel/engine.py:335-345` `/turn_images`：Painter 出图 + TTS 合成，返回图片/音频。
-- 前端 `templates/index.html:1654-1658`：先渲染文本，再异步请求 `/turn_images` 补图。
+- 前端 `frontend/index.html:1654-1658`：先渲染文本，再异步请求 `/turn_images` 补图。
 - 两阶段之间靠落盘状态文件衔接（ZeroGPU 无状态 worker 场景，`/tmp` 共享文件 + 原子写，
   `engine.py:35-57,321-341`）。
 
@@ -331,6 +331,11 @@ GBNF grammar 约束采样过程，模型想输出非法结构都不可能。
 - 名句在 `BLOG.md:384`："grammar is a constraint, prompting is a suggestion"。
 - `visualnovel/utils.py:34-70` `close_truncated_json()`：即便有 grammar，`max_tokens` 截断
   仍可能留下未闭合 JSON，做最后一层修复。
+- **跨后端降级**（重要边界）：grammar 只在 llama.cpp 后端可用（`llm.py:84-92`）。
+  transformers 后端无 grammar 支持，退化为"骨架注入 + 3 次重试"（`llm.py:168-208`）——
+  同一份代码在不同推理后端上，格式可靠性的等级不同。这对 Storyloom 的启示：
+  grammar 约束不能作为**唯一**防线，prompt 规范 + 解析容错 + 反馈循环的"事后防线"
+  仍然必须有（对应 Storyloom 三层防线，见下）。
 
 **和 Storyloom 的对应**：
 - Storyloom 的格式可靠性靠：① prompt 规范（`prompt-design.md` §4.2 首轮前缀 + XML 格式示例）；
@@ -348,10 +353,18 @@ GBNF grammar 约束采样过程，模型想输出非法结构都不可能。
 clamp/白名单/节流/静默忽略，LLM 从不直接写状态。
 
 **怎么实现**：
-- `visualnovel/state.py:25-140` `apply_directives()` 是**唯一 mutator**：LLM 建议
-  `emotion`/`relationship_delta`/`location` 等，程序校验范围、clamp 到合法值、
-  忽略不可能请求（如关系值越界、情绪不在枚举内）。
-- LLM 只读 `memory.assemble_context()` 生成的**字符串快照**——拿不到状态对象，改不了状态。
+- `visualnovel/state.py:25-140` `apply_directives()` 是**唯一 mutator**（头注释即声明此约定，
+  `state.py:1-9`）：LLM 建议 `emotion`/`relationship_delta`/`location` 等，程序校验范围、
+  clamp 到合法值（如关系值 clamp ±100，`:65`）、白名单外情绪静默忽略（`:114-117`）、
+  不在场角色的 exit 忽略（`:97`）、facts 上限 8 条（`:80`）、beat 最少间隔 4 回合节流
+  （`:126-131`）。
+- LLM 只读 `memory.assemble_context()` 生成的**字符串快照**（`memory.py:26-126`）——
+  拿不到状态对象，改不了状态；`load_from_md` 直接 `NotImplementedError`（`state.py:206-210`），
+  从根上禁止外部改状态。
+- **第二道裁决**：`orchestrator.py:276-308` `_repair` 在应用前再钳一遍 speaker/delta/字段词数。
+- **anti-repeat 热重试**（`orchestrator.py:152-177`）：新回合内容与历史用 `difflib` 比较，
+  相似度 ≥ 0.95 判定为复读，立即用更高 temperature（0.9）+ presence_penalty（0.8）重试——
+  这是"程序裁决"在**内容层**（而非状态层）的应用：LLM 想复读，程序不让。
 
 **和 Storyloom 的对应**：
 - 完全同构：Storyloom 的 `StateManager` 是状态唯一处理者，`<set>` 经校验后才应用，
@@ -367,9 +380,13 @@ clamp/白名单/节流/静默忽略，LLM 从不直接写状态。
 超预算触发 LLM 压缩。
 
 **怎么实现**：
-- `visualnovel/config.py:102`：3500 token 预算。
-- 超预算触发 `compact_memory`（LLM 压缩历史），带 `/no_think` 指令防 Qwen3 输出 think 块。
-- `visualnovel/utils.py:34-70`：截断 JSON 修复（见 2.3.4）。
+- `visualnovel/config.py:102`：3500 token 预算；`:103` `RECENT_TURNS_K=6`（最近 6 回合完整保留）。
+- `visualnovel/memory.py:135-162`：按 角色数×4 粗略估算每回合 token 占用，超预算就从
+  **最旧的回合开始逐条丢弃**（不是一次性截断，而是渐进腾挪）。
+- `memory.py:129-132` `should_compact`：回合数 > 12 时触发压缩 `compact_memory`
+  （`orchestrator.py:183-214`）：LLM 用 `max_tokens=320` 的自由文本调用把历史压成摘要，
+  消息尾追加 `/no_think` 指令防 Qwen3 输出 think 块（`:201`）+ `strip_think` 清理。
+- `visualnovel/utils.py:34-70`：截断 JSON 修复（见 2.3.4，调用点 `llm.py:96-99`）。
 
 **和 Storyloom 的对应**：与 Storyloom 的 `ContextManager`（`context_manager.py`）几乎一一对应：
 系统 prompt 永不压缩（`context_manager.py:16-17`）+ 滑动窗口 3 轮完整保留 + 滑出窗口轮次
@@ -381,12 +398,12 @@ Storyloom 的压缩源是"已发生事实的结晶体"，EH 是"模型转述"，
 
 | 维度 | Ephemeral Hearts | Storyloom |
 |------|-----------------|-----------|
-| LLM 流式 | ❌ 阻塞式（`llm.py:75-100`），前端打字机装饰（`index.html:1011-1019`） | ✅ 真流式逐行解析（`stream_parser.py:177`） |
+| LLM 流式 | ❌ 阻塞式（`llm.py:75-100`），前端打字机装饰（`frontend/index.html:1011-1019`） | ✅ 真流式逐行解析（`stream_parser.py:177`） |
 | 回合结构 | 两阶段：文本先行 → 图像后补（`engine.py:260-345`） | 事件级管线并行：素材任务在文本流中异步（`design.md` §3.1） |
-| 跨回合重叠 | ❌ 无（busy 锁输入，`index.html:1651,1661`） | ✅ bridge 预取（`game_loop.py:929-966`） |
+| 跨回合重叠 | ❌ 无（busy 锁输入，`frontend/index.html:1651,1661`） | ✅ bridge 预取（`game_loop.py:929-966`） |
 | 素材复用 | sha1(prompt+seed) 磁盘缓存（`painter.py:180-198`） | AssetLibrary 实体复用 + use_count（`assets/_library.py`） |
 | 格式约束 | grammar 解码约束（`llm.py:81-99`） | prompt 规范 + 反馈循环（`prompt-design.md` §4.1） |
-| 程序裁决 | apply_directives 唯一 mutator，静默修正（`state.py:25-140`） | StateManager 校验 + rejected_changes 反馈（`block-spec.md`） |
+| 程序裁决 | apply_directives 唯一 mutator，静默修正（`state.py:25-140`）；anti-repeat 内容层重试（`orchestrator.py:152-177`） | StateManager 校验 + rejected_changes 反馈（`block-spec.md`） |
 | 记忆 | summary + 在场角色 + 6 回合，3500 token（`config.py:102`） | 系统 prompt 锚定 + 3 轮窗口 + checkpoint 摘要压缩（`context_manager.py`） |
 | 出厂模式 | mock-first 零模型可跑通（`config.py:42`） | 测试全 mock（`tests/`），无 mock 运行模式（可借鉴） |
 | 语音链路 | Whisper STT + Kokoro TTS 按角色冻结音色（`tts.py:117-136`） | 无（Phase 3 路线图；可借鉴音色冻结） |
@@ -704,7 +721,7 @@ Storyloom 的立足点。
 | | `visualnovel/state.py` | apply_directives 唯一 mutator |
 | | `visualnovel/painter.py` | sha1 磁盘缓存、seed 固定 |
 | | `visualnovel/engine.py` | 两阶段回合（turn_text / turn_images） |
-| | `templates/index.html` | 前端打字机、busy 锁 |
+| | `frontend/index.html` | 前端打字机、busy 锁 |
 | InfiPlot | `app/[locale]/play/page.tsx` | 预生成触发/算法/缓存键/abort、图片预取、预烘焙卡 |
 | | `lib/engine/director.ts` | 多智能体 Promise DAG、plan 解锁、mergeCharacters |
 | | `lib/engine/stream/index.ts` | StreamRouter 标签状态机 |
