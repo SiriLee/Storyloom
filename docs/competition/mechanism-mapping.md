@@ -111,10 +111,13 @@ UI：首段（第一个 beat）一就绪立即渲染 ←── TTFT 后马上有
 交错"的混合流。解析器的设计主题是"宽容弱模型"——容错多级降级。
 
 **怎么实现**：
-- 格式契约定义在 `vn_prompt.py:49-88`（prompt 里教 LLM 怎么输出）；解析器在 `vn_engine.py`
-  （`[TOOL:` 正则 + 括号平衡解析工具参数；台词用 `^\[(\w+)\]:\s*"..."` 正则识别）。
-- `vn_engine.py:542-577` `_loads_lenient()` 四级容错：严格 JSON → `ast.literal_eval`（接受 Python repr）
-  → 给裸 key 补引号 → 再试一次。模型输出不规范的代价被逐级兜住。
+- 格式契约定义在 `vn_prompt.py:49-88`（prompt 里教 LLM 怎么输出，含 7 个工具的格式样板，
+  如 `[TOOL: offer_choices choices='[{...}]']`）；解析器在 `vn_engine.py`
+  （`_TOOL_CALL_RE` 正则 + 括号深度扫描找配平 `]`，`vn_engine.py:102,271-338`；
+  台词用 `^\[(\w+)\]:\s*"..."` 正则识别，`vn_engine.py:769-777`，校验侧同正则 `vn_validate.py:222`）。
+- `vn_engine.py:542-577` `_loads_lenient()` 四级容错：① 严格 `json.loads` → ② `ast.literal_eval`
+  （接受 Python repr 的单引号键值）→ ③ 正则给裸 key 补引号（`([{,]\s*)(\w+)(\s*:)`）再 loads →
+  ④ 修复后 literal_eval，全败抛原始错误。模型输出不规范的代价被逐级兜住。
 
 **和 Storyloom 的对应**：
 - Storyloom 的对应物是**结构化 XML**（`<seg>/<choice>/<set>/<checkpoint>/<bridge/>`，`block-spec.md`）。
@@ -135,7 +138,11 @@ UI：首段（第一个 beat）一就绪立即渲染 ←── TTFT 后马上有
 **训练数据过滤器 + 评测指标**，运行时靠的是引擎内的行级清洗 + 回合末复查）：
 - `vn_validate.py:22-23`：校验器直接 import 引擎的解析器函数。
 - `vn_validate.py:123-244` `validate_turn()`：校验"工具调用可解析 / 枚举值合法 / choices 结构 /
-  cast-lock（无 cast 外角色台词）/ 至少有叙述或 choices"。
+  cast-lock（无 cast 外角色台词）/ 至少有叙述或 choices"。文件头 `vn_validate.py:4-12` 明言
+  "nothing is reimplemented, so a record that validates here is exactly a record the engine
+  would accept"——"通过校验 ≡ 引擎能接受"是**结构性等价**（同用一套解析器），而非两套规则对齐。
+- 调用方是训练工具：`tools/build_sft_dataset.py:37,112`、`tools/transform_vn_dataset.py:46,271`、
+  `tools/eval_generations.py:22,42`。
 - 运行时程序裁决另有其路（见 1.3.4 cast-lock 的引擎侧两道）。
 
 **和 Storyloom 的对应**：
@@ -151,9 +158,12 @@ UI：首段（第一个 beat）一就绪立即渲染 ←── TTFT 后马上有
 **是什么**：cast 锁定后，LLM 不允许写 cast 之外的角色台词。三道防线，一道比一道硬。
 
 **怎么实现**：
-1. **prompt 强令**（`vn_prompt.py:45-47`）：prompt 明确"只能使用这些角色"。
-2. **引擎行级清洗**（`vn_engine.py:394-412`）：解析时发现非 cast 台词，直接清洗/改写。
-3. **回合末全量复查**（`vn_engine.py:816-850`）：整回合结束后再扫一遍，残留违规记入 trace。
+1. **prompt 强令**（`vn_prompt.py:45-47`）：prompt 明确"## CAST-LOCK RULE — STRICT ENFORCEMENT"
+   （只能使用这些角色）。
+2. **引擎行级清洗**（`vn_engine.py:394-412` `_clean_noncast_dialogue`）：解析时发现非 cast 台词，
+   替换为 `*(someone speaks)*`（流内逐行 `:768` + 最终 `:845` 两道应用点）。
+3. **回合末全量复查**（`vn_engine.py:361-372` `_find_cast_violations`，调用 `:816`）：整回合结束后
+   再扫一遍，残留违规追加 `[Engine: CAST-LOCK removed ...]` 注记（`:846-850`），并记入 trace。
 
 **和 Storyloom 的对应**：同构且更激进。Storyloom 的对应物是 `StateManager` 对 `<set>` 的状态
 校验 + `rejected_changes`（`block-spec.md`）——但 Storyloom 只管状态变量，不管"文本内容里
@@ -165,14 +175,26 @@ UI：首段（第一个 beat）一就绪立即渲染 ←── TTFT 后马上有
 也是理解 Storyloom 素材管线价值的反例。
 
 **怎么实现**：
-- **选角烘焙**：Gradio 状态机（`ui/callbacks.py` 的 `on_start`/`on_casting_confirm`/`redo`）——
-  生成 base 立绘 → 用户确认 → **一次 bake 7 个标准表情**（`neutral/smile/laugh/sad/angry/
-  surprised/embarrassed`，`vn_contracts.py:12-16` 定义）落盘缓存。此时 VRAM 要换手：
-  杀 LLM 进程 → bake → 重启 LLM（`model_client.py:343-518` VRAM 编排 + `callbacks.py:82,273-274`）。
-- **背景现场生成**：`providers.py:250` 对非预设 key 调用 `_comfy_wait(timeout=120)`——
-  **同步阻塞最长 120 秒**；按设计只在 beat 边界调用（不打断文本流）。
-- 图像转 data URI 内嵌 + `lru_cache`（`ui/media.py:12-43`），避免重复加载。
-- `cast_pipeline.py`：人脸检测门 → FaceDetailer 逐表情重绘保身份 → rembg 抠图 → 统一裁切。
+- **选角烘焙**：Gradio 生成器状态机（`ui/callbacks.py:37-102` `on_start` 生成第一张 base →
+  review 屏；`188-299` `on_casting_confirm` 逐角色确认；`301-339` `on_casting_redo`
+  改 prompt / seed+1 重画）——全部确认后**趁 UNET 还热着**一次 bake 7 个标准表情
+  （`neutral/smile/laugh/sad/angry/surprised/embarrassed`，`vn_contracts.py:12-16` 定义，
+  bake 主体 `cast_pipeline.py:1290-1360` `_generate_one_via_comfy`：对每个表情
+  `_generate_expression_retry`，FaceDetailer 只重绘脸部保身份 799-894，`neutral` 直接拷贝
+  base 817-819，整 set 已存在则缓存复用 1303-1306）。然后 VRAM 换手：
+  `comfy_free_vram()` + `ensure_llm(...)`（`callbacks.py:273-274`；VRAM 编排本体
+  `model_client.py:343-518`——win 模式 taskkill / wsl 模式 pkill / ollama keep_alive=0，
+  `ensure_llm` Popen 拉起 + 轮询 /health 最多 300s）。
+- **背景现场生成**：`providers.py:199-218` `get_background` 仅在 `key not in PRESET_BACKGROUNDS`
+  时生成；`220-262` `_generate_background` 提交 ComfyUI（`_comfy_submit` :249）后
+  `_comfy_wait(pid, timeout=120)`（:250）轮询 `/history`——**同步阻塞最长 120 秒**。
+  类文档 `providers.py:186-192` 明示"invoked from beat boundaries (casting/pre-staging),
+  never mid-scene-turn"——只在 beat 边界触发，不打断文本流；回合内每 beat 渲染
+  （`ui/beats.py:268,284`）对 preset key 走磁盘。
+- 图像转 data URI 内嵌 + `lru_cache`（`ui/media.py:12-43`，maxsize=256，key 含 mtime），避免重复加载。
+- `cast_pipeline.py`：角色设计（LLM 严格 JSON / 关键字启发式回退，435-469）→ base 生成 +
+  anime 人脸门（777-792，失败 bump seed 重试）→ FaceDetailer 逐表情重绘保身份（799-894）→
+  rembg isnet-anime 抠图（945-976）→ 全 cast 统一裁切（983-1096，脸归一化缩放 + 脚部下沉）。
 
 **和 Storyloom 的对应**：
 - "选角烘焙 7 表情" ≈ Storyloom 的**共创阶段素材预构建**（`graph-mode-spec/design.md` §5.3/§6.1：
@@ -189,9 +211,11 @@ UI：首段（第一个 beat）一就绪立即渲染 ←── TTFT 后马上有
 **是什么**：`SceneState`（`vn_contracts.py:124-168`）是回合间传递的结构化状态；记忆是
 "尾部 4 回合 / 1200 字符"的纯文本滑动窗口，直接拼进 prompt。
 
-**怎么实现**：`vn_prompt.py:256-289` `build_recent_history(max_turns=4, max_chars=1200)` 截取
-最近历史，注入 prompt 的 RECENT STORY 块（`vn_prompt.py:317-320`）。无摘要压缩——旧内容
-直接滑出窗口丢失。
+**怎么实现**：`vn_prompt.py:256-289` `build_recent_history(max_turns=4, max_chars=1200)`——按
+`\n\n` 分块从尾部倒走（269-281），`▸` 开头的块计一个回合边界（275-278），超 1200 字符在
+下一行首硬切防半句（282-288）；注入 prompt 的 RECENT STORY 块（`vn_prompt.py:317-320`）。
+无摘要压缩——旧内容直接滑出窗口丢失。日志由 `ui/callbacks.py:341-352` `_append_log` 维护，
+`run_turn_stream` 的 history 参数来自 `callbacks.py:385`。
 
 **和 Storyloom 的对应**：Storyloom 的 `ContextManager`（`context_manager.py`）是**滑动窗口 +
 摘要压缩**：WINDOW_SIZE=3 完整保留 + 滑出窗口的轮次压缩为 checkpoint summary 注入
@@ -207,7 +231,7 @@ UI：首段（第一个 beat）一就绪立即渲染 ←── TTFT 后马上有
 | 输出格式 | 自由 DSL 混流 + 多级容错（`vn_engine.py:542-577`） | 结构化 XML + 逐行正则（`stream_parser.py:95-120`） |
 | 程序裁决 | cast-lock 三重 + validate（运行时清洗 + 回合末复查） | `StateManager` 状态校验 + `rejected_changes`（`block-spec.md`） |
 | 跨回合重叠 | ❌ 无（回合间硬等待） | ✅ bridge 预取（`game_loop.py:929-966` Phase 5 触发） |
-| 素材 | 全预生成（bake）+ 同步阻塞 120s（`providers.py:250`） | 选择优先 + 异步任务池（`tasks/_generator.py`） |
+| 素材 | 全预生成（bake 7 表情，`cast_pipeline.py:1290-1360`）+ 同步阻塞 120s（`providers.py:250`） | 选择优先 + 异步任务池（`tasks/_generator.py`） |
 | 素材复用 | data URI + 内存 lru_cache | 磁盘 `AssetLibrary` + `use_count` 引用计数（`assets/_library.py:292`） |
 | 记忆 | 4 回合/1200 字符滑动窗口，无压缩 | 3 轮窗口 + checkpoint summary 压缩（`context_manager.py`） |
 | 自举数据 | trace → validate 门控 → SFT（`trace_log.py`） | 无（可移植） |
