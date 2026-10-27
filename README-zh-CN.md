@@ -32,13 +32,13 @@
 *需要 Python ≥ 3.10。*
 
 ```bash
-pip install storyloom-engine
+uv tool install storyloom-engine
 ```
 
 可选附加组件：
 
 ```bash
-pip install "storyloom-engine[desktop,bg]"   # 原生窗口 + 背景移除
+uv tool install "storyloom-engine[desktop,bg]"   # 原生窗口 + 背景移除
 ```
 
 | 附加组件 | 作用 |
@@ -57,8 +57,6 @@ uv sync --extra desktop --extra bg
 uv run storyloom-web
 ```
 
-也可以在虚拟环境中执行 `pip install -e ".[desktop,bg]"`。
-
 ### 数据目录与卸载
 
 用户数据 —— `config.json`、`saves/`、`media/`、`system_media/` —— 存放在应用本体（`app/`）之外：
@@ -66,16 +64,16 @@ uv run storyloom-web
 | 安装方式 | 数据目录 |
 |---------|---------|
 | 独立二进制 | `Storyloom` 可执行文件所在目录 |
-| wheel（pip） | `~/.local/share/Storyloom`（Linux）、`~/Library/Application Support/Storyloom`（macOS）、`%APPDATA%\Storyloom`（Windows） |
+| wheel（uv tool） | `~/.local/share/Storyloom`（Linux）、`~/Library/Application Support/Storyloom`（macOS）、`%APPDATA%\Storyloom`（Windows） |
 | 从源码安装 | 仓库根目录 |
 
 可通过 `STORYLOOM_APP_DIR` 环境变量覆盖。
 
-`pip uninstall storyloom-engine` 只会卸载软件包，**不会**删除你的数据。
+`uv tool uninstall storyloom-engine` 只会卸载软件包，**不会**删除你的数据。
 存档与媒体文件会被保留。如需彻底删除：
 
 ```bash
-pip uninstall storyloom-engine
+uv tool uninstall storyloom-engine
 rm -rf ~/.local/share/Storyloom   # 按上表调整路径
 ```
 

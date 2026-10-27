@@ -33,13 +33,13 @@ and run `Storyloom`.
 *Requires Python ≥ 3.10.*
 
 ```bash
-pip install storyloom-engine
+uv tool install storyloom-engine
 ```
 
 Optional extras:
 
 ```bash
-pip install "storyloom-engine[desktop,bg]"   # native window + background removal
+uv tool install "storyloom-engine[desktop,bg]"   # native window + background removal
 ```
 
 | Extra | Adds |
@@ -59,8 +59,6 @@ uv sync --extra desktop --extra bg
 uv run storyloom-web
 ```
 
-Alternatively, run `pip install -e ".[desktop,bg]"` in a virtualenv.
-
 ### Data directory & uninstall
 
 User data — `config.json`, `saves/`, `media/`, `system_media/` — lives
@@ -69,16 +67,16 @@ outside the app payload (`app/`):
 | Install | Data directory |
 |---------|----------------|
 | Standalone binary | Next to the `Storyloom` executable |
-| Wheel (pip) | `~/.local/share/Storyloom` (Linux), `~/Library/Application Support/Storyloom` (macOS), `%APPDATA%\Storyloom` (Windows) |
+| Wheel (uv tool) | `~/.local/share/Storyloom` (Linux), `~/Library/Application Support/Storyloom` (macOS), `%APPDATA%\Storyloom` (Windows) |
 | From source | The repository root |
 
 Override with the `STORYLOOM_APP_DIR` environment variable.
 
-`pip uninstall storyloom-engine` removes only the package — **not** your data.
-Saves and media are kept.  To remove everything:
+`uv tool uninstall storyloom-engine` removes only the package — **not**
+your data.  Saves and media are kept.  To remove everything:
 
 ```bash
-pip uninstall storyloom-engine
+uv tool uninstall storyloom-engine
 rm -rf ~/.local/share/Storyloom   # adjust path per the table above
 ```
 
