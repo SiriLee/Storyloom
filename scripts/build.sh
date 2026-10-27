@@ -69,10 +69,15 @@ print(f'  Downloaded {os.path.getsize(dest)} bytes')
     }
 fi
 
-# 1. Install project + build tools (PyInstaller needs deps to discover imports)
-echo "--- Installing project + build tools ---"
-$PYTHON -m pip install -q -e ".[bg,desktop]" build pyinstaller wheel 2>/dev/null || \
-    $PYTHON -m pip install -q --break-system-packages -e ".[bg,desktop]" build pyinstaller wheel
+# 1. Project + build tooling live in the uv-managed .venv — never in the
+#    system/user site-packages.
+echo "--- Syncing project + build tools (uv) ---"
+command -v uv >/dev/null 2>&1 || {
+    echo "ERROR: uv is required — https://docs.astral.sh/uv/getting-started/installation/" >&2
+    exit 1
+}
+uv sync --locked --extra bg --extra desktop --group build
+PYTHON="uv run --no-sync python"
 
 # 2. pip packages (wheel + sdist)
 #    i18n (.mo + frontend JS dict) compiled automatically by setup.py build hook

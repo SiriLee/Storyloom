@@ -186,16 +186,13 @@ graph TD
 ## 开发
 
 ```bash
-# 克隆并安装。`[test]`（pytest + babel）覆盖全部核心测试；
-# 仅当开发对应功能时才额外加 `[bg]` / `[desktop]`。
+# 克隆并安装（开发/测试依赖由 `dev` 组提供）。
 git clone https://github.com/SiriLee/Storyloom.git
 cd Storyloom
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[test]"
+uv sync
 
 # 测试（无需 API 密钥）
-pytest
+uv run pytest
 
 # 构建（可由 CI 自动执行）
 bash scripts/build.sh                # 独立二进制 + wheel

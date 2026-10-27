@@ -192,16 +192,13 @@ blocking the text pipeline.
 ## Development
 
 ```bash
-# Clone and install.  `[test]` (pytest + babel) covers all core tests;
-# add `[bg]` / `[desktop]` only when developing those features.
+# Clone and install (dev + test deps come from the `dev` group).
 git clone https://github.com/SiriLee/Storyloom.git
 cd Storyloom
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[test]"
+uv sync
 
 # Tests (no API key needed)
-pytest
+uv run pytest
 
 # Build (can be run automatically by CI)
 bash scripts/build.sh                # standalone binary + wheel

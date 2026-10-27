@@ -18,7 +18,12 @@ dependencies = [
 [project.optional-dependencies]
 bg = ["onnxruntime>=1.18", "numpy>=1.24"]
 desktop = ["pywebview>=5.0"]
+# pip-compatible alias of the `dev` group below.
 test = ["babel>=2.10", "pytest>=7.0"]
+
+[dependency-groups]
+dev = ["babel>=2.10", "pytest>=7.0"]
+build = ["build>=1.2", "wheel", "pyinstaller>=6.0"]
 
 [project.scripts]
 storyloom-web = "storyloom.web.server:main"

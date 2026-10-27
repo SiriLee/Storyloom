@@ -74,13 +74,14 @@ jobs:
     needs: verify
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
+          enable-cache: true
       - name: Install
-        run: pip install ".[bg,test]"
+        run: uv sync --locked --extra bg --extra test
       - name: Run tests
-        run: pytest --tb=short
+        run: uv run --no-sync pytest --tb=short
 
   build:
     name: Build (${{ matrix.os }})
@@ -93,9 +94,10 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
+          enable-cache: true
       - name: Build wheel + PyInstaller + zips
         shell: bash
         run: bash scripts/build.sh
