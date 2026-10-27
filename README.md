@@ -55,10 +55,11 @@ System media assets are not included in the wheel.  Download them via
 ```bash
 git clone https://github.com/SiriLee/Storyloom.git
 cd Storyloom
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[desktop,bg]"
+uv sync --extra desktop --extra bg
+uv run storyloom-web
 ```
+
+Alternatively, run `pip install -e ".[desktop,bg]"` in a virtualenv.
 
 ### Data directory & uninstall
 

@@ -53,10 +53,11 @@ pip install "storyloom-engine[desktop,bg]"   # 原生窗口 + 背景移除
 ```bash
 git clone https://github.com/SiriLee/Storyloom.git
 cd Storyloom
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[desktop,bg]"
+uv sync --extra desktop --extra bg
+uv run storyloom-web
 ```
+
+也可以在虚拟环境中执行 `pip install -e ".[desktop,bg]"`。
 
 ### 数据目录与卸载
 
